@@ -6,8 +6,8 @@
  * Last Updated: February 7, 2026
  */
 
-const { logger } = require('./logger');
-const { ERROR_CODES, ERROR_MESSAGES } = require('../config/constants');
+import { logger } from './logger.js';
+import { ERROR_CODES, ERROR_MESSAGES } from '../config/constants.js';
 
 // ============================================================================
 // CLASS: GoogleApiError
@@ -412,7 +412,7 @@ function getErrorHandler(options = {}) {
 
 const errorHandler = getErrorHandler();
 
-module.exports = {
+export {
   GoogleApiError,
   GoogleApiErrorHandler,
   getErrorHandler,

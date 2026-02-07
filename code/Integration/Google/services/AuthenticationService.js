@@ -6,12 +6,12 @@
  * Last Updated: February 7, 2026
  */
 
-const jwt = require('jsonwebtoken');
-const axios = require('axios');
-const { logger } = require('../utils/logger');
-const { errorHandler } = require('../utils/errorHandler');
-const { getCredentialsManager } = require('../config/credentials');
-const { GOOGLE_SCOPES, API_ENDPOINTS, SERVICE_CONFIG } = require('../config/constants');
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import { logger } from '../utils/logger.js';
+import { errorHandler } from '../utils/errorHandler.js';
+import { getCredentialsManager } from '../config/credentials.js';
+import { GOOGLE_SCOPES, API_ENDPOINTS, SERVICE_CONFIG } from '../config/constants.js';
 
 // ============================================================================
 // CLASS: AuthenticationService
@@ -485,7 +485,7 @@ function getAuthenticationService(config = {}) {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   AuthenticationService,
   getAuthenticationService,
 };

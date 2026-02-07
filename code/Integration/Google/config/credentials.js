@@ -6,9 +6,13 @@
  * Last Updated: February 7, 2026
  */
 
-const fs = require('fs');
-const path = require('path');
-const { logger } = require('../utils/logger');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { logger } from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ============================================================================
 // CLASS: GoogleCredentialsManager
@@ -343,7 +347,7 @@ function validateCredentialsObject(credentials, type = 'service_account') {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   GoogleCredentialsManager,
   getCredentialsManager,
   loadCredentialsFromEnv,

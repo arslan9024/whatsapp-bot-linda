@@ -300,7 +300,7 @@ const PAGINATION = {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   GOOGLE_SCOPES,
   API_ENDPOINTS,
   SERVICE_CONFIG,

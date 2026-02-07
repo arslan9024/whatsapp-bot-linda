@@ -58,8 +58,11 @@ async function initializeServices() {
     // Create manager instance
     console.log(`\n${colors.blue}📍 Step 2: Creating Service Manager${colors.reset}\n`);
 
+    // Load credentials JSON
+    const credentialsData = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+
     const manager = new GoogleServiceManager({
-      credentials: require(credentialsPath),
+      credentials: credentialsData,
     });
 
     console.log(`   ✅ GoogleServiceManager created`);
