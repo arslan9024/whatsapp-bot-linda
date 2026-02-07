@@ -2,6 +2,7 @@ import qrcode from "qrcode-terminal";
 import { MessageAnalyzer } from "./MessageAnalyzer.js";
 import { displayCode, displayQRInstructions, closeInterface } from "../utils/interactiveSetup.js";
 import { displayFeatureStatus } from "../utils/featureStatus.js";
+import { createDeviceStatusFile, updateDeviceStatus, displayDeviceStatus, displayAuthenticationSuccess } from "../utils/deviceStatus.js";
 
 export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatus) => {
 
@@ -51,17 +52,28 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     });
 
     client.on("authenticated", () => {
-      console.clear();
-      console.log("\n✅ ✅ ✅ AUTHENTICATED SUCCESSFULLY! ✅ ✅ ✅\n");
-      console.log(`📱 Bot ID: ${number}`);
-      console.log("Status: Connected to WhatsApp");
-      console.log("Session: Saved in /sessions folder\n");
+      // Update device status when authenticated
+      updateDeviceStatus(number, {
+        deviceLinked: true,
+        isActive: true,
+        linkedAt: new Date().toISOString(),
+        lastConnected: new Date().toISOString(),
+        authMethod: authMethod,
+      });
+      
+      displayAuthenticationSuccess(number, authMethod);
     });
 
     client.on("auth_failure", msg => {
       // Fired if session restore was unsuccessful
+      updateDeviceStatus(number, {
+        deviceLinked: false,
+        isActive: false,
+      });
+      
       console.error("\n❌ AUTHENTICATION FAILURE:", msg);
-      console.error("Please try again with the QR code or pairing code.\n");
+      console.error("Your device has been unlinked. Please re-authenticate.\n");
+      console.log("Creating new session file...\n");
     });
 
     // When the client is ready, run this code (only once)
@@ -72,11 +84,15 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
       console.log("╚════════════════════════════════════════════════════════════╝\n");
       console.log(`✅ Master Account: ${number}`);
       console.log("✅ Status: Connected & Authenticated");
-      console.log("✅ Session: Stored & Persistent");
-      console.log("✅ Listening for incoming messages...\n");
+      console.log("✅ Session: Stored & Persistent\n");
+      
+      // Display device status
+      displayDeviceStatus(number);
       
       // Display connected features
       displayFeatureStatus(number);
+      
+      console.log("✅ Listening for incoming messages...\n");
     });
 
     client.on("ready", async () => {

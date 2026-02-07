@@ -1,5 +1,6 @@
 import readline from "readline";
 import { checkSessionExists, displaySessionRestored, displayNewSetup, displayFeatureStatus } from "./featureStatus.js";
+import { displayDeviceStatus } from "./deviceStatus.js";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -42,6 +43,7 @@ export const checkAndHandleExistingSession = async (number) => {
   
   if (sessionExists) {
     displaySessionRestored(number);
+    displayDeviceStatus(number);
     return "restore"; // Signal to restore existing session
   } else {
     displayNewSetup(number);
