@@ -85,11 +85,16 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     client.once("ready", () => {
       console.clear();
       console.log("\n╔════════════════════════════════════════════════════════════╗");
-      console.log("║               🤖 BOT IS READY TO SERVE!                   ║");
+      console.log("║          🤖 LION0 BOT IS READY TO SERVE!                  ║");
       console.log("╚════════════════════════════════════════════════════════════╝\n");
-      console.log(`✅ Master Account: ${number}`);
-      console.log("✅ Status: Connected & Authenticated");
-      console.log("✅ Session: Stored & Persistent\n");
+      
+      console.log(`📱 Master Account: ${number}`);
+      console.log(`✅ Device Status: LINKED & ACTIVE`);
+      console.log(`✅ Connection: AUTHENTICATED`);
+      console.log(`✅ Session: PERSISTENT\n`);
+      
+      console.log(`🤖 Bot Instance: Lion0`);
+      console.log(`📍 Global Reference: global.Lion0 = ${number}\n`);
       
       // Display device status
       displayDeviceStatus(number);
@@ -97,7 +102,20 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
       // Display connected features
       displayFeatureStatus(number);
       
-      console.log("✅ Listening for incoming messages...\n");
+      console.log("\n╔════════════════════════════════════════════════════════════╗");
+      console.log("║          ✅ LISTENING FOR MESSAGES                        ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      
+      console.log(`📞 Commands Ready:`);
+      console.log(`   • Incoming messages will be logged`);
+      console.log(`   • Test with: !ping (bot will reply "pong")`);
+      console.log(`   • Ready for message handlers\n`);
+      
+      console.log(`🚀 Ready for:`);
+      console.log(`   ✓ Automated campaigns`);
+      console.log(`   ✓ Contact management`);
+      console.log(`   ✓ Message forwarding`);
+      console.log(`   ✓ AI-powered responses\n`);
     });
 
     client.on("ready", async () => {

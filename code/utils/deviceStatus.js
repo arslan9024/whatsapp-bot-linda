@@ -65,28 +65,45 @@ export const displayDeviceStatus = (number) => {
   
   if (status) {
     if (status.deviceLinked && status.isActive) {
-      console.log("✅ Device Status: LINKED & ACTIVE\n");
+      console.log("╔════════════════════════════════════════════════════════════╗");
+      console.log("║      ✅ DEVICE LINKED & ACTIVE - READY TO USE              ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log(`✓ Device Status: LINKED & ACTIVE`);
       console.log(`✓ Linked At: ${new Date(status.linkedAt).toLocaleString()}`);
       console.log(`✓ Last Connected: ${new Date(status.lastConnected).toLocaleString()}`);
-      console.log(`✓ Auth Method: ${status.authMethod || "N/A"}\n`);
+      console.log(`✓ Auth Method: ${status.authMethod === 'code' ? '6-Digit Code' : 'QR Code'}\n`);
+      console.log(`🤖 Bot Instance: Lion0`);
+      console.log(`📱 Ready for messages & commands\n`);
     } else if (status.deviceLinked && !status.isActive) {
-      console.log("⚠️  Device Status: LINKED BUT INACTIVE\n");
+      console.log("╔════════════════════════════════════════════════════════════╗");
+      console.log("║  ⚠️  DEVICE LINKED BUT INACTIVE - RECONNECTING...         ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log(`⚠️  Device Status: LINKED BUT INACTIVE`);
       console.log(`✓ Linked At: ${new Date(status.linkedAt).toLocaleString()}`);
-      console.log("ℹ️  Session exists but needs re-authentication\n");
+      console.log(`ℹ️  Session exists but needs re-authentication\n`);
+      console.log(`🔄 Action: Please scan QR or enter 6-digit code again\n`);
     } else {
-      console.log("❌ Device Status: NOT LINKED\n");
-      console.log("ℹ️  Please authenticate with QR code or 6-digit code\n");
+      console.log("╔════════════════════════════════════════════════════════════╗");
+      console.log("║      ❌ DEVICE NOT LINKED - AUTHENTICATION NEEDED         ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log(`❌ Device Status: NOT LINKED`);
+      console.log(`ℹ️  Please authenticate with QR code or 6-digit code\n`);
+      console.log(`📱 Choose authentication method to link device\n`);
     }
   } else {
-    console.log("❌ Device Status: NOT LINKED\n");
-    console.log("ℹ️  Please authenticate with QR code or 6-digit code\n");
+    console.log("╔════════════════════════════════════════════════════════════╗");
+    console.log("║      ❌ DEVICE NOT LINKED - AUTHENTICATION NEEDED         ║");
+    console.log("╚════════════════════════════════════════════════════════════╝\n");
+    console.log(`❌ Device Status: NOT LINKED`);
+    console.log(`ℹ️  Please authenticate with QR code or 6-digit code\n`);
+    console.log(`📱 Choose authentication method to link device\n`);
   }
 };
 
 export const displayAuthenticationSuccess = (number, authMethod) => {
   console.clear();
   console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║        ✅ Device Linked Successfully!                     ║");
+  console.log("║      ✅ DEVICE LINKED SUCCESSFULLY!                       ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
   
   console.log(`📱 Master Account: ${number}\n`);
@@ -94,5 +111,15 @@ export const displayAuthenticationSuccess = (number, authMethod) => {
   console.log(`✅ Status: ACTIVE & READY`);
   console.log(`✅ Auth Method: ${authMethod === "code" ? "6-Digit Code" : "QR Code"}`);
   console.log(`✅ Session: Saved & Persistent\n`);
+  
+  console.log(`🤖 Bot Instance Assigned: Lion0`);
+  console.log(`📍 Variable: global.Lion0 = ${number}\n`);
+  
+  console.log(`⚡ Features Ready:`);
+  console.log(`   ✓ Message listening`);
+  console.log(`   ✓ Command processing`);
+  console.log(`   ✓ Campaign sending`);
+  console.log(`   ✓ Contact management\n`);
+  
   console.log("⏳ Bot initializing... Please wait.\n");
 };

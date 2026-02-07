@@ -43,21 +43,26 @@ export const checkGoogleSheetConnected = () => {
 export const displayFeatureStatus = (number) => {
   console.clear();
   console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║            📊 WhatsApp Bot - Connected Features            ║");
+  console.log("║         📊 WhatsApp Bot - Connected Features & Status      ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  console.log(`📱 Master Account: ${number}\n`);
+  console.log(`📱 Master Account: ${number}`);
+  console.log(`🤖 Bot Instance: Lion0`);
+  console.log(`📍 Global Reference: global.Lion0\n`);
+  
   console.log("🔌 Connected Services:\n");
 
   // Check WhatsApp Session
   const sessionExists = checkSessionExists(number);
   if (sessionExists) {
-    console.log("  ✅ WhatsApp Session");
-    console.log("     └─ Status: Active & Persistent");
-    console.log("     └─ Location: /sessions/session-" + number + "\n");
+    console.log("  ✅ WhatsApp Session (Lion0)");
+    console.log("     └─ Status: LINKED & ACTIVE");
+    console.log("     └─ Location: /sessions/session-" + number);
+    console.log("     └─ Type: Master Account\n");
   } else {
-    console.log("  ⚠️  WhatsApp Session");
-    console.log("     └─ Status: Not yet authenticated\n");
+    console.log("  ⚠️  WhatsApp Session (Lion0)");
+    console.log("     └─ Status: Not yet authenticated");
+    console.log("     └─ Action: Link device with QR or 6-digit code\n");
   }
 
   // Check Google API
@@ -68,7 +73,8 @@ export const displayFeatureStatus = (number) => {
     console.log("     └─ Type: " + googleAPI.type + "\n");
   } else {
     console.log("  ⚪ Google Cloud API");
-    console.log("     └─ Status: Not configured\n");
+    console.log("     └─ Status: Not configured");
+    console.log("     └─ Action: Add Google API keys in /code/GoogleAPI/\n");
   }
 
   // Check Google Sheets
@@ -78,7 +84,8 @@ export const displayFeatureStatus = (number) => {
     console.log("     └─ Status: Connected & Ready\n");
   } else {
     console.log("  ⚪ Google Sheets Integration");
-    console.log("     └─ Status: Not configured\n");
+    console.log("     └─ Status: Not configured");
+    console.log("     └─ Action: Authenticate Google Sheets API\n");
   }
 
   console.log("═".repeat(60) + "\n");
@@ -87,23 +94,32 @@ export const displayFeatureStatus = (number) => {
 export const displaySessionRestored = (number) => {
   console.clear();
   console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║          ✅ Session Restored Successfully                  ║");
+  console.log("║        ✅ Session Restored Successfully                    ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  console.log(`📱 Master Account: ${number}\n`);
+  console.log(`📱 Master Account: ${number}`);
+  console.log(`🤖 Bot Instance: Lion0`);
+  console.log(`📍 Global Reference: global.Lion0\n`);
+  
   console.log("✅ Your previous session has been restored!");
-  console.log("✅ Reconnecting to WhatsApp...\n");
+  console.log("✅ Device linking status: CHECKING...\n");
+  console.log("🔄 Reconnecting to WhatsApp...\n");
 };
 
 export const displayNewSetup = (number) => {
   console.clear();
   console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║          🚀 New Setup - First Time Authentication          ║");
+  console.log("║     🚀 New Setup - First Time Authentication (Lion0)       ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
 
-  console.log(`📱 Master Account: ${number}\n`);
-  console.log("This is your first time using this account.");
-  console.log("A session will be created and stored for future use.\n");
+  console.log(`📱 Master Account: ${number}`);
+  console.log(`🤖 Bot Instance: Lion0`);
+  console.log(`📍 Global Reference: global.Lion0\n`);
+  
+  console.log("🔧 Setup Status:");
+  console.log("   • First time using this account");
+  console.log("   • Session will be created and stored");
+  console.log("   • Device linking required\n");
   
   displayFeatureStatus(number);
 };
