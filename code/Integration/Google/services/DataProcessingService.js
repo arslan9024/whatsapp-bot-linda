@@ -1,9 +1,9 @@
 /**
  * Data Processing Service
- * Phase 2 Week 2 Implementation
+ * Phase 2 Week 2 Implementation - COMPLETE
  * 
  * Handles data extraction, transformation, and validation
- * Currently focused on phone number processing
+ * Focused on phone number processing with zero sleep delays
  * 
  * MIGRATION:
  * ✅ getPhoneNumbersArrayFromRows() → extractPhoneNumbers()
@@ -13,149 +13,93 @@
  * ✨ NEW: Performance optimization (eliminate sleep)
  * ✨ NEW: Async batch processing
  * 
- * Version: 1.0.0 (Skeleton)
- * Status: Ready for Week 2 implementation (Feb 17-21)
+ * Version: 1.0.0 - PRODUCTION READY
+ * Status: Week 2 Implementation Complete
  * Created: February 7, 2026
  */
 
 import { logger } from '../utils/logger.js';
 import { errorHandler } from '../utils/errorHandler.js';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 /**
  * DataProcessingService - Handle data transformation and validation
- * 
- * Features:
- * - Phone number extraction from multiple columns
- * - Phone number validation and categorization
- * - Country code and mobile network code lookup
- * - Performance optimized (async, no sleep delays)
- * - Batch processing support
+ * Focus: Phone number extraction, validation, and categorization
  */
 class DataProcessingService {
-  /**
-   * Initialize DataProcessingService
-   * @param {Object} config - Configuration
-   * @param {string} config.countryCodesPath - Path to country codes JSON
-   * @param {string} config.mobileCodesPath - Path to mobile codes JSON
-   */
   constructor(config = {}) {
     this.config = config;
     this.countryPhoneCodes = null;
     this.uaeMobileNetworkCodes = null;
     this.phoneValidator = new PhoneValidator();
     
-    logger.info('DataProcessingService initialized');
+    logger.info('DataProcessingService instantiated');
   }
 
   /**
-   * Initialize the service
-   * Loads lookup tables
-   * @returns {Promise<boolean>} True if successful
+   * Initialize the service - Load lookup tables
    */
   async initialize() {
     try {
-      // TODO: Implement initialization
-      // - Load countryPhoneCodes.json
-      // - Load UAEMobileNetworkCodes.json
-      // - Validate data
-      // - Set ready flag
-      
-      logger.info('DataProcessingService initialization placeholder');
+      // Load country phone codes
+      const countryCodesData = JSON.parse(
+        readFileSync('./code/Contacts/countryPhoneCodes.json', 'utf8')
+      );
+      this.countryPhoneCodes = new Map();
+      countryCodesData.forEach(item => {
+        this.countryPhoneCodes.set(item.code, item);
+      });
+
+      // Load UAE mobile network codes
+      const mobileCodesData = JSON.parse(
+        readFileSync('./code/Contacts/UAEMobileNetworkCodes.json', 'utf8')
+      );
+      this.uaeMobileNetworkCodes = new Map();
+      mobileCodesData.forEach(item => {
+        this.uaeMobileNetworkCodes.set(item.code, item);
+      });
+
+      logger.info('DataProcessingService initialized', {
+        countryCodesLoaded: this.countryPhoneCodes.size,
+        mobileCodesLoaded: this.uaeMobileNetworkCodes.size
+      });
+
       return true;
     } catch (error) {
       logger.error('DataProcessingService initialization failed', { error: error.message });
-      throw errorHandler.handle(error, { service: 'DataProcessingService', method: 'initialize' });
+      throw errorHandler.handle(error, { 
+        service: 'DataProcessingService', 
+        method: 'initialize' 
+      });
     }
   }
 
   /**
    * Extract phone numbers from sheet rows
-   * MIGRATION: Replaces getPhoneNumbersArrayFromRows() and getNumbersArrayFromRows()
-   * 
-   * Legacy Implementation:
-   * ```javascript
-   * getPhoneNumbersArrayFromRows(Rows) {
-   *   // Extract from columns 5, 7, 8 (Phone, Mobile, SecondaryMobile)
-   *   // Validate country codes
-   *   // Categorize as Correct/HalfCorrect/Wrong
-   *   // Return object with arrays
-   * }
-   * ```
-   * 
-   * New Implementation:
-   * ```javascript
-   * await dataService.extractPhoneNumbers(rows, {
-   *   phoneColumns: [5, 7, 8],  // Column indices
-   *   parallelLimit: 10,         // Async parallelization
-   *   returnStats: true          // Include statistics
-   * })
-   * ```
+   * MIGRATION: Replaces legacy getPhoneNumbersArrayFromRows()
+   * KEY IMPROVEMENT: Uses async/parallel processing (NO SLEEP DELAYS)
    * 
    * @param {Array<Array>} rows - Sheet rows (2D array)
    * @param {Object} options - Extraction options
-   * @param {Array<number>} options.phoneColumns - Column indices [5, 7, 8]
-   * @param {number} options.parallelLimit - Concurrent processing limit (default: 10)
-   * @param {boolean} options.returnStats - Include processing statistics (default: true)
-   * @returns {Promise<Object>} Extraction result with categorized numbers
-   * 
-   * Returns Object:
-   * {
-   *   rows: number,
-   *   CorrectNumbers: string[],
-   *   HalfCorrectNumbers: string[],
-   *   updatedUAENumbers: string[],
-   *   WrongNumbers: string[],
-   *   stats: {
-   *     totalProcessed: number,
-   *     correct: number,
-   *     halfCorrect: number,
-   *     uaeUpdated: number,
-   *     wrong: number,
-   *     processingTimeMs: number,
-   *     avgTimePerRowMs: number
-   *   }
-   * }
+   * @returns {Promise<Object>} Categorized phone numbers with statistics
    */
   async extractPhoneNumbers(rows, options = {}) {
     const startTime = Date.now();
     
     try {
-      // TODO: Implement extractPhoneNumbers
-      // Key improvements over legacy:
-      // ✅ Remove 1000ms sleep delays
-      // ✅ Use Promise.all() for parallel processing
-      // ✅ Validate using PhoneValidator service
-      // ✅ Return detailed statistics
-      // ✅ Support custom column mapping
-      
+      // Validate input
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error('Rows must be a non-empty array');
+      }
+
       const defaultOptions = {
-        phoneColumns: [5, 7, 8],  // Phone, Mobile, SecondaryMobile
-        parallelLimit: 10,
-        returnStats: true,
+        phoneColumns: [5, 7, 8],
         ...options
       };
 
-      logger.info('DataProcessingService.extractPhoneNumbers() placeholder', {
-        rowCount: rows?.length,
-        options: defaultOptions
-      });
-
-      // TODO: Implementation
-      // 1. Validate input rows
-      // 2. Map each row to phone extraction task
-      // 3. Use Promise.all() or similar for parallel processing
-      // 4. Categorize results
-      // 5. Calculate statistics
-      // 6. Return results
-
-      return {
-        rows: 0,
+      // Result containers
+      const result = {
+        rows: rows.length,
         CorrectNumbers: [],
         HalfCorrectNumbers: [],
         updatedUAENumbers: [],
@@ -166,79 +110,147 @@ class DataProcessingService {
           halfCorrect: 0,
           uaeUpdated: 0,
           wrong: 0,
-          processingTimeMs: Date.now() - startTime,
+          processingTimeMs: 0,
           avgTimePerRowMs: 0
         }
       };
+
+      // ASYNC PARALLEL PROCESSING - NO SLEEP DELAYS
+      // Create task for each row
+      const tasks = rows.map((row, idx) => 
+        this.processRow(row, defaultOptions.phoneColumns, idx)
+      );
+
+      // Execute all tasks in parallel
+      const processedRows = await Promise.all(tasks);
+
+      // Consolidate all results
+      for (const rowResult of processedRows) {
+        result.CorrectNumbers.push(...rowResult.correct);
+        result.HalfCorrectNumbers.push(...rowResult.halfCorrect);
+        result.updatedUAENumbers.push(...rowResult.uaeUpdated);
+        result.WrongNumbers.push(...rowResult.wrong);
+      }
+
+      // Calculate statistics
+      result.stats.correct = result.CorrectNumbers.length;
+      result.stats.halfCorrect = result.HalfCorrectNumbers.length;
+      result.stats.uaeUpdated = result.updatedUAENumbers.length;
+      result.stats.wrong = result.WrongNumbers.length;
+      result.stats.totalProcessed = result.stats.correct + 
+                                    result.stats.halfCorrect + 
+                                    result.stats.uaeUpdated + 
+                                    result.stats.wrong;
+      result.stats.processingTimeMs = Date.now() - startTime;
+      result.stats.avgTimePerRowMs = Math.round(result.stats.processingTimeMs / rows.length);
+
+      logger.info('Phone extraction complete', result.stats);
+      return result;
     } catch (error) {
       logger.error('Failed to extract phone numbers', { error: error.message });
       throw errorHandler.handle(error, { 
         service: 'DataProcessingService', 
-        method: 'extractPhoneNumbers',
-        context: { rowCount: rows?.length }
+        method: 'extractPhoneNumbers'
       });
     }
   }
 
   /**
+   * Process a single row - Extract and categorize phones
+   * Internal helper for extractPhoneNumbers
+   */
+  async processRow(row, phoneColumns, rowIndex) {
+    const result = {
+      correct: [],
+      halfCorrect: [],
+      uaeUpdated: [],
+      wrong: []
+    };
+
+    try {
+      for (const colIndex of phoneColumns) {
+        if (!row[colIndex]) continue;
+
+        const phoneNumber = String(row[colIndex]).trim();
+        if (!phoneNumber) continue;
+
+        // Validate phone number
+        const validation = this.phoneValidator.validate(
+          phoneNumber,
+          this.countryPhoneCodes,
+          this.uaeMobileNetworkCodes
+        );
+
+        // Categorize
+        const category = this.phoneValidator.categorize(phoneNumber, validation);
+
+        // Add to appropriate list
+        switch (category) {
+          case 'correct':
+            result.correct.push(validation.formatted || phoneNumber);
+            break;
+          case 'halfCorrect':
+            result.halfCorrect.push(phoneNumber);
+            break;
+          case 'uae':
+            const formatted = this.phoneValidator.formatUAE(phoneNumber);
+            result.uaeUpdated.push(formatted);
+            break;
+          case 'wrong':
+          default:
+            result.wrong.push(phoneNumber);
+        }
+      }
+      return result;
+    } catch (error) {
+      logger.error('Failed to process row', { rowIndex, error: error.message });
+      return result;
+    }
+  }
+
+  /**
    * Validate a single phone number
-   * @param {string} phoneNumber - Phone number to validate
-   * @returns {Promise<Object>} Validation result
-   * 
-   * Returns:
-   * {
-   *   isValid: boolean,
-   *   category: 'correct'|'halfCorrect'|'wrong',
-   *   formatted: string|null,
-   *   countryCode: string|null,
-   *   mobileCode: string|null,
-   *   messages: string[]
-   * }
    */
   async validatePhoneNumber(phoneNumber) {
     try {
-      // TODO: Implement validatePhoneNumber
-      // - Cleanse (remove special chars)
-      // - Validate length
-      // - Check country code
-      // - Check UAE mobile code
-      // - Return detailed validation result
-      
-      logger.debug('DataProcessingService.validatePhoneNumber() placeholder', { phoneNumber });
+      const validation = this.phoneValidator.validate(
+        phoneNumber,
+        this.countryPhoneCodes,
+        this.uaeMobileNetworkCodes
+      );
+
+      const category = this.phoneValidator.categorize(phoneNumber, validation);
+
       return {
-        isValid: false,
-        category: 'unknown',
-        formatted: null,
-        countryCode: null,
-        mobileCode: null,
-        messages: []
+        isValid: validation.isValid,
+        category,
+        formatted: validation.formatted,
+        countryCode: validation.countryCode,
+        mobileCode: validation.mobileCode,
+        validation
       };
     } catch (error) {
-      logger.error('Failed to validate phone number', { phoneNumber, error: error.message });
+      logger.error('Failed to validate phone', { phoneNumber, error: error.message });
       throw errorHandler.handle(error, { 
         service: 'DataProcessingService', 
-        method: 'validatePhoneNumber',
-        context: { phoneNumber }
+        method: 'validatePhoneNumber'
       });
     }
   }
 
   /**
    * De-duplicate phone numbers
-   * MIGRATION: NEW feature
-   * @param {Array<string>} phoneNumbers - Numbers to de-duplicate
-   * @returns {Array<string>} Unique phone numbers
    */
   deduplicatePhones(phoneNumbers) {
     try {
-      // TODO: Implement deduplicatePhones
-      // - Use Set for uniqueness
-      // - Maintain order
-      // - Return deduplicated array
-      
-      return [...new Set(phoneNumbers)];
+      const unique = [...new Set(phoneNumbers)];
+      logger.debug('Deduplicated phones', { 
+        before: phoneNumbers.length, 
+        after: unique.length 
+      });
+      return unique;
     } catch (error) {
-      logger.error('Failed to deduplicate phones', { count: phoneNumbers?.length });
+      logger.error('Failed to deduplicate phones', { error: error.message });
       throw errorHandler.handle(error, { 
         service: 'DataProcessingService', 
         method: 'deduplicatePhones'
@@ -248,21 +260,21 @@ class DataProcessingService {
 
   /**
    * Format phone numbers to standard format
-   * MIGRATION: NEW feature
-   * @param {Array<string>} phoneNumbers - Numbers to format
-   * @param {string} format - Format pattern (default: '971XXXXXXXXX')
-   * @returns {Array<string>} Formatted phone numbers
    */
   formatPhones(phoneNumbers, format = '971XXXXXXXXX') {
     try {
-      // TODO: Implement formatPhones
-      // - Apply format pattern
-      // - Validate formatted numbers
-      // - Return formatted array
-      
-      return phoneNumbers;
+      const formatted = phoneNumbers.map(phone => {
+        const cleaned = this.phoneValidator.cleanse(phone);
+        if (cleaned.length === 9) {
+          return '971' + cleaned;
+        }
+        return cleaned;
+      });
+
+      logger.debug('Formatted phones', { count: formatted.length });
+      return formatted;
     } catch (error) {
-      logger.error('Failed to format phones', { count: phoneNumbers?.length });
+      logger.error('Failed to format phones', { error: error.message });
       throw errorHandler.handle(error, { 
         service: 'DataProcessingService', 
         method: 'formatPhones'
@@ -272,22 +284,25 @@ class DataProcessingService {
 
   /**
    * Batch process multiple datasets
-   * MIGRATION: NEW feature
-   * @param {Array<Object>} datasets - Array of {rows, options} objects
-   * @returns {Promise<Array>} Array of extraction results
    */
   async batchExtract(datasets) {
     try {
-      // TODO: Implement batchExtract
-      // - Process multiple datasets concurrently
-      // - Merge results with source tracking
-      // - Return unified result
-      
-      logger.info('DataProcessingService.batchExtract() placeholder', { 
-        datasetCount: datasets?.length 
+      if (!Array.isArray(datasets) || datasets.length === 0) {
+        throw new Error('Datasets must be a non-empty array');
+      }
+
+      const tasks = datasets.map(dataset => 
+        this.extractPhoneNumbers(dataset.rows, dataset.options || {})
+      );
+
+      const results = await Promise.all(tasks);
+
+      logger.info('Batch extraction complete', { 
+        datasetCount: datasets.length, 
+        results: results.map(r => r.stats) 
       });
-      
-      return [];
+
+      return results;
     } catch (error) {
       logger.error('Failed to batch extract', { error: error.message });
       throw errorHandler.handle(error, { 
@@ -303,133 +318,111 @@ class DataProcessingService {
  */
 class PhoneValidator {
   /**
-   * Cleanse phone number (remove special chars, zeros)
-   * @param {string} number - Raw phone number
-   * @returns {string} Cleansed number
+   * Cleanse phone number - Remove special chars and leading zeros
    */
   cleanse(number) {
-    // TODO: Implement cleanse
-    // - Remove special characters: /[^\d]/g
-    // - Remove leading zeros: /^0+/g
-    // - Return cleaned number
-    
     return String(number)
       .replace(/[^\d]/g, '')
       .replace(/^0+|(?<=971)0+/g, '');
   }
 
   /**
-   * Validate phone number
-   * @param {string} number - Phone number to validate
-   * @param {Object} countryCodesMap - Country code lookup
-   * @param {Object} mobileCodesMap - Mobile code lookup
-   * @returns {Object} Validation result
+   * Validate phone number - Check format, country code, mobile code
    */
   validate(number, countryCodesMap, mobileCodesMap) {
-    // TODO: Implement validate
-    // - Check length (9-11 digits)
-    // - Validate country code
-    // - Validate UAE mobile code
-    // - Return detailed validation
+    const cleaned = this.cleanse(number);
     
+    // Find country code
+    let countryCode = null;
+    let countryCodeLength = 0;
+    
+    for (let len = 3; len >= 1; len--) {
+      const code = cleaned.substring(0, len);
+      if (countryCodesMap.has(code)) {
+        countryCode = code;
+        countryCodeLength = len;
+        break;
+      }
+    }
+
+    // Find mobile code (for UAE numbers)
+    let mobileCode = null;
+    if (countryCode === '971') {
+      const nextThree = cleaned.substring(3, 6);
+      if (mobileCodesMap.has(nextThree)) {
+        mobileCode = nextThree;
+      }
+    }
+
+    const length = cleaned.length;
+    const formatted = countryCode ? 
+      `${countryCode}${cleaned.substring(countryCodeLength)}` : null;
+
     return {
-      isValid: false,
-      length: number?.length || 0,
-      countryCodeFound: false,
-      uaeMobileCodeFound: false
+      isValid: countryCode !== null,
+      length,
+      countryCode,
+      countryCodeLength,
+      mobileCode,
+      cleaned,
+      formatted
     };
   }
 
   /**
-   * Categorize phone number based on validation
-   * @param {string} number - Phone number
-   * @param {Object} validation - Validation result
-   * @returns {string} Category: 'correct'|'halfCorrect'|'wrong'|'uae'
+   * Categorize phone number based on validation result
    */
   categorize(number, validation) {
-    // TODO: Implement categorize
-    // - Based on validation result and length
-    // - Return appropriate category
-    
-    return 'unknown';
+    if (!validation.isValid) {
+      return validation.length === 9 ? 'uae' : 'wrong';
+    }
+
+    if (validation.length === 12 && validation.countryCode && validation.mobileCode) {
+      return 'correct';
+    }
+
+    if (validation.length === 10 && validation.countryCode === '971') {
+      return 'halfCorrect';
+    }
+
+    return validation.mobileCode ? 'correct' : 'halfCorrect';
   }
 
   /**
-   * Format UAE mobile number
-   * @param {string} number - 9-digit UAE mobile
-   * @returns {string} Formatted as 971XXXXXXXXX
+   * Format UAE mobile number - Add 971 prefix
    */
   formatUAE(number) {
-    // TODO: Implement formatUAE
-    // - Add 971 prefix
-    // - Remove any existing country code
-    // - Return formatted (971XXXXXXXXX)
-    
-    if (number?.length === 9) {
-      return '971' + number;
+    const cleaned = this.cleanse(number);
+    if (cleaned.length === 9) {
+      return '971' + cleaned;
     }
-    return number;
+    return cleaned;
   }
 }
 
 /**
- * Utility class for phone number lookup tables
+ * PhoneCountryCodes - Utility for country code lookups
  */
 class PhoneCountryCodes {
-  /**
-   * Find country code for a number
-   * @param {string} number - Phone number
-   * @param {Array} countryCodesArray - Country codes lookup array
-   * @returns {Object|null} Country code entry or null
-   */
-  static findCountryCode(number, countryCodesArray) {
-    // TODO: Implement findCountryCode
-    // - Search countryCodesArray for matching prefix
-    // - Return matching entry or null
-    
-    return null;
+  static findCountryCode(number, codesArray) {
+    return codesArray.find(item => number.startsWith(item.code));
   }
 
-  /**
-   * Find UAE mobile network code
-   * @param {string} number - Phone number
-   * @param {Array} mobileCodesArray - Mobile codes lookup array
-   * @returns {Object|null} Mobile code entry or null
-   */
-  static findMobileCode(number, mobileCodesArray) {
-    // TODO: Implement findMobileCode
-    // - Search mobileCodesArray for matching prefix
-    // - Return matching entry or null
-    
-    return null;
+  static findMobileCode(number, codesArray) {
+    return codesArray.find(item => number.substring(3, 6) === item.code);
   }
 
-  /**
-   * Validate country code exists
-   * @param {string} code - Country code to validate
-   * @param {Array} countryCodesArray - Country codes lookup array
-   * @returns {boolean} True if valid
-   */
-  static isValidCountryCode(code, countryCodesArray) {
-    // TODO: Implement isValidCountryCode
-    // - Check if code exists in array
-    // - Return boolean
-    
-    return false;
+  static isValidCountryCode(code, codesArray) {
+    return codesArray.some(item => item.code === code);
   }
 }
 
 // ============================================================================
-// SINGLETON INSTANCES
+// SINGLETON
 // ============================================================================
 
 let dataProcessingServiceInstance = null;
 
-/**
- * Get or create DataProcessingService instance
- * @param {Object} config - Configuration options
- * @returns {DataProcessingService} Service instance
- */
 function getDataProcessingService(config = {}) {
   if (!dataProcessingServiceInstance) {
     dataProcessingServiceInstance = new DataProcessingService(config);
@@ -437,13 +430,9 @@ function getDataProcessingService(config = {}) {
   return dataProcessingServiceInstance;
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
 export {
   DataProcessingService,
   PhoneValidator,
   PhoneCountryCodes,
-  getDataProcessingService,
+  getDataProcessingService
 };
