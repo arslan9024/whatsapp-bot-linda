@@ -6,11 +6,11 @@
  * Last Updated: February 7, 2026
  */
 
-const { logger } = require('./utils/logger');
-const { errorHandler } = require('./utils/errorHandler');
-const { getCredentialsManager } = require('./config/credentials');
-const { AuthenticationService } = require('./services/AuthenticationService');
-const { GOOGLE_SCOPES } = require('./config/constants');
+import { logger } from './utils/logger.js';
+import { errorHandler } from './utils/errorHandler.js';
+import { getCredentialsManager } from './config/credentials.js';
+import { AuthenticationService } from './services/AuthenticationService.js';
+import { GOOGLE_SCOPES } from './config/constants.js';
 
 // ============================================================================
 // CLASS: GoogleServiceManager
@@ -494,7 +494,7 @@ function createServiceManager(config = {}) {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   GoogleServiceManager,
   getServiceManager,
   createServiceManager,

@@ -12,12 +12,20 @@
  * Usage: node scripts/initializeGoogleServices.js
  */
 
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { GoogleServiceManager } from '../code/Integration/Google/GoogleServiceManager.js';
+import { logger } from '../code/Integration/Google/utils/logger.js';
+import { GOOGLE_SCOPES } from '../code/Integration/Google/config/constants.js';
+import fs from 'fs';
 
-const { GoogleServiceManager } = require('../code/Integration/Google/GoogleServiceManager');
-const { logger } = require('../code/Integration/Google/utils/logger');
-const { GOOGLE_SCOPES } = require('../code/Integration/Google/config/constants');
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // Color codes for output
 const colors = {

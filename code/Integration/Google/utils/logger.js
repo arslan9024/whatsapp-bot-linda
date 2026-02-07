@@ -6,8 +6,9 @@
  * Last Updated: February 7, 2026
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // ============================================================================
 // LOGGER LEVELS
@@ -304,8 +305,7 @@ function getLogger(options = {}) {
 
 const logger = getLogger();
 
-module.exports = {
-  Logger,
+export {  Logger,
   getLogger,
   logger,
   LOG_LEVELS,
