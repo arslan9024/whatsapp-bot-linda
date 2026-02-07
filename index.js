@@ -1,34 +1,43 @@
+import 'dotenv/config';
 import { WhatsAppClientFunctions } from "./code/WhatsAppBot/WhatsAppClientFunctions.js";
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
-import { askForMasterNumber, askForAuthMethod, checkAndHandleExistingSession, closeInterface } from "./code/utils/interactiveSetup.js";
+import { checkAndHandleExistingSession } from "./code/utils/interactiveSetup.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 
-// Global references for the bot (for backward compatibility)
+// Global references for the bot
 let Lion0 = null;
 
 // Main initialization function
 async function initializeBot() {
   try {
-    // Start interactive setup
-    console.log("\n");
-    const masterNumber = await askForMasterNumber();
+    // Get master number from .env file
+    const masterNumber = process.env.BOT_MASTER_NUMBER;
+    
+    if (!masterNumber) {
+      throw new Error("BOT_MASTER_NUMBER not found in .env file");
+    }
+    
+    console.log("\n╔════════════════════════════════════════════════════════════╗");
+    console.log("║          🚀 WhatsApp Bot - Automatic Initialization        ║");
+    console.log("╚════════════════════════════════════════════════════════════╝\n");
+    
+    console.log(`📱 Master Account (from .env): ${masterNumber}`);
+    console.log(`🤖 Bot Instance: Lion0\n`);
 
     // Check if session already exists
     const sessionStatus = await checkAndHandleExistingSession(masterNumber);
 
     // Create or update device status file
     if (sessionStatus === "new") {
+      console.log("📝 Creating new device status file...\n");
       createDeviceStatusFile(masterNumber);
     }
 
-    // Only ask for auth method if it's a new session
-    let authMethod = "code"; // default to 6-digit code
-
-    if (sessionStatus === "new") {
-      authMethod = await askForAuthMethod();
-    }
-
-    console.log("\n⏳ Initializing WhatsApp Bot...\n");
+    // Auto-use 6-digit code for authentication
+    const authMethod = "code"; // Always use 6-digit code
+    console.log(`🔐 Authentication Method: 6-Digit Code (Recommended)\n`);
+    
+    console.log("⏳ Creating WhatsApp client...\n");
 
     // Create the WhatsApp client
     Lion0 = await CreatingNewWhatsAppClient(masterNumber);
@@ -37,7 +46,10 @@ async function initializeBot() {
       throw new Error("Failed to create WhatsApp client");
     }
 
-    // Initialize with chosen authentication method
+    console.log("✅ WhatsApp client created successfully\n");
+    console.log("🔄 Initializing WhatsApp client for device linking...\n");
+
+    // Initialize with authentication method
     WhatsAppClientFunctions(Lion0, masterNumber, authMethod, sessionStatus);
 
     // Make bot available globally
@@ -45,15 +57,9 @@ async function initializeBot() {
     global.Lion = Lion0; // Alias for backward compatibility
     global.MasterBot = Lion0; // Alias for clarity
 
-    // Close readline interface after client setup
-    setTimeout(() => {
-      closeInterface();
-    }, 2000);
-
   } catch (error) {
     console.error("\n❌ Initialization Error:", error.message);
     console.error("Stack:", error.stack);
-    closeInterface();
     process.exit(1);
   }
 }
