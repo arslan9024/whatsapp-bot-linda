@@ -1,8 +1,17 @@
 import { google } from 'googleapis';
-import { PowerAgent } from "../GoogleAPI/main.js";
+import { getPowerAgent, initializeGoogleAuth } from "../GoogleAPI/main.js";
 
 export async function getSheet(Project) {
-    // console.log("get Sheet data for", Project)
+    // Initialize Google auth if not already done
+    await initializeGoogleAuth();
+    
+    // Get the authenticated PowerAgent
+    const PowerAgent = await getPowerAgent();
+    
+    if (!PowerAgent) {
+        console.error('❌ Google Sheets is not connected. Please fix credentials.');
+        return null;
+    }
 
     let sheetData;
     const gsapi = google.sheets({ version: 'v4', auth: PowerAgent });

@@ -1,13 +1,22 @@
 import { google } from 'googleapis';
-import { PowerAgent } from "../GoogleAPI/main.js";
+import { getPowerAgent, initializeGoogleAuth } from "../GoogleAPI/main.js";
 import { MyProjects } from "../MyProjects/MyProjects.js";
 
 
 export async function WriteToSheet(msg) {
-    // console.log("WriteToSheet", msg)
-    console.log("CollectInputForWriteToSheet the function has pid  44");
-      const Project = MyProjects.find((x) => x.ProjectID === 44);
-
+    // Initialize Google auth if not already done
+    await initializeGoogleAuth();
+    
+    // Get the authenticated PowerAgent
+    const PowerAgent = await getPowerAgent();
+    
+    if (!PowerAgent) {
+        console.error('❌ Google Sheets is not connected. Please fix credentials.');
+        return;
+    }
+    
+    console.log("CollectInputForWriteToSheet the function has pid 44");
+    const Project = MyProjects.find((x) => x.ProjectID === 44);
 
     let sheetData;
     const gsapi = google.sheets({ version: 'v4', auth: PowerAgent });

@@ -1,7 +1,18 @@
 import { google } from 'googleapis';
-import { PowerAgent } from "../GoogleAPI/main.js";
+import { getPowerAgent, initializeGoogleAuth } from "../GoogleAPI/main.js";
 
 export async function getSheetWMN(Project) {
+    // Initialize Google auth if not already done
+    await initializeGoogleAuth();
+    
+    // Get the authenticated PowerAgent
+    const PowerAgent = await getPowerAgent();
+    
+    if (!PowerAgent) {
+        console.error('❌ Google Sheets is not connected. Please fix credentials.');
+        return null;
+    }
+    
     console.log("get Sheet data for ----------------------", Project.ProjectSheetID);
 
     let sheetData;
@@ -18,4 +29,4 @@ export async function getSheetWMN(Project) {
     }
     // console.log("get Sheet data for data",sheetData.data.values )
     return sheetData;
-};
+}
