@@ -3,9 +3,14 @@ import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAp
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from "./code/utils/browserCleanup.js";
 import SessionManager from "./code/utils/SessionManager.js";
+import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
+
+// Initialize Conversation Analyzer (Session 18 - February 7, 2026)
+// This sets up message type logging and global statistics functions
+import "./code/WhatsAppBot/AnalyzerGlobals.js";
+
 import fs from "fs";
 import path from "path";
-import qrcode from "qrcode-terminal";
 
 // Global bot instance
 let Lion0 = null;
@@ -214,20 +219,21 @@ function setupNewLinkingFlow(client, masterNumber) {
   let qrShown = false;
   let authComplete = false;
 
-  client.on("qr", (qr) => {
+  client.on("qr", async (qr) => {
     if (!qrShown) {
       qrShown = true;
-      console.clear();
-      console.log("\n╔════════════════════════════════════════════════════════════╗");
-      console.log("║         🔗 DEVICE LINKING - SCAN QR CODE                  ║");
-      console.log("╚════════════════════════════════════════════════════════════╝\n");
-      console.log("📱 Master Device Number: " + masterNumber + "\n");
-      console.log("⏳ Scanning... Open WhatsApp → Settings → Linked Devices\n");
       
-      // Display compact QR code using imported qrcode-terminal
-      qrcode.generate(qr, { small: true, quiet: 1 });
-      
-      console.log("ℹ️  Waiting for you to scan the QR code with your phone...\n");
+      // Use improved QR code display with Windows compatibility
+      try {
+        await QRCodeDisplay.display(qr, {
+          method: 'auto',        // Primary: qrcode-terminal, then fallbacks
+          fallback: true,        // Use fallbacks if needed
+          masterAccount: masterNumber
+        });
+      } catch (error) {
+        logBot("QR display error: " + error.message, "error");
+        logBot("Please manually link device via WhatsApp Settings → Linked Devices", "warn");
+      }
     }
   });
 

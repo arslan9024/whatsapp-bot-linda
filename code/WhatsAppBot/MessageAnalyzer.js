@@ -8,14 +8,37 @@ import {
 } from "../Message/questionsInConversation.js";
 import { ProjectCampaign } from "../MyProjects/ProjectCampaign.js";
 import { findWord } from "../Search/findWord.js";
-import { WriteToSheet } from "../GoogleSheet/WriteToSheet.js";
+/**
+ * CONSOLIDATION (Session 18 - February 7, 2026)
+ * Removed unused import: WriteToSheet (no longer needed, use GoogleServicesConsolidated if needed)
+ */
 import { MissionOneE } from "../Campaigns/MissionOneE.js";
 
 import { CreatingNewWhatsAppClientLucy } from "./CreatingNewWhatsAppClientLucy.js";
 import { SharingMobileNumber } from "../Replies/SharingMobileNumber.js";
+
+/**
+ * CONVERSATION ANALYZER (Session 18 - February 7, 2026)
+ * Analyzes message types and displays results in terminal
+ */
+import { getConversationAnalyzer } from "./ConversationAnalyzer.js";
+const analyzer = getConversationAnalyzer();
+
 export async function MessageAnalyzer(msg) {
+  // Log message type to console for every message received
+  analyzer.logMessageTypeCompact(msg);
+
   let Lucy;
   try {
+    // Analyze sentiment and intent
+    const sentiment = analyzer.analyzeSentiment(msg);
+    const intent = analyzer.analyzeIntent(msg);
+    
+    // Log analysis results for text messages
+    if (msg.type === 'chat' || msg.type === 'text') {
+      console.log(`   💭 Sentiment: ${sentiment} | Intent: ${intent}`);
+    }
+
     if (msg.type === 'chat') {
       //  MissionOneE(msg, MyProjects);
 

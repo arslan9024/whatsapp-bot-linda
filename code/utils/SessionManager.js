@@ -7,7 +7,7 @@
 
 import path from "path";
 import fs from "fs/promises";
-import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync } from "fs";
+import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -334,7 +334,7 @@ export class SessionManager {
       
       // Find most recent backup
       const backupDir = SESSION_CACHE_DIR;
-      const backups = fsSyncVarious.readdirSync(backupDir)
+      const backups = readdirSync(backupDir)
         .filter(f => f.startsWith(`backup-${masterNumber}`))
         .sort()
         .reverse();
@@ -377,7 +377,7 @@ export class SessionManager {
       canRestoreImmediate: canRestore,
       lastState: state,
       path: sessionFolder,
-      createdAt: exists ? fsSyncVarious.statSync(sessionFolder).birthtime : null
+      createdAt: exists ? statSync(sessionFolder).birthtime : null,
     };
   }
 
@@ -391,10 +391,10 @@ export class SessionManager {
       const now = Date.now();
       const maxAge = daysOld * 24 * 60 * 60 * 1000;
 
-      fsSyncVarious.readdirSync(SESSION_CACHE_DIR).forEach(file => {
+      readdirSync(SESSION_CACHE_DIR).forEach(file => {
         const filePath = path.join(SESSION_CACHE_DIR, file);
         if (existsSync(filePath)) {
-          const stats = fsSyncVarious.statSync(filePath);
+          const stats = statSync(filePath);
           if (now - stats.mtime.getTime() > maxAge) {
             rmSync(filePath, { recursive: true, force: true });
             console.log(`🧹 Cleaned old backup: ${file}`);

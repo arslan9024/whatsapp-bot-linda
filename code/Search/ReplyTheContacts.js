@@ -1,7 +1,18 @@
 // Lion0 is available as global.Lion0 after bot initialization
+/**
+ * CONSOLIDATION (Session 18 - February 7, 2026)
+ * Updated to use GoogleServicesConsolidated
+ * Previously imported: getSheetWMN (was duplicate of getSheet, getGoogleSheet)
+ */
+
 import { MyProjectsWMN } from "../MyProjects/MyProjectsWMN.js";
-import { getSheetWMN } from "../GoogleSheet/getSheetWMN.js";
+import { GoogleServicesConsolidated } from "../Integration/Google/GoogleServicesConsolidated.js";
 import { CorrectifyOneNumer } from "../utils/contacts.js";
+
+// Initialize Google services once at import time
+await GoogleServicesConsolidated.initialize().catch(err => {
+  console.warn('⚠️ Google services failed to initialize:', err.message);
+});
 
 export async function ReplyTheContacts(msg, Time) {
     let SendReport;
@@ -20,12 +31,12 @@ try {
        const Project =  MyProjectsWMN[1];
         console.log("Message type is chat includes Municipality", Project);
 
- const data = await getSheetWMN(Project);
+        const data = await GoogleServicesConsolidated.getSheetData(Project);
 
 
     //   let Project =  msg.body.includes(x.ProjectName);
 
-    //   const data = await getSheetWMN(Project);
+    //   const data = await GoogleServicesConsolidated.getSheetData(Project);
       console.log("Project sheet has Length", data.data.values);
       const result= data.data.values.filter(x=>x.includes(MunicipalityNumber));
 

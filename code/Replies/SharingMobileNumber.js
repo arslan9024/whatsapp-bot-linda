@@ -1,6 +1,16 @@
-import { getSheetWMN } from "../GoogleSheet/getSheetWMN.js";
+/**
+ * CONSOLIDATION (Session 18 - February 7, 2026)
+ * Updated to use GoogleServicesConsolidated
+ * Previously imported: getSheetWMN (was duplicate of getSheet, getGoogleSheet)
+ */
+import { GoogleServicesConsolidated } from "../Integration/Google/GoogleServicesConsolidated.js";
 import { MyProjectsWMN } from "../MyProjects/MyProjectsWMN.js";
 import { CorrectifyOneNumer } from "../utils/contacts.js";
+
+// Initialize Google services once at import time
+await GoogleServicesConsolidated.initialize().catch(err => {
+  console.warn('⚠️ Google services failed to initialize:', err.message);
+});
 
 // Lion0 is available as global.Lion0 after bot initialization
 
@@ -16,7 +26,7 @@ export async function SharingMobileNumber(msg) {
     console.log("Message type was chat so we are in new function", MunicipalityNumber);
     const Project =  MyProjectsWMN[1];
             console.log("Message type is chat includes Municipality", Project);
-             const data = await getSheetWMN(Project);
+             const data = await GoogleServicesConsolidated.getSheetData(Project);
                console.log("Project sheet has Length", data.data.values);
       const result= data.data.values.filter(x=>x.includes(MunicipalityNumber));
 

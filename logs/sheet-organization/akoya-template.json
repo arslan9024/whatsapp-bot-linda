@@ -1,0 +1,236 @@
+{
+  "name": "Akoya-Oxygen-2023-Arslan-Organized",
+  "description": "Interactive Data Viewer for Akoya-Oxygen-2023 data with organized structure",
+  "created": "2026-02-07T20:29:00.307Z",
+  "tabs": [
+    {
+      "name": "Data Viewer",
+      "type": "interactive",
+      "rows": 17,
+      "description": "Interactive single-row viewer with column filters",
+      "data": [
+        [
+          "ROW SELECTOR & FILTERS"
+        ],
+        [],
+        [
+          "Enter Row Number:",
+          1,
+          "← Change this to view different row"
+        ],
+        [
+          "Current Row:",
+          "=A3",
+          ""
+        ],
+        [],
+        [
+          "COLUMN VISIBILITY FILTERS"
+        ],
+        [],
+        [
+          "Show Columns: ",
+          "Contact_Name",
+          "Phone_Number",
+          "Property_Name",
+          "Status",
+          "Inquiry_Date",
+          "Notes",
+          "Email",
+          "Amount"
+        ],
+        [
+          "✓",
+          "✓",
+          "✓",
+          "✓",
+          "✓",
+          "✓",
+          "✓",
+          "✓"
+        ],
+        [],
+        [
+          "SELECTED ROW DATA"
+        ],
+        [],
+        [
+          "Contact_Name",
+          "Phone_Number",
+          "Property_Name",
+          "Status",
+          "Inquiry_Date",
+          "Notes",
+          "Email",
+          "Amount"
+        ],
+        [],
+        [
+          "{formula for column 1}",
+          "{formula for column 2}",
+          "{formula for column 3}",
+          "{formula for column 4}",
+          "{formula for column 5}",
+          "{formula for column 6}",
+          "{formula for column 7}",
+          "{formula for column 8}"
+        ],
+        [],
+        [
+          "← Scroll up to change row number"
+        ]
+      ]
+    },
+    {
+      "name": "Organized Data",
+      "type": "data",
+      "rows": 6,
+      "columns": 8,
+      "description": "Cleaned and normalized data from original sheet",
+      "headers": [
+        "Contact_Name",
+        "Phone_Number",
+        "Property_Name",
+        "Status",
+        "Inquiry_Date",
+        "Notes",
+        "Email",
+        "Amount"
+      ],
+      "sampleData": [
+        [
+          "Contact 1",
+          "+971501234567",
+          "Property 1",
+          "Active",
+          "2026-02-01",
+          "Sample note",
+          "contact1@example.com",
+          "50000"
+        ],
+        [
+          "Contact 2",
+          "+971501234567",
+          "Property 2",
+          "Active",
+          "2026-02-01",
+          "Sample note",
+          "contact2@example.com",
+          "100000"
+        ],
+        [
+          "Contact 3",
+          "+971501234567",
+          "Property 3",
+          "Active",
+          "2026-02-01",
+          "Sample note",
+          "contact3@example.com",
+          "150000"
+        ]
+      ]
+    },
+    {
+      "name": "Metadata",
+      "type": "metadata",
+      "rows": 18,
+      "description": "Transformation metadata and column mapping",
+      "data": [
+        [
+          "SHEET TRANSFORMATION METADATA"
+        ],
+        [],
+        [
+          "Original Sheet ID",
+          "1gV4-hSAhDyWsivajBb2E2DSs25CMbqhc-6oufP1ZX04"
+        ],
+        [
+          "Organized Date",
+          "2026-02-07T20:29:00.302Z"
+        ],
+        [
+          "Total Data Rows",
+          50
+        ],
+        [
+          "Total Columns",
+          8
+        ],
+        [],
+        [
+          "COLUMN MAPPING"
+        ],
+        [],
+        [
+          "Original Header",
+          "Organized Header",
+          "Column Index"
+        ],
+        [
+          "Contact_Name",
+          "Contact_Name",
+          1
+        ],
+        [
+          "Phone_Number",
+          "Phone_Number",
+          2
+        ],
+        [
+          "Property_Name",
+          "Property_Name",
+          3
+        ],
+        [
+          "Status",
+          "Status",
+          4
+        ],
+        [
+          "Inquiry_Date",
+          "Inquiry_Date",
+          5
+        ],
+        [
+          "Notes",
+          "Notes",
+          6
+        ],
+        [
+          "Email",
+          "Email",
+          7
+        ],
+        [
+          "Amount",
+          "Amount",
+          8
+        ]
+      ]
+    }
+  ],
+  "configuration": {
+    "originalSheetId": "1gV4-hSAhDyWsivajBb2E2DSs25CMbqhc-6oufP1ZX04",
+    "originalSheetName": "Akoya-Oxygen-2023-Arslan-only",
+    "newSheetName": "Akoya-Oxygen-2023-Arslan-Organized",
+    "locale": "en_US",
+    "autoRecalc": "ON_CHANGE"
+  },
+  "instructions": [
+    "TAB 1: Data Viewer",
+    "  - Interactive single-row viewer",
+    "  - Enter row number in cell B3 to view that row",
+    "  - Check/uncheck columns in visibility section to show/hide",
+    "  - Filtered columns display below",
+    "",
+    "TAB 2: Organized Data",
+    "  - Contains all data in normalized format",
+    "  - Headers are standardized and cleaned",
+    "  - Each row has metadata (import date, etc)",
+    "",
+    "TAB 3: Metadata",
+    "  - Shows transformation details",
+    "  - Maps original to organized columns",
+    "  - Provides audit trail"
+  ]
+}

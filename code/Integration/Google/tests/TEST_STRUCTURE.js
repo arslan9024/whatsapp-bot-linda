@@ -18,37 +18,7 @@ export {
   PerformanceTests,
   TestStructure
 } from './TEST_STRUCTURE_CLEAN.js';
- * import { SheetsService } from '../SheetsService.js';
- * import { describe, it, expect, beforeEach, afterEach } from 'vitest';
- * 
- * describe('SheetsService', () => {
- *   let service;
- * 
- *   beforeEach(async () => {
- *     service = new SheetsService({ /* test config */ });
- *     await service.initialize();
- *   });
- * 
- *   describe('readSheet', () => {
- *     it('should read sheet data successfully', async () => {
- *       const data = await service.readSheet('spreadsheetId', 'SheetName!A:Z');
- *       expect(data).toBeDefined();
- *       expect(data.values).toBeInstanceOf(Array);
- *     });
- * 
- *     it('should handle non-existent spreadsheet', async () => {
- *       expect(() => 
- *         service.readSheet('invalid-id', 'Sheet!A:A')
- *       ).rejects.toThrow();
- *     });
- *   });
- * 
- *   afterEach(async () => {
- *     await service.cleanup();
- *   });
- * });
- * ```
- */
+
 const SheetsServiceTestStructure = {
   fileName: 'SheetsService.test.js',
   location: 'code/Integration/Google/tests/',

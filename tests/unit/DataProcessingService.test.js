@@ -139,7 +139,7 @@ describe('DataProcessingService Unit Tests', () => {
       });
 
       expect(phones.length).toBe(6);
-      expect(phones.filter(p => p)).length).toBe(6);
+      expect(phones.filter(p => p).length).toBe(6);
     });
 
     it('should extract UAE phone numbers', () => {

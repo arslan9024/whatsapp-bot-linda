@@ -1,9 +1,14 @@
 
 import { MyProjects } from "../MyProjects/MyProjects.js";
 import { ClientQuestionsArray, ClientAnswersArray } from "./questionsInConverstation.js";
-import { getSheet } from '../GoogleSheet/getSheet.js';
-import { getNumbersArrayFromRows } from '../GoogleSheet/getNumberFromSheet.js';
+import { GoogleServicesConsolidated } from '../Integration/Google/GoogleServicesConsolidated.js';
 import { sendBroadcast } from "./sendBroadCast.js";
+
+// Initialize Google services once at import time
+await GoogleServicesConsolidated.initialize().catch(err => {
+  console.warn('⚠️ Google services failed to initialize:', err.message);
+});
+
 export async function MessageAnalyzerTwo(msg) {
     try {
         if ((msg.body == 'Tell me clusters in Damac Hills 2')) {
@@ -19,9 +24,9 @@ export async function MessageAnalyzerTwo(msg) {
         } else if (MyProjects.find(x => x.ProjectName === msg.body)) {
             console.log("in campaign of the", msg.body);
             const Project = MyProjects.find(x => x.ProjectName === msg.body);
-            const data = await getSheet(Project);
+            const data = await GoogleServicesConsolidated.getSheetValues(Project);
             console.log("still working code Last", data);
-            const ArrayNumbers = await getNumbersArrayFromRows(data);
+            const ArrayNumbers = await GoogleServicesConsolidated.extractPhoneNumbers(data.values || data);
             console.log("still working code CleanNumbersResult", ArrayNumbers);
             const result = await sendBroadcast(ArrayNumbers);
             console.log("we have completed the campaign for Sheet data for index", Project);

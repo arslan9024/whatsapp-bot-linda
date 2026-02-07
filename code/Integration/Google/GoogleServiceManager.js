@@ -1,9 +1,15 @@
 /**
  * Google Service Manager
- * Centralized orchestrator for all Google API services
+ * Centralized orchestrator for all Google API services with multi-account support
  * 
- * Version: 1.0.0
+ * Version: 1.1.0
  * Last Updated: February 7, 2026
+ * 
+ * Features:
+ * - Multi-account support (Power Agent + Goraha Properties)
+ * - Easy account switching
+ * - Automatic service initialization per account
+ * - Account context management
  */
 
 import { logger } from './utils/logger.js';
@@ -11,6 +17,8 @@ import { errorHandler } from './utils/errorHandler.js';
 import { getCredentialsManager } from './config/credentials.js';
 import { AuthenticationService } from './services/AuthenticationService.js';
 import { GOOGLE_SCOPES } from './config/constants.js';
+import { AccountManager, getAccountManager } from './accounts/AccountManager.js';
+import { AccountSwitcher } from './accounts/AccountSwitcher.js';
 
 // ============================================================================
 // CLASS: GoogleServiceManager
@@ -37,6 +45,10 @@ class GoogleServiceManager {
     
     // Credentials manager
     this.credentialsManager = null;
+
+    // Account management
+    this.accountManager = null;
+    this.accountSwitcher = null;
     
     // Multi-account support
     this.accounts = new Map();
@@ -59,23 +71,33 @@ class GoogleServiceManager {
       totalRequests: 0,
     };
     
-    logger.info('GoogleServiceManager initialized');
+    logger.info('GoogleServiceManager initialized with multi-account support');
   }
 
   /**
-   * Initialize all services
+   * Initialize all services with multi-account support
    * @param {Object} options - Initialization options
    * @returns {Promise<Object>} Initialization result
    */
   async initialize(options = {}) {
     try {
-      logger.info('Initializing Google Services Manager');
+      logger.info('Initializing Google Services Manager with multi-account support');
 
       const {
         credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH,
+        accountsConfigPath = './code/Integration/Google/accounts/accounts.config.json',
         scopes = [],
         services = ['auth', 'sheets', 'gmail', 'drive'],
       } = options;
+
+      // Initialize account manager first
+      logger.info('Loading accounts configuration...');
+      this.accountManager = getAccountManager(accountsConfigPath);
+      await this.accountManager.loadConfig();
+
+      // Validate credentials
+      const validation = await this.accountManager.validateAllCredentials();
+      logger.info('Account credentials validation:', validation);
 
       // Initialize credentials manager
       this.credentialsManager = getCredentialsManager({
@@ -108,6 +130,10 @@ class GoogleServiceManager {
         this.serviceStatus.auth = 'auth-failed';
       }
 
+      // Initialize account switcher
+      this.accountSwitcher = new AccountSwitcher(this.accountManager, this);
+      logger.info('AccountSwitcher initialized for multi-account operations');
+
       // Initialize requested services (stub implementations)
       for (const serviceName of services) {
         this.initializeService(serviceName);
@@ -119,12 +145,14 @@ class GoogleServiceManager {
       logger.info('GoogleServiceManager initialization complete', {
         initializedServices: services,
         activeAccount: this.activeAccountEmail,
+        accounts: this.accountManager.listAccounts(),
       });
 
       return {
         success: true,
         initializedServices: services,
         activeAccount: this.activeAccountEmail,
+        accounts: this.accountManager.listAccounts(),
         status: this.serviceStatus,
       };
     } catch (error) {
@@ -320,6 +348,87 @@ class GoogleServiceManager {
       throw error;
     }
   }
+
+  /**
+   * Get AccountManager instance
+   * @returns {AccountManager} Account manager
+   */
+  getAccountManager() {
+    if (!this.accountManager) {
+      throw new Error('AccountManager not initialized. Call initialize() first.');
+    }
+    return this.accountManager;
+  }
+
+  /**
+   * Get AccountSwitcher instance for multi-account operations
+   * @returns {AccountSwitcher} Account switcher
+   */
+  getAccountSwitcher() {
+    if (!this.accountSwitcher) {
+      throw new Error('AccountSwitcher not initialized. Call initialize() first.');
+    }
+    return this.accountSwitcher;
+  }
+
+  /**
+   * Switch to different account by ID (from AccountManager)
+   * @param {string} accountId - Account ID (e.g., 'power-agent', 'goraha-properties')
+   * @returns {boolean} True if successful
+   */
+  switchAccountById(accountId) {
+    try {
+      if (!this.accountManager) {
+        throw new Error('AccountManager not initialized');
+      }
+      const success = this.accountManager.switchAccount(accountId);
+      if (success) {
+        const account = this.accountManager.getActiveAccount();
+        this.activeAccountEmail = account.name;
+      }
+      return success;
+    } catch (error) {
+      logger.error('Failed to switch account by ID', { accountId, error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Execute operation with specific account
+   * @param {string} accountId - Account ID
+   * @param {Function} operation - Async operation function
+   * @returns {Promise<*>} Operation result
+   */
+  async executeWithAccount(accountId, operation) {
+    try {
+      if (!this.accountSwitcher) {
+        throw new Error('AccountSwitcher not initialized');
+      }
+      return await this.accountSwitcher.executeWithAccount(accountId, operation);
+    } catch (error) {
+      logger.error('Failed to execute with account', { accountId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * List all configured accounts
+   * @returns {Array} Array of account info objects
+   */
+  listAccounts() {
+    if (this.accountManager) {
+      return this.accountManager.listAccounts();
+    }
+    return Array.from(this.accounts.keys()).map(email => ({
+      email,
+      isActive: email === this.activeAccountEmail,
+    }));
+  }
+
+  /**
+   * Get account status and information
+   * @returns {Object} Account status information
+   */
 
   /**
    * List all accounts

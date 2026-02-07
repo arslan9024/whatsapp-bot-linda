@@ -1,7 +1,17 @@
 // Lion0 is available as global.Lion0 after bot initialization
+/**
+ * CONSOLIDATION (Session 18 - February 7, 2026)
+ * Updated to use GoogleServicesConsolidated
+ * Previously imported: getOneRowFromSheet (was duplicate of getSheet methods)
+ */
 import { MyProjectsWMN } from "../MyProjects/MyProjectsWMN.js";
 import { CorrectifyOneNumer } from "../utils/contacts.js";
-import { getOneRowFromSheet } from "../GoogleSheet/getOneRowFromSheet.js";
+import { GoogleServicesConsolidated } from "../Integration/Google/GoogleServicesConsolidated.js";
+
+// Initialize Google services once at import time
+await GoogleServicesConsolidated.initialize().catch(err => {
+  console.warn('⚠️ Google services failed to initialize:', err.message);
+});
 
 export async function ReplyTheContactsFromProject(msg, Time) {
     let SendReport;
@@ -13,7 +23,7 @@ try {
 const splitted = msg.body.split( '-IN-' );
 const ClusterName= splitted[1];
        const Project =  MyProjectsWMN[1];
-       const OneRow = await getOneRowFromSheet(Project, ClusterName, UnitNumber);
+       const OneRow = await GoogleServicesConsolidated.getOneRowFromSheet(Project, ClusterName, UnitNumber);
       console.log("Project sheet has OneRow", OneRow);
       // let result= data.data.values.filter(x=>x.includes(ClusterName));
 

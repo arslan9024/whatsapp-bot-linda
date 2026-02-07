@@ -1,9 +1,20 @@
-import { getGoogleSheet } from "../GoogleSheet/getGoogleSheet.js";
+/**
+ * CONSOLIDATION (Session 18 - February 7, 2026)
+ * Updated to use GoogleServicesConsolidated
+ * Previously imported duplicate functions:
+ * - getGoogleSheet (was duplicate of getSheet, getSheetWMN)
+ * - getNumbersArrayFromRows (was duplicate of getPhoneNumbersArrayFromRows)
+ * Removed unused imports: FindPropertiesInGoogleSheet
+ */
+
+import { GoogleServicesConsolidated } from "../Integration/Google/GoogleServicesConsolidated.js";
 import { FindBastardsInContacts } from "../Contacts/FindBastardsInContacts.js";
-import { FindPropertiesInGoogleSheet } from "../GoogleSheet/FindPropertiesInGoogleSheet.js";
-import { getNumbersArrayFromRows } from "../GoogleSheet/getNumberFromSheet.js";
 import { sendBroadcast } from "../Message/sendBroadCast.js";
 
+// Initialize Google services once at import time
+await GoogleServicesConsolidated.initialize().catch(err => {
+  console.warn('⚠️ Google services failed to initialize:', err.message);
+});
 
 export async function ProjectCampaign(Project) {
       console.log("in campaign of the project", Project);
@@ -13,13 +24,13 @@ export async function ProjectCampaign(Project) {
   try {
     if (Project) {
 
-      const data = await getGoogleSheet(Project);
+      const data = await GoogleServicesConsolidated.getSheetValues(Project);
       const ListOfBastardsSheet = await FindBastardsInContacts({ ProjectID: 0, ProjectName: "List-Of-Bastards", ProjectSheetID: "1D7Sspk-FK558EvcTQsIfc5dwccoaggvRtrEPUlswNOU" });
       // we are trying to remove bastards
       console.log("The object has returned the numbers for bastards owners", ListOfBastardsSheet);
    //We try to find the properties used in the Google Sheet
-      // PropertiesUsedInGoogleSheet = await FindPropertiesInGoogleSheet(data.data.values);
-      const ArrayNumbers = await getNumbersArrayFromRows(data.data.values);
+      // PropertiesUsedInGoogleSheet = await FindPropertiesInGoogleSheet(data.values);
+      const ArrayNumbers = await GoogleServicesConsolidated.extractPhoneNumbers(data.values || []);
 
       // console.log("The object has returned the row headings", PropertiesUsedInGoogleSheet)
 
@@ -61,7 +72,7 @@ export async function ProjectCampaign(Project) {
       ProjectCampaignResult = await sendBroadcast(FinalNumbersForCampaign, Project);
 
 console.log(`Project ${Project.ProjectName}, 
-    Total Numbers in this project ${data.data.values.length},
+    Total Numbers in this project ${data.values?.length || 0},
   Correct Numbers ${ArrayNumbers.CorrectNumbers.length},
   Wrong Numbers ${ArrayNumbers.WrongNumbers.length},
   HalfCorrect Numbers ${ArrayNumbers.HalfCorrectNumbers.length},`);
