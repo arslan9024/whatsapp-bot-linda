@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from "./code/utils/browserCleanup.js";
+import SessionManager from "./code/utils/SessionManager.js";
 import fs from "fs";
 import path from "path";
 import qrcode from "qrcode-terminal";
@@ -48,7 +49,15 @@ async function initializeBot() {
     logBot(`Master Account: ${masterNumber}`, "info");
     logBot(`Initialization Attempt: ${initAttempts}/${MAX_INIT_ATTEMPTS}`, "info");
 
-    // Check session folder
+    // Check session restoration capability (NEW: Enhanced session manager)
+    const sessionInfo = SessionManager.getSessionInfo(masterNumber);
+    const canRestoreSession = SessionManager.canRestoreSession(masterNumber);
+    const savedState = SessionManager.loadSessionState();
+
+    logBot(`Session Folder Exists: ${sessionInfo.sessionFolderExists}`, "info");
+    logBot(`Can Restore Immediately: ${canRestoreSession}`, "info");
+
+    // Check session folder (legacy compatibility)
     const sessionFolder = path.join(process.cwd(), "sessions", `session-${masterNumber}`);
     const sessionExists = fs.existsSync(sessionFolder);
     const deviceStatusPath = path.join(sessionFolder, "device-status.json");
@@ -74,9 +83,10 @@ async function initializeBot() {
 
     logBot("WhatsApp client created", "success");
 
-    // Route based on session status
-    if (sessionExists && deviceStatus && deviceStatus.deviceLinked) {
-      // Session exists and device was already linked
+    // NEW: Route based on enhanced session restoration capability
+    if (canRestoreSession && (sessionExists && deviceStatus && deviceStatus.deviceLinked)) {
+      // Session exists, can be restored, and device was already linked
+
       logBot("Restoring previous session...", "info");
       setupRestoreFlow(Lion0, masterNumber, deviceStatus);
     } else if (sessionExists) {
@@ -131,6 +141,12 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
 
   client.once("authenticated", () => {
     logBot("Session authenticated successfully", "success");
+    // Save session state for future restores
+    SessionManager.saveSessionState(masterNumber, {
+      isLinked: true,
+      authMethod: deviceStatus.authMethod || "qr",
+      deviceStatus: deviceStatus
+    });
   });
 
   client.once("ready", () => {
@@ -141,6 +157,9 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
     logBot(`Auth Method: ${deviceStatus.authMethod === "code" ? "6-Digit Code" : "QR Code"}`, "success");
     logBot("Waiting for messages...", "info");
     
+    // Save session backup for emergency recovery
+    SessionManager.backupSession(masterNumber);
+    
     // Set up message listening
     setupMessageListeners(client);
     isInitializing = false;
@@ -148,8 +167,20 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
 
   client.once("auth_failure", (msg) => {
     logBot(`Session restore failed: ${msg}`, "error");
-    logBot("Will need to re-authenticate with new QR code on next restart", "warn");
-    isInitializing = false;
+    logBot("Attempting to restore from backup...", "warn");
+    
+    // Try to restore from backup if available
+    if (SessionManager.restoreFromBackup(masterNumber)) {
+      logBot("Session restored from backup - retrying...", "warn");
+      isInitializing = false;
+      setTimeout(() => {
+        isInitializing = false;
+        initializeBot();
+      }, 3000);
+    } else {
+      logBot("Will need to re-authenticate with new QR code on next restart", "warn");
+      isInitializing = false;
+    }
   });
 
   client.on("disconnected", (reason) => {
@@ -203,12 +234,22 @@ function setupNewLinkingFlow(client, masterNumber) {
   client.once("authenticated", () => {
     authComplete = true;
     logBot("✅ Device linked successfully!", "success");
+    
+    // Save session state for restoration on restart
+    SessionManager.saveSessionState(masterNumber, {
+      isLinked: true,
+      authMethod: "qr",
+      linkedAt: new Date().toISOString()
+    });
   });
 
   client.once("ready", () => {
     logBot("🟢 READY - Bot is online and listening", "ready");
     logBot("Session saved for future restarts", "success");
     logBot("Waiting for messages...", "info");
+    
+    // Create session backup for emergency recovery
+    SessionManager.backupSession(masterNumber);
     
     // Set up message listening
     setupMessageListeners(client);
