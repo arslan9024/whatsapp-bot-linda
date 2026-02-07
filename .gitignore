@@ -40,8 +40,11 @@ config/*-credentials.json
 config/*-keys.json
 code/GoogleAPI/keys.json
 code/GoogleAPI/*/keys.json
+code/Integration/Google/keys.json
+code/Integration/Google/*/keys.json
 *.pem
 *-key.json
+.env.google
 
 # Backups & Temp Files
 *.bak

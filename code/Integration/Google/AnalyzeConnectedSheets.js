@@ -4,6 +4,7 @@
  */
 
 import { MyProjects } from '../../MyProjects/MyProjects.js';
+import GoogleCredentialsManager from './GoogleCredentialsManager.js';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
@@ -100,27 +101,30 @@ function displayDetailed() {
 }
 
 /**
- * Check Google API credentials
+ * Check Google API credentials using the credentials manager
  */
 function checkGoogleCredentials() {
   console.log(colors.info('🔐 GOOGLE API CREDENTIALS CHECK'));
   console.log(colors.info('─'.repeat(70)));
 
-  const keysPath = path.join(process.cwd(), 'code/Integration/Google/keys.json');
+  try {
+    GoogleCredentialsManager.loadCredentials();
+    GoogleCredentialsManager.validate();
 
-  if (fs.existsSync(keysPath)) {
-    console.log(colors.success('✓ Google API credentials file found'));
-    try {
-      const keys = JSON.parse(fs.readFileSync(keysPath, 'utf8'));
-      console.log(`  ${colors.info('→')} Project ID: ${keys.project_id || 'Not found'}`);
-      console.log(`  ${colors.info('→')} Email: ${keys.client_email || 'Not found'}`);
-      console.log(`  ${colors.info('→')} Key Type: ${keys.type || 'Not found'}`);
-    } catch (error) {
-      console.log(colors.error('✗ Error reading credentials file'));
-    }
-  } else {
-    console.log(colors.error('✗ Google API credentials file NOT found'));
-    console.log(`  Expected location: ${colors.sheetId(keysPath)}`);
+    const creds = GoogleCredentialsManager.getCredentials();
+    const path = GoogleCredentialsManager.getCredentialsPath();
+
+    console.log(colors.success('✓ Google API credentials configured'));
+    console.log(`  ${colors.info('→')} Location: ${path}`);
+    console.log(`  ${colors.info('→')} Project ID: ${creds.project_id}`);
+    console.log(`  ${colors.info('→')} Email: ${creds.client_email}`);
+    console.log(`  ${colors.info('→')} Key Type: ${creds.type}`);
+    console.log(`  ${colors.success('✓')} All validations passed`);
+  } catch (error) {
+    console.log(colors.error('✗ Credentials configuration failed'));
+    console.log(`  ${colors.warning('⚠')} ${error.message}`);
+    console.log(`  ${colors.info('→')} Primary: code/Integration/Google/keys.json`);
+    console.log(`  ${colors.info('→')} Fallback: code/GoogleAPI/keys.json`);
   }
   console.log('');
 }
