@@ -10,6 +10,7 @@
         "clean-sessions": "node tools/cleanSessions.js",
         "fresh-start": "node tools/freshStart.js",
         "list-sessions": "node tools/listSessions.js",
+        "send-hello": "node tools/sendHelloMessage.js",
         "test": "echo \"Error: no test specified\" && exit 1",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
