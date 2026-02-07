@@ -90,7 +90,18 @@ export class SessionRestoreHandler {
     // Client should already be initializing from CreatingNewWhatsAppClient
     if (!this.client._state) {
       console.log("🚀 Initializing WhatsApp client with existing session...\n");
-      this.client.initialize();
+      try {
+        this.client.initialize();
+      } catch (error) {
+        // Handle browser already running error
+        if (error.message.includes("browser is already running")) {
+          console.warn("⚠️  Browser already running for this session");
+          console.log("🔄 Waiting for existing browser to connect...\n");
+          // Don't retry - let the existing browser complete
+        } else {
+          throw error;
+        }
+      }
     } else {
       console.log("⏳ Waiting for client initialization with existing session...\n");
     }
@@ -157,8 +168,8 @@ export class SessionRestoreHandler {
       
       setTimeout(() => {
         this.restoreInProgress = false;  // Reset flag for retry
-        this.restoreAttempts++;
-        this.setupRestoreListeners();
+        // Don't call setupRestoreListeners here - just restart
+        this.startRestore();
       }, 5000);
     } else {
       console.error("❌ Maximum restore attempts exceeded.");

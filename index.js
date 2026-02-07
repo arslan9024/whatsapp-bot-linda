@@ -9,9 +9,18 @@ import SessionManager from "./code/utils/SessionManager.js";
 
 // Global references for the bot
 let Lion0 = null;
+let isInitializing = false; // Guard to prevent multiple initializations
 
 // Main initialization function
 async function initializeBot() {
+  // Guard to prevent multiple simultaneous initializations
+  if (isInitializing) {
+    console.log("⚠️  Bot initialization already in progress, skipping...\n");
+    return;
+  }
+  
+  isInitializing = true;
+  
   try {
     // Get master number from .env file
     const masterNumber = process.env.BOT_MASTER_NUMBER;

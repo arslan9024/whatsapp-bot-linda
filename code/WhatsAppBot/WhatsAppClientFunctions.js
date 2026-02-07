@@ -141,30 +141,9 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
       console.log(`   ✓ AI-powered responses\n`);
     });
 
-    client.on("ready", async () => {
-      console.log("READY");
-      const debugWWebVersion = await client.getWWebVersion();
-      console.log(`WWebVersion = ${debugWWebVersion}`);
-
-      client.pupPage.on("pageerror", function (err) {
-        console.log("Page error: " + err.toString());
-      });
-      client.pupPage.on("error", function (err) {
-        console.log("Page error: " + err.toString());
-      });
-    });
-    // // When the client received QR-Code
-    // client.on("qr", (qr) => {
-    //   // console.log('QR RECEIVED', qr);
-    //   // QRCodeScanner(qr);
-    //   qrcode.generate(qr, { small: true });
-
-    // });
-
-    // client.on("ready", () => {
-    //   console.log("CLient is ready again for service, My King!", WhatsAppBotClient.info);
-    // });
-    // client.initialize();
+    // NOTE: Removed duplicate client.on("ready") handler that was firing every time
+    // The client.once("ready") above handles initial ready event
+    // This prevents duplicate processing and display of feature status
 
     client.on("message", msg => {
       // Log message type in terminal
