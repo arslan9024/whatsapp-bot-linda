@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import { WhatsAppClientFunctions } from "./code/WhatsAppBot/WhatsAppClientFunctions.js";
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
+import DeviceLinker from "./code/WhatsAppBot/DeviceLinker.js";
 import { checkAndHandleExistingSession } from "./code/utils/interactiveSetup.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
+import SessionManager from "./code/utils/SessionManager.js";
 
 // Global references for the bot
 let Lion0 = null;
@@ -47,10 +49,12 @@ async function initializeBot() {
     }
 
     console.log("✅ WhatsApp client created successfully\n");
-    console.log("🔄 Initializing WhatsApp client for device linking...\n");
-
-    // Initialize with authentication method
-    WhatsAppClientFunctions(Lion0, masterNumber, authMethod, sessionStatus);
+    
+    // Initialize device linker for proper 6-digit code handling
+    const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod);
+    
+    console.log("🔄 Initializing device linking...\n");
+    await deviceLinker.startLinking();
 
     // Make bot available globally
     global.Lion0 = Lion0;
@@ -60,6 +64,15 @@ async function initializeBot() {
   } catch (error) {
     console.error("\n❌ Initialization Error:", error.message);
     console.error("Stack:", error.stack);
+    
+    console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🔧 Troubleshooting Tips:");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("1. Clear old sessions: npm run clean-sessions");
+    console.log("2. Check .env file: BOT_MASTER_NUMBER=971505760056");
+    console.log("3. Verify internet connection");
+    console.log("4. Try again: npm run dev\n");
+    
     process.exit(1);
   }
 }
