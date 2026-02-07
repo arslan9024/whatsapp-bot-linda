@@ -1,7 +1,9 @@
 import qrcode from "qrcode-terminal";
 import { MessageAnalyzer } from "./MessageAnalyzer.js";
+import { displayCode, displayQRInstructions, closeInterface } from "../utils/interactiveSetup.js";
+import { displayFeatureStatus } from "../utils/featureStatus.js";
 
-export const WhatsAppClientFunctions = (client, number, PCE) => {
+export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatus) => {
 
   try {
     // client initialize does not finish at ready now.
@@ -15,24 +17,36 @@ export const WhatsAppClientFunctions = (client, number, PCE) => {
     });
     
     client.on('qr', async (qr) => {
+      // Skip QR if this is a restored session
+      if (sessionStatus === "restore") {
+        return;
+      }
+      
       if (!qrDisplayed) {
         qrDisplayed = true;
-        console.clear();
-        console.log("\n╔════════════════════════════════════════════════════════════╗");
-        console.log("║       🚀 WhatsApp Bot - Quick Link Setup                   ║");
-        console.log("╚════════════════════════════════════════════════════════════╝\n");
         
-        console.log("📱 SCAN QR CODE WITH YOUR PHONE:\n");
-        console.log("Follow these steps:");
-        console.log("  1️⃣  Open WhatsApp on your phone");
-        console.log("  2️⃣  Go to: Settings → Linked Devices");
-        console.log("  3️⃣  Tap: Link a Device");
-        console.log("  4️⃣  Scan the code below:\n");
-        
-        // Display the QR code
-        qrcode.generate(qr, { small: true });
-        
-        console.log(`\n${number} - Waiting for scan...\n`);
+        // If user chose pairing code method
+        if (authMethod === "code") {
+          if (!pairingCodeRequested) {
+            try {
+              const pairingCode = await client.requestPairingCode(number);
+              displayCode(pairingCode, number);
+              pairingCodeRequested = true;
+            } catch (error) {
+              console.warn("⚠️  Pairing code not available, falling back to QR code...\n");
+              displayQRInstructions(number);
+              qrcode.generate(qr, { small: true });
+              console.log(`\n✅ Bot ID: ${number}`);
+              console.log("⏳ Waiting for authentication...\n");
+            }
+          }
+        } else {
+          // QR code method
+          displayQRInstructions(number);
+          qrcode.generate(qr, { small: true });
+          console.log(`\n✅ Bot ID: ${number}`);
+          console.log("⏳ Waiting for authentication...\n");
+        }
       }
     });
 
@@ -40,24 +54,29 @@ export const WhatsAppClientFunctions = (client, number, PCE) => {
       console.clear();
       console.log("\n✅ ✅ ✅ AUTHENTICATED SUCCESSFULLY! ✅ ✅ ✅\n");
       console.log(`📱 Bot ID: ${number}`);
-      console.log("Status: Connected to WhatsApp\n");
+      console.log("Status: Connected to WhatsApp");
+      console.log("Session: Saved in /sessions folder\n");
     });
 
     client.on("auth_failure", msg => {
       // Fired if session restore was unsuccessful
       console.error("\n❌ AUTHENTICATION FAILURE:", msg);
-      console.error("Please try scanning the QR code again.\n");
+      console.error("Please try again with the QR code or pairing code.\n");
     });
 
     // When the client is ready, run this code (only once)
     client.once("ready", () => {
       console.clear();
       console.log("\n╔════════════════════════════════════════════════════════════╗");
-      console.log("║                  🤖 BOT IS READY TO SERVE!                 ║");
+      console.log("║               🤖 BOT IS READY TO SERVE!                   ║");
       console.log("╚════════════════════════════════════════════════════════════╝\n");
-      console.log(`✅ Bot ID: ${number}`);
+      console.log(`✅ Master Account: ${number}`);
       console.log("✅ Status: Connected & Authenticated");
+      console.log("✅ Session: Stored & Persistent");
       console.log("✅ Listening for incoming messages...\n");
+      
+      // Display connected features
+      displayFeatureStatus(number);
     });
 
     client.on("ready", async () => {
