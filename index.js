@@ -38,7 +38,11 @@ async function initializeBot() {
     // Use QR code authentication for headless/local development
     // (6-digit code requires full browser APIs not available in headless mode)
     const authMethod = "qr"; // Use QR code for local development
-    console.log(`🔐 Authentication Method: QR Code (Headless Mode)\n`);
+    
+    // Only show authentication message if new session
+    if (sessionStatus === "new") {
+      console.log(`🔐 Authentication Method: QR Code (Headless Mode)\n`);
+    }
     
     console.log("⏳ Creating WhatsApp client...\n");
 
@@ -51,11 +55,17 @@ async function initializeBot() {
 
     console.log("✅ WhatsApp client created successfully\n");
     
-    // Initialize device linker for proper 6-digit code handling
-    const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod);
-    
-    console.log("🔄 Initializing device linking...\n");
-    await deviceLinker.startLinking();
+    // Initialize device linker only if new session
+    // Existing sessions will be restored automatically
+    if (sessionStatus === "new") {
+      console.log("🔄 Initializing device linking...\n");
+      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, sessionStatus);
+      await deviceLinker.startLinking();
+    } else {
+      console.log("✅ Existing session found - Restoring connection...\n");
+      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, sessionStatus);
+      await deviceLinker.startLinking();
+    }
 
     // Make bot available globally
     global.Lion0 = Lion0;

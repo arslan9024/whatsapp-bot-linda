@@ -9,10 +9,11 @@ import { updateDeviceStatus, displayAuthenticationSuccess } from "../utils/devic
 import qrcode from "qrcode-terminal";
 
 export class DeviceLinker {
-  constructor(client, masterNumber, authMethod) {
+  constructor(client, masterNumber, authMethod, sessionStatus = "new") {
     this.client = client;
     this.masterNumber = masterNumber;
     this.authMethod = authMethod;
+    this.sessionStatus = sessionStatus; // "new" or "restore"
     this.pairingCodeRequested = false;
     this.qrDisplayed = false;
     this.authAttempts = 0;
@@ -65,6 +66,12 @@ export class DeviceLinker {
    */
   async handleQREvent(qr) {
     try {
+      // Skip QR display if this is a restored session (already linked)
+      if (this.sessionStatus === "restore") {
+        console.log("✅ Session restored - Authenticating with existing device...\n");
+        return;
+      }
+
       if (this.qrDisplayed) {
         return;
       }
@@ -114,13 +121,14 @@ export class DeviceLinker {
   }
 
   /**
-   * Display QR code in terminal
+   * Display QR code in terminal (compact size)
    */
   displayQRCode(qr) {
     displayQRInstructions(this.masterNumber);
     
     try {
-      qrcode.generate(qr, { small: true });
+      // Generate QR code with extra small size for VSCode terminal
+      qrcode.generate(qr, { small: true, width: 60 });
     } catch (error) {
       console.error("❌ QR Code Display Error:", error.message);
       console.log("📱 Please scan the QR code shown above\n");
