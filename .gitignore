@@ -1,0 +1,54 @@
+# Dependencies and Build
+node_modules/
+package-lock.json
+npm-debug.log
+yarn-error.log
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Browser Sessions (WhatsApp)
+sessions/
+session-*/
+
+# Chrome/Chromium User Data
+.wdm/
+
+# Output Files
+Outputs/
+outputs/
+*.txt
+*.csv
+
+# System Files
+.DS_Store
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Backups & Temp Files
+*.bak
+*.tmp
+Backup/original/
+.backup/
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db
+.DS_Store
