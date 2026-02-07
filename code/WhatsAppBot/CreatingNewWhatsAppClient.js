@@ -13,12 +13,16 @@ export async function CreatingNewWhatsAppClient(ClientID) {
             clientId: `${ClientID}`,
             dataPath: "sessions"
           }),
-          restartOnAuthFail: true, // optional
-          selenium: {
-            headless: false,
+          restartOnAuthFail: true,
+          // Local development - headless mode for VSCode terminal only
+          headless: true,
+          seleniumOpts: {
+            headless: true,
             args: [
-              "--no-sandbox"
-              // other node args
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-gpu",
+              "--single-process"
             ]
           },
           webVersionCache: {

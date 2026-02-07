@@ -6,37 +6,58 @@ export const WhatsAppClientFunctions = (client, number, PCE) => {
   try {
     // client initialize does not finish at ready now.
     client.initialize();
-    client.on("loading_screen", (percent, message) => {
-      console.log("LOADING SCREEN", percent, message);
-    });
-    // Pairing code only needs to be requested once
+    
     let pairingCodeRequested = false;
+    let qrDisplayed = false;
+    
+    client.on("loading_screen", (percent, message) => {
+      console.log("📊 LOADING:", percent + "%", message);
+    });
+    
     client.on('qr', async (qr) => {
-      // NOTE: This event will not be fired if a session is specified.
-      console.log('QR RECEIVED', qr);
-      console.log('QR RECEIVED', number);
-
-      // pairing code example
-      const pairingCodeEnabled = PCE;
-      if (pairingCodeEnabled && !pairingCodeRequested) {
-        const pairingCode = await client.requestPairingCode(number); // enter the target phone number
-        console.log(`Pairing code enabled for ${number}, code: ` + pairingCode);
-        pairingCodeRequested = true;
+      if (!qrDisplayed) {
+        qrDisplayed = true;
+        console.clear();
+        console.log("\n╔════════════════════════════════════════════════════════════╗");
+        console.log("║       🚀 WhatsApp Bot - Quick Link Setup                   ║");
+        console.log("╚════════════════════════════════════════════════════════════╝\n");
+        
+        console.log("📱 SCAN QR CODE WITH YOUR PHONE:\n");
+        console.log("Follow these steps:");
+        console.log("  1️⃣  Open WhatsApp on your phone");
+        console.log("  2️⃣  Go to: Settings → Linked Devices");
+        console.log("  3️⃣  Tap: Link a Device");
+        console.log("  4️⃣  Scan the code below:\n");
+        
+        // Display the QR code
+        qrcode.generate(qr, { small: true });
+        
+        console.log(`\n${number} - Waiting for scan...\n`);
       }
     });
 
     client.on("authenticated", () => {
-      console.log("AUTHENTICATED");
+      console.clear();
+      console.log("\n✅ ✅ ✅ AUTHENTICATED SUCCESSFULLY! ✅ ✅ ✅\n");
+      console.log(`📱 Bot ID: ${number}`);
+      console.log("Status: Connected to WhatsApp\n");
     });
 
     client.on("auth_failure", msg => {
       // Fired if session restore was unsuccessful
-      console.error("AUTHENTICATION FAILURE", msg);
+      console.error("\n❌ AUTHENTICATION FAILURE:", msg);
+      console.error("Please try scanning the QR code again.\n");
     });
 
     // When the client is ready, run this code (only once)
     client.once("ready", () => {
-      console.log("Client is ready for service, My King!!!", number);
+      console.clear();
+      console.log("\n╔════════════════════════════════════════════════════════════╗");
+      console.log("║                  🤖 BOT IS READY TO SERVE!                 ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log(`✅ Bot ID: ${number}`);
+      console.log("✅ Status: Connected & Authenticated");
+      console.log("✅ Listening for incoming messages...\n");
     });
 
     client.on("ready", async () => {

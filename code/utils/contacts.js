@@ -1,9 +1,19 @@
-export { rectifyCorrectNumbers } from '../rectifyContactNumbers.js';
-export { CorrectifyOneNumer } from '../Contacts/CorrectifyOneNumer.js';
-export { validateNumberWithCountryCode } from '../Contacts/validateNumberWithCountryCode.js';
-export { rectifyOneClientNumber } from '../Contacts/rectifyOnePhoneNumber.js';
-export { changeWhatsAppNumberWithNormalNumber, changeNormalNumberWithWhatsAppNumber } from '../Contacts/changeWhatsAppNumberWithNormalNumber.js';
-export { ReplaceContact } from '../Contacts/ReplaceContact.js';
+import { rectifyCorrectNumbers } from '../rectifyContactNumbers.js';
+import { CorrectifyOneNumer } from '../Contacts/CorrectifyOneNumer.js';
+import { validateNumberWithCountryCode } from '../Contacts/validateNumberWithCountryCode.js';
+import { rectifyOneClientNumber } from '../Contacts/rectifyOnePhoneNumber.js';
+import { changeWhatsAppNumberWithNormalNumber, changeNormalNumberWithWhatsAppNumber } from '../Contacts/changeWhatsAppNumberWithNormalNumber.js';
+import { ReplaceContact } from '../Contacts/ReplaceContact.js';
+
+export {
+  rectifyCorrectNumbers,
+  CorrectifyOneNumer,
+  validateNumberWithCountryCode,
+  rectifyOneClientNumber,
+  changeWhatsAppNumberWithNormalNumber,
+  changeNormalNumberWithWhatsAppNumber,
+  ReplaceContact,
+};
 
 export default {
   rectifyCorrectNumbers,
@@ -11,5 +21,6 @@ export default {
   validateNumberWithCountryCode,
   rectifyOneClientNumber,
   changeWhatsAppNumberWithNormalNumber,
+  changeNormalNumberWithWhatsAppNumber,
   ReplaceContact,
 };

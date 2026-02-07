@@ -3,7 +3,7 @@ import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAp
 import {Agents} from "./Inputs/ArslanNumbers.js";
 // import {NawalAgents} from "./Inputs/NawalNumbers.js";
 
-
+// Enable pairing code (6-digit code) instead of QR code
 export const Lion0 = await CreatingNewWhatsAppClient(Agents.Agent0.Number);
 WhatsAppClientFunctions(Lion0, Agents.Agent0.Number, true);
 // export const Lion1 = await CreatingNewWhatsAppClient(Agents.Agent1.Number);
