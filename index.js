@@ -1,106 +1,268 @@
 import 'dotenv/config';
-import { WhatsAppClientFunctions } from "./code/WhatsAppBot/WhatsAppClientFunctions.js";
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
-import DeviceLinker from "./code/WhatsAppBot/DeviceLinker.js";
-import SessionRestoreHandler from "./code/WhatsAppBot/SessionRestoreHandler.js";
-import { checkAndHandleExistingSession } from "./code/utils/interactiveSetup.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
-import SessionManager from "./code/utils/SessionManager.js";
+import fs from "fs";
+import path from "path";
 
-// Global references for the bot
+// Global bot instance
 let Lion0 = null;
-let isInitializing = false; // Guard to prevent multiple initializations
+let isInitializing = false;
+let initAttempts = 0;
+const MAX_INIT_ATTEMPTS = 2;
 
-// Main initialization function
+// Simple console logging without interactive prompts
+function logBot(msg, type = "info") {
+  const timestamp = new Date().toLocaleTimeString();
+  const prefix = {
+    info: "ℹ️ ",
+    success: "✅",
+    error: "❌",
+    warn: "⚠️ ",
+    ready: "🚀"
+  }[type] || "ℹ️ ";
+  
+  console.log(`[${timestamp}] ${prefix} ${msg}`);
+}
+
 async function initializeBot() {
-  // Guard to prevent multiple simultaneous initializations
+  // Prevent multiple simultaneous initializations
   if (isInitializing) {
-    console.log("⚠️  Bot initialization already in progress, skipping...\n");
+    logBot("Initialization already in progress, will wait...", "warn");
     return;
   }
-  
+
   isInitializing = true;
-  
+  initAttempts++;
+
   try {
-    // Get master number from .env file
-    const masterNumber = process.env.BOT_MASTER_NUMBER;
+    const masterNumber = process.env.BOT_MASTER_NUMBER || "971505760056";
     
-    if (!masterNumber) {
-      throw new Error("BOT_MASTER_NUMBER not found in .env file");
-    }
-    
-    console.log("\n╔════════════════════════════════════════════════════════════╗");
-    console.log("║          🚀 WhatsApp Bot - Automatic Initialization        ║");
-    console.log("╚════════════════════════════════════════════════════════════╝\n");
-    
-    console.log(`📱 Master Account (from .env): ${masterNumber}`);
-    console.log(`🤖 Bot Instance: Lion0\n`);
-
-    // Check if session already exists
-    const sessionStatus = await checkAndHandleExistingSession(masterNumber);
-
-    // Create or update device status file
-    if (sessionStatus === "new") {
-      console.log("📝 Creating new device status file...\n");
-      createDeviceStatusFile(masterNumber);
+    if (initAttempts === 1) {
+      console.log("\n╔════════════════════════════════════════════════════════════╗");
+      console.log("║         🤖 LINDA - WhatsApp Bot Background Service        ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
     }
 
-    // Use QR code authentication for headless/local development
-    // (6-digit code requires full browser APIs not available in headless mode)
-    const authMethod = "qr"; // Use QR code for local development
-    
-    // Only show authentication message if new session
-    if (sessionStatus === "new") {
-      console.log(`🔐 Authentication Method: QR Code (Headless Mode)\n`);
-    }
-    
-    console.log("⏳ Creating WhatsApp client...\n");
+    logBot(`Master Account: ${masterNumber}`, "info");
+    logBot(`Initialization Attempt: ${initAttempts}/${MAX_INIT_ATTEMPTS}`, "info");
 
-    // Create the WhatsApp client
+    // Check session folder
+    const sessionFolder = path.join(process.cwd(), "sessions", `session-${masterNumber}`);
+    const sessionExists = fs.existsSync(sessionFolder);
+    const deviceStatusPath = path.join(sessionFolder, "device-status.json");
+    let deviceStatus = null;
+
+    // Try to read device status if session exists
+    if (sessionExists) {
+      try {
+        deviceStatus = JSON.parse(fs.readFileSync(deviceStatusPath, "utf8"));
+        logBot(`Session found - Device linked: ${deviceStatus.deviceLinked}`, "info");
+      } catch (e) {
+        logBot(`Session folder exists but no valid device-status.json`, "warn");
+      }
+    }
+
+    // Create WhatsApp client
+    logBot("Creating WhatsApp client...", "info");
     Lion0 = await CreatingNewWhatsAppClient(masterNumber);
-    
+
     if (!Lion0) {
       throw new Error("Failed to create WhatsApp client");
     }
 
-    console.log("✅ WhatsApp client created successfully\n");
-    
-    // Handle new vs restore sessions with different flows
-    if (sessionStatus === "new") {
-      console.log("🔄 Initializing device linking for NEW session...\n");
-      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, "new");
-      deviceLinker.startLinking();
-      // Don't await - event listeners handle completion
+    logBot("WhatsApp client created", "success");
+
+    // Route based on session status
+    if (sessionExists && deviceStatus && deviceStatus.deviceLinked) {
+      // Session exists and device was already linked
+      logBot("Restoring previous session...", "info");
+      setupRestoreFlow(Lion0, masterNumber, deviceStatus);
+    } else if (sessionExists) {
+      // Session folder exists but not properly linked
+      logBot("Session exists but device not linked - requesting new auth", "warn");
+      setupNewLinkingFlow(Lion0, masterNumber);
     } else {
-      console.log("✅ Existing session found - Reactivating device connection...\n");
-      console.log("⏳ Attempting to reactivate previous session (max 3 attempts)...\n");
-      
-      // For restore sessions: use dedicated session restore handler
-      const restoreHandler = new SessionRestoreHandler(Lion0, masterNumber);
-      restoreHandler.startRestore();
-      // Handler manages the entire restore flow including fallback
+      // Brand new session
+      logBot("NEW SESSION - Device linking required", "info");
+      createDeviceStatusFile(masterNumber);
+      setupNewLinkingFlow(Lion0, masterNumber);
     }
 
-    // Make bot available globally immediately (before session ready)
+    // Make bot available globally
     global.Lion0 = Lion0;
-    global.Lion = Lion0; // Alias for backward compatibility
-    global.MasterBot = Lion0; // Alias for clarity
+    global.Linda = Lion0;
 
   } catch (error) {
-    console.error("\n❌ Initialization Error:", error.message);
-    console.error("Stack:", error.stack);
+    logBot(`Initialization Error: ${error.message}`, "error");
     
-    console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔧 Troubleshooting Tips:");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("1. Clear old sessions: npm run clean-sessions");
-    console.log("2. Check .env file: BOT_MASTER_NUMBER=971505760056");
-    console.log("3. Verify internet connection");
-    console.log("4. Try again: npm run dev\n");
-    
-    process.exit(1);
+    if (initAttempts < MAX_INIT_ATTEMPTS) {
+      logBot(`Retrying in 5 seconds... (Attempt ${initAttempts + 1}/${MAX_INIT_ATTEMPTS})`, "warn");
+      isInitializing = false;
+      setTimeout(initializeBot, 5000);
+    } else {
+      logBot("Max initialization attempts reached. Bot will remain idle.", "error");
+      logBot("Fix the issue and restart with: npm run dev", "warn");
+      isInitializing = false;
+      // Don't exit - let bot stay alive for monitoring
+    }
   }
 }
 
+/**
+ * Setup restore flow for existing linked devices
+ */
+function setupRestoreFlow(client, masterNumber, deviceStatus) {
+  logBot("Setting up session restore...", "info");
+
+  // Set up event listeners BEFORE initialization
+  let readyFired = false;
+
+  client.once("authenticated", () => {
+    logBot("Session authenticated successfully", "success");
+  });
+
+  client.once("ready", () => {
+    if (readyFired) return;
+    readyFired = true;
+    
+    logBot("🟢 READY - Bot is online and listening", "ready");
+    logBot(`Auth Method: ${deviceStatus.authMethod === "code" ? "6-Digit Code" : "QR Code"}`, "success");
+    logBot("Waiting for messages...", "info");
+    
+    // Set up message listening
+    setupMessageListeners(client);
+    isInitializing = false;
+  });
+
+  client.once("auth_failure", (msg) => {
+    logBot(`Session restore failed: ${msg}`, "error");
+    logBot("Will need to re-authenticate with new QR code on next restart", "warn");
+    isInitializing = false;
+  });
+
+  client.on("disconnected", (reason) => {
+    logBot(`Disconnected: ${reason}`, "warn");
+  });
+
+  client.on("error", (error) => {
+    logBot(`Client error: ${error.message}`, "error");
+  });
+
+  // Initialize client to restore session
+  logBot("Initializing with existing session...", "info");
+  try {
+    client.initialize();
+  } catch (error) {
+    if (error.message.includes("browser is already running")) {
+      logBot("Browser already locked - this is a nodemon restart", "warn");
+      logBot("Waiting for existing browser to connect...", "info");
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Setup new device linking flow
+ */
+function setupNewLinkingFlow(client, masterNumber) {
+  logBot("Setting up device linking...", "info");
+
+  let qrShown = false;
+  let authComplete = false;
+
+  client.on("qr", (qr) => {
+    if (!qrShown) {
+      qrShown = true;
+      console.clear();
+      console.log("\n╔════════════════════════════════════════════════════════════╗");
+      console.log("║         🔗 DEVICE LINKING - SCAN QR CODE                  ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log("📱 Master Device Number: " + masterNumber + "\n");
+      console.log("⏳ Scanning... Open WhatsApp → Settings → Linked Devices\n");
+      
+      // Display QR code
+      const qrcode = require("qrcode-terminal");
+      qrcode.generate(qr, { small: true });
+      
+      console.log("\nℹ️  Waiting for you to scan the QR code with your phone...\n");
+    }
+  });
+
+  client.once("authenticated", () => {
+    authComplete = true;
+    logBot("✅ Device linked successfully!", "success");
+  });
+
+  client.once("ready", () => {
+    logBot("🟢 READY - Bot is online and listening", "ready");
+    logBot("Session saved for future restarts", "success");
+    logBot("Waiting for messages...", "info");
+    
+    // Set up message listening
+    setupMessageListeners(client);
+    isInitializing = false;
+  });
+
+  client.once("auth_failure", (msg) => {
+    logBot(`Authentication failed: ${msg}`, "error");
+    logBot("Please restart and scan QR code again", "warn");
+    isInitializing = false;
+  });
+
+  client.on("disconnected", (reason) => {
+    logBot(`Disconnected: ${reason}`, "warn");
+  });
+
+  client.on("error", (error) => {
+    logBot(`Error during linking: ${error.message}`, "error");
+  });
+
+  logBot("Initializing WhatsApp client for new device link...", "info");
+  client.initialize();
+}
+
+/**
+ * Setup message listening
+ */
+function setupMessageListeners(client) {
+  client.on("message", (msg) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const from = msg.from.includes("@g.us") ? `Group: ${msg.from}` : `User: ${msg.from}`;
+    
+    logBot(`📨 [${timestamp}] ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
+
+    // Test ping command
+    if (msg.body === "!ping") {
+      msg.reply("pong");
+      logBot("📤 Ping reply sent", "success");
+    }
+  });
+
+  logBot("Message listeners ready", "success");
+}
+
+/**
+ * Graceful shutdown
+ */
+process.on("SIGINT", async () => {
+  console.log("\n");
+  logBot("Received shutdown signal", "warn");
+  
+  if (Lion0) {
+    try {
+      logBot("Closing WhatsApp connection...", "info");
+      await Lion0.destroy();
+      logBot("WhatsApp connection closed", "success");
+    } catch (e) {
+      logBot(`Error closing connection: ${e.message}`, "error");
+    }
+  }
+
+  logBot("Bot stopped", "success");
+  process.exit(0);
+});
+
 // Start the bot
+logBot("Starting Linda WhatsApp Bot...", "info");
 initializeBot();

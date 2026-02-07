@@ -1,0 +1,14 @@
+{
+  "watch": ["index.js", "code/", ".env"],
+  "ignore": ["node_modules", "sessions", "*.log"],
+  "ext": "js,json",
+  "delay": 2000,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "exec": "node",
+  "events": {
+    "restart": "echo '🔄 Bot restarted'"
+  },
+  "exitcrash": true
+}
