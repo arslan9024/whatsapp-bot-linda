@@ -1,4 +1,34 @@
+/**
+ * PHASE 5: Database Organization System (Session 16)
+ * 
+ * OrganizedSheets maps each project to its new organized Google Sheet
+ * These sheets contain:
+ *   - Master Data tab: All deduplicated records with unique codes (P001, C001, F001)
+ *   - Code Reference Map: Lookup table
+ *   - Data Viewer: Interactive filterable view
+ *   - Contacts, Properties, Financials: Separated by type
+ *   - Analytics: Deduplication metrics
+ *   - Metadata: Transformation details
+ * 
+ * Usage: Get organized sheet ID for Akoya:
+ *   import { OrganizedSheets } from './DamacHills2List.js';
+ *   const akoyaOrgId = OrganizedSheets.Akoya;  // Use in message handlers
+ * 
+ * Format: 'ProjectName': 'Google Sheet ID string'
+ * Sheet ID found in URL: https://docs.google.com/spreadsheets/d/[SHEET_ID]/edit
+ */
+export const OrganizedSheets = {
+  // DAMAC Hills 2 Projects - Organized Sheets
+  Akoya: process.env.AKOYA_ORGANIZED_SHEET_ID || '',  // Set in .env or manually
+  Janusia: process.env.JANUSIA_ORGANIZED_SHEET_ID || '',
+  Sanctuary: process.env.SANCTUARY_ORGANIZED_SHEET_ID || '',
+  // Add more as projects are organized
+};
 
+/**
+ * Legacy sheets - kept for backward compatibility
+ * New implementations should use OrganizedSheets instead
+ */
 export const D2Sheets=[
 {ProjectID:"1", ProjectName:"Vardon", ProjectSheetID:""},
 {ProjectID:"2", ProjectName:"Sanctnary", ProjectSheetID:""},

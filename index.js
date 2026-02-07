@@ -9,6 +9,13 @@ import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 // This sets up message type logging and global statistics functions
 import "./code/WhatsAppBot/AnalyzerGlobals.js";
 
+// DATABASE INTEGRATION (Session 16 - Phase 2)
+// Import organized sheet services for Akoya database integration
+import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
+import { quickValidateSheet } from "./code/utils/sheetValidation.js";
+import { OperationalAnalytics } from "./code/Services/OperationalAnalytics.js";
+import { OrganizedSheets } from "./code/DamacHills2List.js";
+
 import fs from "fs";
 import path from "path";
 
@@ -87,6 +94,52 @@ async function initializeBot() {
     }
 
     logBot("WhatsApp client created", "success");
+
+    // ═══════════════════════════════════════════════════════════════
+    // DATABASE INITIALIZATION (Session 16 - Akoya Organized Sheet)
+    // ═══════════════════════════════════════════════════════════════
+    
+    let contextIntegration = null;
+    let operationalAnalytics = null;
+    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID || OrganizedSheets.Akoya;
+
+    if (AKOYA_SHEET_ID) {
+      logBot("Initializing organized sheet database (Akoya)...", "info");
+
+      // Step 1: Validate sheet access
+      const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
+      
+      if (sheetValid) {
+        // Step 2: Initialize context integration (loads data into memory)
+        contextIntegration = new AIContextIntegration();
+        try {
+          await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
+          logBot("Database context loaded into memory ✅", "success");
+          global.databaseContext = contextIntegration;  // Make globally available
+        } catch (error) {
+          logBot(`Context initialization failed: ${error.message}`, "warn");
+          contextIntegration = null;
+        }
+
+        // Step 3: Initialize analytics
+        try {
+          operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
+          global.analytics = operationalAnalytics;  // Make globally available
+          logBot("Analytics service initialized ✅", "success");
+        } catch (error) {
+          logBot(`Analytics initialization failed: ${error.message}`, "warn");
+          operationalAnalytics = null;
+        }
+      } else {
+        logBot("Sheet validation failed - bot will use LEGACY MODE (old sheets)", "warn");
+        logBot("Run: npm run organize-sheet to set up organized database", "info");
+      }
+    } else {
+      logBot("⚠️  No organized sheet ID configured (AKOYA_ORGANIZED_SHEET_ID env var)", "warn");
+      logBot("Bot will operate in LEGACY MODE", "info");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
 
     // NEW: Route based on enhanced session restoration capability
     if (canRestoreSession && (sessionExists && deviceStatus && deviceStatus.deviceLinked)) {
