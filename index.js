@@ -10,7 +10,7 @@ const masterNumber = await askForMasterNumber();
 const sessionStatus = await checkAndHandleExistingSession(masterNumber);
 
 // Only ask for auth method if it's a new session
-let authMethod = "qr"; // default
+let authMethod = "code"; // default to 6-digit code
 
 if (sessionStatus === "new") {
   authMethod = await askForAuthMethod();

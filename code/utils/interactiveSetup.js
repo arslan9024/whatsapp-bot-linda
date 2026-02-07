@@ -51,15 +51,15 @@ export const checkAndHandleExistingSession = async (number) => {
 
 export const askForAuthMethod = async () => {
   console.log("🔐 Step 3: Choose Authentication Method\n");
-  console.log("1️⃣  Scan QR Code with WhatsApp");
-  console.log("2️⃣  Link Device with 6-Digit Code\n");
+  console.log("1️⃣  Link Device with 6-Digit Code (Recommended)");
+  console.log("2️⃣  Scan QR Code with WhatsApp\n");
   
-  const choice = await question("Choose option (1 or 2): ");
+  const choice = await question("Choose option (1 or 2, press Enter for default): ");
   
-  if (choice === "1") {
-    return "qr";
+  if (choice === "1" || choice === "") {
+    return "code"; // Default to 6-digit code if empty
   } else if (choice === "2") {
-    return "code";
+    return "qr";
   } else {
     console.log("\n❌ Invalid choice. Please enter 1 or 2.\n");
     return askForAuthMethod();
