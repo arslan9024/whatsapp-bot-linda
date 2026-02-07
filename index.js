@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
+import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from "./code/utils/browserCleanup.js";
 import fs from "fs";
 import path from "path";
 import qrcode from "qrcode-terminal";
@@ -93,10 +94,20 @@ async function initializeBot() {
     global.Lion0 = Lion0;
     global.Linda = Lion0;
 
+    // Setup shutdown handlers for this client
+    setupShutdownHandlers(Lion0);
+
   } catch (error) {
     logBot(`Initialization Error: ${error.message}`, "error");
     
-    if (initAttempts < MAX_INIT_ATTEMPTS) {
+    // Check if this is a browser lock error
+    if (error.message.includes("browser is already running") && initAttempts < MAX_INIT_ATTEMPTS) {
+      logBot("Browser is locked - cleaning up and retrying...", "warn");
+      await killBrowserProcesses();
+      await sleep(2000);
+      isInitializing = false;
+      initializeBot();
+    } else if (initAttempts < MAX_INIT_ATTEMPTS) {
       logBot(`Retrying in 5 seconds... (Attempt ${initAttempts + 1}/${MAX_INIT_ATTEMPTS})`, "warn");
       isInitializing = false;
       setTimeout(initializeBot, 5000);

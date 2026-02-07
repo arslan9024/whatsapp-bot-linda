@@ -1,39 +1,23 @@
-/**
- * Week 2 Implementation Test Suite Skeleton
- * Phase 2: Google API Integration Implementation
- * 
- * Test Files Structure:
- * - SheetsService.test.js - Sheet operations (read, write, append)
- * - DataProcessingService.test.js - Phone number processing and validation
- * - Integration.test.js - End-to-end Google API workflows
- * - Migrations.test.js - Legacy feature migration validation
- * 
- * Test Coverage Goals:
- * - Unit tests for all service classes
- * - Integration tests for service interactions
- * - Migration validation tests (legacy → new compatibility)
- * - Performance benchmarks (async vs sleep)
- * - Error handling and edge cases
- * 
- * Created: February 7, 2026
- * Status: Skeleton Structure Ready
- */
+// NOTE: This file has been cleaned of documentation.
+// See TEST_STRUCTURE.md for complete documentation with examples.
+// See TEST_STRUCTURE_CLEAN.js for the ES module exports.
 
-/**
- * SheetsService.test.js
- * Test sheet operations
- * 
- * Tests to implement:
- * - Authentication and initialization
- * - Read sheet data
- * - Write data to sheet
- * - Append data to sheet
- * - Handle sheet errors
- * - Multiple sheet access
- * - Data validation
- * 
- * Example Test Structure:
- * ```javascript
+export const TEST_SUITE_INFO = {
+  documentation: 'See TEST_STRUCTURE.md for full documentation',
+  version: '1.0.0',
+  updated: '2026-02-07',
+  description: 'This file previously contained JSDoc with embedded code examples which caused compilation errors. All code examples have been moved to TEST_STRUCTURE.md'
+};
+
+// All test structures exported from TEST_STRUCTURE_CLEAN.js
+export {
+  SheetsServiceTests,
+  DataProcessingServiceTests,
+  IntegrationTests,
+  MigrationsTests,
+  PerformanceTests,
+  TestStructure
+} from './TEST_STRUCTURE_CLEAN.js';
  * import { SheetsService } from '../SheetsService.js';
  * import { describe, it, expect, beforeEach, afterEach } from 'vitest';
  * 
