@@ -126,16 +126,23 @@ export class DeviceLinker {
   displayQRCode(qr) {
     displayQRInstructions(this.masterNumber);
     
+    console.log("╔════════════════════════════════════════════════════════════╗");
+    console.log("║            📱 SCAN QR CODE WITH YOUR PHONE                 ║");
+    console.log("╚════════════════════════════════════════════════════════════╝\n");
+    
     try {
-      // Generate QR code with extra small size for VSCode terminal
-      qrcode.generate(qr, { small: true, width: 60 });
+      // Generate QR code - small and compact
+      qrcode.generate(qr, { small: true });
+      console.log("\n");
     } catch (error) {
-      console.error("❌ QR Code Display Error:", error.message);
-      console.log("📱 Please scan the QR code shown above\n");
+      console.error("⚠️  QR Code generation issue");
     }
 
-    console.log(`\n✅ Bot ID: ${this.masterNumber}`);
-    console.log("⏳ Waiting for authentication...\n");
+    console.log("╔════════════════════════════════════════════════════════════╗");
+    console.log("│ Bot ID: 971505760056");
+    console.log("│ Status: Waiting for device link...");
+    console.log("│ Timeout: 60 seconds");
+    console.log("╚════════════════════════════════════════════════════════════╝\n");
   }
 
   /**

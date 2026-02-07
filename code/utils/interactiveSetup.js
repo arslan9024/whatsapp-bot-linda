@@ -105,15 +105,19 @@ export const displayCode = (code, number) => {
 export const displayQRInstructions = (number) => {
   console.clear();
   console.log("\n╔════════════════════════════════════════════════════════════╗");
-  console.log("║          🚀 WhatsApp Bot - QR Code Authentication         ║");
+  console.log("║          � WhatsApp Bot - QR Code Authentication         ║");
   console.log("╚════════════════════════════════════════════════════════════╝\n");
   
   console.log(`📱 Master Number: ${number}\n`);
-  console.log("Follow these steps:");
-  console.log("  1️⃣  Open WhatsApp on your phone");
-  console.log("  2️⃣  Go to: Settings → Linked Devices");
-  console.log("  3️⃣  Tap: Link a Device");
-  console.log("  4️⃣  Scan the QR code below:\n");
+  console.log("┌────────────────────────────────────────────────────────────┐");
+  console.log("│ STEPS TO LINK YOUR DEVICE:                                 │");
+  console.log("│                                                            │");
+  console.log("│ 1️⃣  Open WhatsApp on your phone                            │");
+  console.log("│ 2️⃣  Go to: Settings → Linked Devices                      │");
+  console.log("│ 3️⃣  Tap: Link a Device                                     │");
+  console.log("│ 4️⃣  Scan the QR code shown below with your phone           │");
+  console.log("│                                                            │");
+  console.log("└────────────────────────────────────────────────────────────┘\n");
 };
 
 export const closeInterface = () => {
