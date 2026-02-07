@@ -34,6 +34,15 @@ outputs/
 logs/
 *.log
 
+# Google API Credentials (SENSITIVE - NEVER COMMIT)
+config/google-credentials.json
+config/*-credentials.json
+config/*-keys.json
+code/GoogleAPI/keys.json
+code/GoogleAPI/*/keys.json
+*.pem
+*-key.json
+
 # Backups & Temp Files
 *.bak
 *.tmp
