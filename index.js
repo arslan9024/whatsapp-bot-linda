@@ -193,10 +193,10 @@ function setupNewLinkingFlow(client, masterNumber) {
       console.log("📱 Master Device Number: " + masterNumber + "\n");
       console.log("⏳ Scanning... Open WhatsApp → Settings → Linked Devices\n");
       
-      // Display QR code using imported qrcode-terminal
-      qrcode.generate(qr, { small: true });
+      // Display compact QR code using imported qrcode-terminal
+      qrcode.generate(qr, { small: true, quiet: 1 });
       
-      console.log("\nℹ️  Waiting for you to scan the QR code with your phone...\n");
+      console.log("ℹ️  Waiting for you to scan the QR code with your phone...\n");
     }
   });
 
