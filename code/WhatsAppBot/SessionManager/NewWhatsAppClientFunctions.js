@@ -1,6 +1,7 @@
 import qrcode from "qrcode-terminal";
 import { Lion
 } from "../../index.js";
+import { logMessageTypeCompact } from "../../code/utils/messageTypeLogger.js";
 
 // import { MessageInspector} from "../../../code/Message/MessageInspector.js";
 
@@ -71,6 +72,9 @@ client.on('qr', async (qr) => {
   // client.initialize();
 
   client.on("message", msg => {
+    // Log message type in terminal
+    logMessageTypeCompact(msg);
+    
     if (msg.body == "!ping") {
       msg.reply("pong");
     }

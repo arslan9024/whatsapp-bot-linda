@@ -3,6 +3,7 @@ import { MessageAnalyzer } from "./MessageAnalyzer.js";
 import { displayCode, displayQRInstructions, closeInterface } from "../utils/interactiveSetup.js";
 import { displayFeatureStatus } from "../utils/featureStatus.js";
 import { createDeviceStatusFile, updateDeviceStatus, displayDeviceStatus, displayAuthenticationSuccess } from "../utils/deviceStatus.js";
+import { logMessageType, logMessageTypeCompact } from "../utils/messageTypeLogger.js";
 
 export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatus) => {
   if (!client) {
@@ -144,6 +145,9 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     // client.initialize();
 
     client.on("message", msg => {
+      // Log message type in terminal
+      logMessageTypeCompact(msg);
+      
       if (msg.body == "!ping") {
         msg.reply("pong");
       }
