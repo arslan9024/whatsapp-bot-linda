@@ -4,6 +4,7 @@ import { displayCode, displayQRInstructions, closeInterface } from "../utils/int
 import { displayFeatureStatus } from "../utils/featureStatus.js";
 import { createDeviceStatusFile, updateDeviceStatus, displayDeviceStatus, displayAuthenticationSuccess } from "../utils/deviceStatus.js";
 import { logMessageType, logMessageTypeCompact } from "../utils/messageTypeLogger.js";
+import SessionRestoreHandler from "./SessionRestoreHandler.js";
 
 export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatus) => {
   if (!client) {
@@ -12,7 +13,18 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
   }
 
   try {
-    // client initialize does not finish at ready now.
+    // Handle session restore with dedicated handler
+    let restoreHandler = null;
+    
+    if (sessionStatus === "restore") {
+      console.log(`\n🔄 Session restoration detected for: ${number}`);
+      restoreHandler = new SessionRestoreHandler(client, number);
+      // Start restore process instead of regular initialization
+      restoreHandler.startRestore();
+      return; // Restore handler manages initialization
+    }
+
+    // Regular initialization for new sessions
     console.log(`\n🔄 Initializing WhatsApp client for: ${number}`);
     client.initialize();
     
@@ -24,10 +36,8 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     });
     
     client.on('qr', async (qr) => {
-      // Skip QR if this is a restored session
-      if (sessionStatus === "restore") {
-        return;
-      }
+      // QR display only happens on new sessions
+      // (restore is handled by restoreHandler above)
       
       if (!qrDisplayed) {
         qrDisplayed = true;
@@ -58,27 +68,39 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     });
 
     client.on("authenticated", () => {
-      // Update device status when authenticated
+      // Update device status when authenticated (new session)
+      console.log("\n✅ Authentication successful!");
+      console.log("🔄 Reactivating device for new session...\n");
+      
       updateDeviceStatus(number, {
         deviceLinked: true,
         isActive: true,
         linkedAt: new Date().toISOString(),
         lastConnected: new Date().toISOString(),
         authMethod: authMethod,
+        sessionType: "new",
       });
       
       displayAuthenticationSuccess(number, authMethod);
     });
 
     client.on("auth_failure", msg => {
-      // Fired if session restore was unsuccessful
+      // Authentication failure for new session
+      console.error("\n" + "━".repeat(60));
+      console.error("❌ AUTHENTICATION FAILURE");
+      console.error("━".repeat(60));
+      console.error(`Error: ${msg}`);
+      console.error(`Session Type: ${sessionStatus}`);
+      
       updateDeviceStatus(number, {
         deviceLinked: false,
         isActive: false,
+        authFailure: true,
+        failureTime: new Date().toISOString(),
+        failureMessage: msg,
       });
       
-      console.error("\n❌ AUTHENTICATION FAILURE:", msg);
-      console.error("Your device has been unlinked. Please re-authenticate.\n");
+      console.error("\n⚠️  Device has been unlinked. Please re-authenticate.\n");
       console.log("Creating new session file...\n");
     });
 
