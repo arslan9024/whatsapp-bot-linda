@@ -1,4 +1,4 @@
-import { Lion0} from "../../index.js";
+// Lion0 is available as global.Lion0 after bot initialization
 import { MyProjectsWMN } from "../MyProjects/MyProjectsWMN.js";
 import { getSheetWMN } from "../GoogleSheet/getSheetWMN.js";
 import { CorrectifyOneNumer } from "../utils/contacts.js";

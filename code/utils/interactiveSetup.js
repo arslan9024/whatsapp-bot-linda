@@ -2,16 +2,28 @@ import readline from "readline";
 import { checkSessionExists, displaySessionRestored, displayNewSetup, displayFeatureStatus } from "./featureStatus.js";
 import { displayDeviceStatus } from "./deviceStatus.js";
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+let rl = null;
+
+const getInterface = () => {
+  if (!rl || rl.closed) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+  }
+  return rl;
+};
 
 export const question = (prompt) => {
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      resolve(answer.trim());
-    });
+  return new Promise((resolve, reject) => {
+    try {
+      const readlineInterface = getInterface();
+      readlineInterface.question(prompt, (answer) => {
+        resolve(answer.trim());
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
 };
 
@@ -105,5 +117,8 @@ export const displayQRInstructions = (number) => {
 };
 
 export const closeInterface = () => {
-  rl.close();
+  if (rl && !rl.closed) {
+    rl.close();
+    rl = null;
+  }
 };

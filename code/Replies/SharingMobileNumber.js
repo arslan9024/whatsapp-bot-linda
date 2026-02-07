@@ -1,7 +1,8 @@
 import { getSheetWMN } from "../GoogleSheet/getSheetWMN.js";
 import { MyProjectsWMN } from "../MyProjects/MyProjectsWMN.js";
-import { Lion0 } from "../../index.js";
 import { CorrectifyOneNumer } from "../utils/contacts.js";
+
+// Lion0 is available as global.Lion0 after bot initialization
 
 export async function SharingMobileNumber(msg) {
     let SendReport;

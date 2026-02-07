@@ -1,4 +1,4 @@
-import { Lion0 } from "../../index.js";
+// Lion0 is available as global.Lion0 after bot initialization
 
 
 export async function FindAndShareOwnerNumberOnAgentRequestFromProject(msg, Time) {

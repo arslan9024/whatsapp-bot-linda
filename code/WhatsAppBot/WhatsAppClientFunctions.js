@@ -5,9 +5,14 @@ import { displayFeatureStatus } from "../utils/featureStatus.js";
 import { createDeviceStatusFile, updateDeviceStatus, displayDeviceStatus, displayAuthenticationSuccess } from "../utils/deviceStatus.js";
 
 export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatus) => {
+  if (!client) {
+    console.error("❌ Client is null or undefined");
+    return;
+  }
 
   try {
     // client initialize does not finish at ready now.
+    console.log(`\n🔄 Initializing WhatsApp client for: ${number}`);
     client.initialize();
     
     let pairingCodeRequested = false;
@@ -127,12 +132,16 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
       MessageAnalyzer(msg);
     });
 
+    client.on("error", (error) => {
+      console.error("❌ Client Error:", error.message);
+    });
+
+    client.on("disconnected", (reason) => {
+      console.warn("⚠️  Client Disconnected:", reason);
+    });
+
   } catch (error) {
-    console.log(error);
+    console.error("❌ Error in WhatsAppClientFunctions:", error.message);
+    console.error("Stack:", error.stack);
   }
-
-
-
-
-
 };
