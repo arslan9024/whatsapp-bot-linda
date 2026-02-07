@@ -3,6 +3,7 @@ import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAp
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 import fs from "fs";
 import path from "path";
+import qrcode from "qrcode-terminal";
 
 // Global bot instance
 let Lion0 = null;
@@ -181,8 +182,7 @@ function setupNewLinkingFlow(client, masterNumber) {
       console.log("📱 Master Device Number: " + masterNumber + "\n");
       console.log("⏳ Scanning... Open WhatsApp → Settings → Linked Devices\n");
       
-      // Display QR code
-      const qrcode = require("qrcode-terminal");
+      // Display QR code using imported qrcode-terminal
       qrcode.generate(qr, { small: true });
       
       console.log("\nℹ️  Waiting for you to scan the QR code with your phone...\n");
