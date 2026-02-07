@@ -1,0 +1,41 @@
+{
+  "accounts": [
+    {
+      "id": "power-agent",
+      "name": "Power Agent",
+      "description": "Primary Google account for WhatsApp Bot operations and shared sheets",
+      "type": "service-account",
+      "credentialsPath": "./code/Integration/Google/accounts/power-agent/keys.json",
+      "keyPath": "./code/Integration/Google/keys.json",
+      "scopes": [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "active",
+      "createdAt": "2026-02-07",
+      "lastUsed": "2026-02-07"
+    },
+    {
+      "id": "goraha-properties",
+      "name": "Goraha Properties",
+      "description": "Google account for Goraha Properties-specific sheets and reports",
+      "type": "service-account",
+      "credentialsPath": "./code/Integration/Google/accounts/goraha-properties/keys.json",
+      "scopes": [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "configured",
+      "createdAt": "2026-02-07",
+      "lastUsed": null
+    }
+  ],
+  "defaultAccount": "power-agent",
+  "version": "1.0.0",
+  "lastModified": "2026-02-07",
+  "notes": {
+    "power-agent": "Connect credentials to: code/Integration/Google/accounts/power-agent/keys.json",
+    "goraha-properties": "Connect Goraha Properties credentials to: code/Integration/Google/accounts/goraha-properties/keys.json"
+  }
+}

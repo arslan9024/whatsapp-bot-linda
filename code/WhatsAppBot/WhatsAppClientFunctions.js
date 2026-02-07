@@ -1,5 +1,6 @@
 import qrcode from "qrcode-terminal";
 import { MessageAnalyzer } from "./MessageAnalyzer.js";
+import { getEnhancedMessageHandler } from "./EnhancedMessageHandler.js";
 import { displayCode, displayQRInstructions, closeInterface } from "../utils/interactiveSetup.js";
 import { displayFeatureStatus } from "../utils/featureStatus.js";
 import { createDeviceStatusFile, updateDeviceStatus, displayDeviceStatus, displayAuthenticationSuccess } from "../utils/deviceStatus.js";
@@ -145,14 +146,20 @@ export const WhatsAppClientFunctions = (client, number, authMethod, sessionStatu
     // The client.once("ready") above handles initial ready event
     // This prevents duplicate processing and display of feature status
 
-    client.on("message", msg => {
-      // Log message type in terminal
-      logMessageTypeCompact(msg);
-      
-      if (msg.body == "!ping") {
-        msg.reply("pong");
+    client.on("message", async (msg) => {
+      // Phase 3: Use enhanced message handler with context enrichment
+      try {
+        const handler = getEnhancedMessageHandler();
+        await handler.processMessage(msg);
+      } catch (error) {
+        console.error("❌ Error in enhanced handler:", error.message);
+        // Fallback to legacy analyzer for stability
+        try {
+          MessageAnalyzer(msg);
+        } catch (e) {
+          console.error("❌ Fallback analyzer also failed:", e.message);
+        }
       }
-      MessageAnalyzer(msg);
     });
 
     client.on("error", (error) => {
