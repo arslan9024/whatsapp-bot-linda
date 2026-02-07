@@ -65,12 +65,18 @@ class SheetsService {
    */
   async initialize() {
     try {
-      // TODO: Implement initialization
-      // - Get authenticated client from authService
-      // - Create sheets API instance
-      // - Test connection with health check
+      // Get authenticated client from authService
+      const authClient = await this.authService.getAuthClient();
       
-      logger.info('SheetsService initialization placeholder');
+      if (!authClient) {
+        throw new Error('Failed to get authenticated client from AuthenticationService');
+      }
+      
+      // Create sheets API instance
+      this.sheetsAPI = google.sheets({ version: 'v4', auth: authClient });
+      
+      // Test connection with health check
+      logger.info('SheetsService initialized successfully');
       return true;
     } catch (error) {
       logger.error('SheetsService initialization failed', { error: error.message });
@@ -89,15 +95,50 @@ class SheetsService {
    */
   async getValues(spreadsheetId, range = 'Sheet1', options = {}) {
     try {
-      // TODO: Implement getValues
-      // - Check cache first (if enabled)
-      // - Build request options
-      // - Call sheets.spreadsheets.values.get()
-      // - Cache result
-      // - Return data
+      // Check cache first (if enabled)
+      if (this.enableCache) {
+        const cacheKey = `${spreadsheetId}:${range}`;
+        const cachedData = this.cache.get(cacheKey);
+        
+        if (cachedData && (Date.now() - cachedData.timestamp) < this.cacheTTL) {
+          logger.debug('Returning cached sheet values', { spreadsheetId, range });
+          return cachedData.data;
+        }
+      }
       
-      logger.info('SheetsService.getValues() placeholder', { spreadsheetId, range });
-      return null;
+      // Build request options
+      const requestOptions = {
+        spreadsheetId,
+        range,
+        ...options
+      };
+      
+      // Call sheets.spreadsheets.values.get()
+      const response = await this.sheetsAPI.spreadsheets.values.get(requestOptions);
+      
+      const data = {
+        spreadsheetId,
+        range: response.data.range || range,
+        values: response.data.values || [],
+        majorDimension: response.data.majorDimension || 'ROWS'
+      };
+      
+      // Cache result
+      if (this.enableCache) {
+        const cacheKey = `${spreadsheetId}:${range}`;
+        this.cache.set(cacheKey, {
+          data,
+          timestamp: Date.now()
+        });
+      }
+      
+      logger.info('Successfully retrieved sheet values', { 
+        spreadsheetId, 
+        range, 
+        rowCount: data.values.length 
+      });
+      
+      return data;
     } catch (error) {
       logger.error('Failed to get sheet values', { 
         spreadsheetId, 
@@ -122,12 +163,18 @@ class SheetsService {
    */
   async getCell(spreadsheetId, cellRange) {
     try {
-      // TODO: Implement getCell
-      // - Get values for single cell range
-      // - Extract and return cell value
-      // - Handle empty cells
+      // Get values for single cell range
+      const response = await this.getValues(spreadsheetId, cellRange);
       
-      logger.info('SheetsService.getCell() placeholder', { spreadsheetId, cellRange });
+      // Extract and return cell value
+      if (response.values && response.values.length > 0 && response.values[0].length > 0) {
+        const cellValue = response.values[0][0];
+        logger.debug('Retrieved cell value', { spreadsheetId, cellRange, cellValue });
+        return cellValue;
+      }
+      
+      // Handle empty cells
+      logger.debug('Cell is empty', { spreadsheetId, cellRange });
       return null;
     } catch (error) {
       logger.error('Failed to get cell', { spreadsheetId, cellRange, error: error.message });
@@ -150,14 +197,23 @@ class SheetsService {
    */
   async getColumn(spreadsheetId, column, sheetName = 'Sheet1') {
     try {
-      // TODO: Implement getColumn
-      // - Build range for entire column
-      // - Get values
-      // - Extract column array
-      // - Return filtered values
+      // Build range for entire column
+      const range = `${sheetName}!${column}:${column}`;
       
-      logger.info('SheetsService.getColumn() placeholder', { spreadsheetId, column, sheetName });
-      return [];
+      // Get values
+      const response = await this.getValues(spreadsheetId, range);
+      
+      // Extract column array and return filtered values (remove empty cells)
+      const values = response.values || [];
+      const columnValues = values.map(row => row[0] || null).filter(val => val !== null);
+      
+      logger.info('Retrieved column values', { 
+        spreadsheetId, 
+        column, 
+        valueCount: columnValues.length 
+      });
+      
+      return columnValues;
     } catch (error) {
       logger.error('Failed to get column', { spreadsheetId, column, error: error.message });
       throw errorHandler.handle(error, { 
@@ -179,14 +235,22 @@ class SheetsService {
    */
   async getRow(spreadsheetId, rowNumber, sheetName = 'Sheet1') {
     try {
-      // TODO: Implement getRow
-      // - Build range for specific row
-      // - Get values
-      // - Extract row array
-      // - Return values
+      // Build range for specific row
+      const range = `${sheetName}!${rowNumber}:${rowNumber}`;
       
-      logger.info('SheetsService.getRow() placeholder', { spreadsheetId, rowNumber, sheetName });
-      return [];
+      // Get values
+      const response = await this.getValues(spreadsheetId, range);
+      
+      // Extract row array and return values
+      const values = response.values && response.values.length > 0 ? response.values[0] : [];
+      
+      logger.info('Retrieved row values', { 
+        spreadsheetId, 
+        rowNumber, 
+        valueCount: values.length 
+      });
+      
+      return values;
     } catch (error) {
       logger.error('Failed to get row', { spreadsheetId, rowNumber, error: error.message });
       throw errorHandler.handle(error, { 
@@ -210,13 +274,29 @@ class SheetsService {
    */
   async getFiltered(spreadsheetId, range, filterOptions = {}) {
     try {
-      // TODO: Implement getFiltered
-      // - Get all values from range
-      // - Apply filter criteria
-      // - Return matching rows
+      // Get all values from range
+      const response = await this.getValues(spreadsheetId, range);
+      const allRows = response.values || [];
       
-      logger.info('SheetsService.getFiltered() placeholder', { spreadsheetId, range, filterOptions });
-      return [];
+      // Apply filter criteria
+      if (!filterOptions.columnIndex || filterOptions.value === undefined) {
+        logger.warn('Incomplete filter options provided');
+        return allRows;
+      }
+      
+      const filteredRows = allRows.filter(row => {
+        return row[filterOptions.columnIndex] === filterOptions.value;
+      });
+      
+      logger.info('Applied filter to sheet values', { 
+        spreadsheetId, 
+        range, 
+        totalRows: allRows.length,
+        filteredRows: filteredRows.length,
+        filter: filterOptions
+      });
+      
+      return filteredRows;
     } catch (error) {
       logger.error('Failed to get filtered values', { spreadsheetId, range, error: error.message });
       throw errorHandler.handle(error, { 
@@ -249,15 +329,43 @@ class SheetsService {
    */
   async appendRow(spreadsheetId, values, options = {}) {
     try {
-      // TODO: Implement appendRow
-      // - Validate values array
-      // - Build append request
-      // - Call sheets.spreadsheets.values.append()
-      // - Clear cache
-      // - Return result
+      // Validate values array
+      if (!Array.isArray(values) || values.length === 0) {
+        throw new Error('Values must be a non-empty array');
+      }
       
-      logger.info('SheetsService.appendRow() placeholder', { spreadsheetId, valuesCount: values?.length });
-      return null;
+      // Build append request
+      const range = options.range || 'Sheet1';
+      const requestBody = {
+        values: [values]
+      };
+      
+      // Call sheets.spreadsheets.values.append()
+      const response = await this.sheetsAPI.spreadsheets.values.append({
+        spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: requestBody
+      });
+      
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully appended row to sheet', { 
+        spreadsheetId, 
+        range, 
+        valuesCount: values.length,
+        updatedCells: response.data.updates?.updatedCells
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to append row', { spreadsheetId, error: error.message });
       throw errorHandler.handle(error, { 
@@ -279,15 +387,48 @@ class SheetsService {
    */
   async appendRows(spreadsheetId, rows, options = {}) {
     try {
-      // TODO: Implement appendRows
-      // - Validate rows array
-      // - Build batch append request
-      // - Call sheets.spreadsheets.values.append() with all rows
-      // - Clear cache
-      // - Return result
+      // Validate rows array
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error('Rows must be a non-empty array');
+      }
       
-      logger.info('SheetsService.appendRows() placeholder', { spreadsheetId, rowCount: rows?.length });
-      return null;
+      // Validate each row is an array
+      if (!rows.every(row => Array.isArray(row))) {
+        throw new Error('Each row must be an array');
+      }
+      
+      // Build batch append request
+      const range = options.range || 'Sheet1';
+      const requestBody = {
+        values: rows
+      };
+      
+      // Call sheets.spreadsheets.values.append() with all rows
+      const response = await this.sheetsAPI.spreadsheets.values.append({
+        spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: requestBody
+      });
+      
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully appended multiple rows to sheet', { 
+        spreadsheetId, 
+        range, 
+        rowCount: rows.length,
+        updatedCells: response.data.updates?.updatedCells
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to append rows', { spreadsheetId, error: error.message });
       throw errorHandler.handle(error, { 
@@ -309,14 +450,36 @@ class SheetsService {
    */
   async updateCell(spreadsheetId, cellRange, value) {
     try {
-      // TODO: Implement updateCell
-      // - Build update request
-      // - Call sheets.spreadsheets.values.update()
-      // - Clear cache
-      // - Return result
+      // Build update request
+      const requestBody = {
+        values: [[value]]
+      };
       
-      logger.info('SheetsService.updateCell() placeholder', { spreadsheetId, cellRange });
-      return null;
+      // Call sheets.spreadsheets.values.update()
+      const response = await this.sheetsAPI.spreadsheets.values.update({
+        spreadsheetId,
+        range: cellRange,
+        valueInputOption: 'RAW',
+        resource: requestBody
+      });
+      
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully updated cell', { 
+        spreadsheetId, 
+        cellRange, 
+        updatedCells: response.data.updatedCells
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to update cell', { spreadsheetId, cellRange, error: error.message });
       throw errorHandler.handle(error, { 
@@ -338,14 +501,42 @@ class SheetsService {
    */
   async updateRange(spreadsheetId, range, values) {
     try {
-      // TODO: Implement updateRange
-      // - Build update request
-      // - Call sheets.spreadsheets.values.update()
-      // - Clear cache
-      // - Return result
+      // Validate values
+      if (!Array.isArray(values)) {
+        throw new Error('Values must be a 2D array');
+      }
       
-      logger.info('SheetsService.updateRange() placeholder', { spreadsheetId, range });
-      return null;
+      // Build update request
+      const requestBody = {
+        values: values
+      };
+      
+      // Call sheets.spreadsheets.values.update()
+      const response = await this.sheetsAPI.spreadsheets.values.update({
+        spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: requestBody
+      });
+      
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully updated range', { 
+        spreadsheetId, 
+        range, 
+        updatedCells: response.data.updatedCells,
+        rowCount: values.length
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to update range', { spreadsheetId, range, error: error.message });
       throw errorHandler.handle(error, { 
@@ -366,14 +557,29 @@ class SheetsService {
    */
   async clearRange(spreadsheetId, range) {
     try {
-      // TODO: Implement clearRange
-      // - Build clear request
-      // - Call sheets.spreadsheets.values.clear()
-      // - Clear cache
-      // - Return result
+      // Call sheets.spreadsheets.values.clear()
+      const response = await this.sheetsAPI.spreadsheets.values.clear({
+        spreadsheetId,
+        range
+      });
       
-      logger.info('SheetsService.clearRange() placeholder', { spreadsheetId, range });
-      return null;
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully cleared range', { 
+        spreadsheetId, 
+        range, 
+        clearedCells: response.data.clearedCells
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to clear range', { spreadsheetId, range, error: error.message });
       throw errorHandler.handle(error, { 
@@ -394,14 +600,39 @@ class SheetsService {
    */
   async batchUpdate(spreadsheetId, requests) {
     try {
-      // TODO: Implement batchUpdate
-      // - Build batch update request
-      // - Call sheets.spreadsheets.batchUpdate()
-      // - Clear cache
-      // - Return result
+      // Validate requests
+      if (!Array.isArray(requests) || requests.length === 0) {
+        throw new Error('Requests must be a non-empty array');
+      }
       
-      logger.info('SheetsService.batchUpdate() placeholder', { spreadsheetId, requestCount: requests?.length });
-      return null;
+      // Build batch update request
+      const requestBody = {
+        requests: requests
+      };
+      
+      // Call sheets.spreadsheets.batchUpdate()
+      const response = await this.sheetsAPI.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: requestBody
+      });
+      
+      // Clear cache for this spreadsheet
+      if (this.enableCache && spreadsheetId) {
+        const cachePrefix = `${spreadsheetId}:`;
+        for (let [key] of this.cache) {
+          if (key.startsWith(cachePrefix)) {
+            this.cache.delete(key);
+          }
+        }
+      }
+      
+      logger.info('Successfully batch updated', { 
+        spreadsheetId, 
+        requestCount: requests.length,
+        responseCount: response.data.replies?.length
+      });
+      
+      return response.data;
     } catch (error) {
       logger.error('Failed to batch update', { spreadsheetId, error: error.message });
       throw errorHandler.handle(error, { 
