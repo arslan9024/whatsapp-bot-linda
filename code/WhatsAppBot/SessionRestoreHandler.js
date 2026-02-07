@@ -6,6 +6,7 @@
 
 import { updateDeviceStatus, getDeviceStatus, displayDeviceStatus } from "../utils/deviceStatus.js";
 import { logSessionEvent } from "../utils/sessionLogger.js";
+import DeviceLinker from "./DeviceLinker.js";
 
 export class SessionRestoreHandler {
   constructor(client, masterNumber) {
@@ -16,12 +17,21 @@ export class SessionRestoreHandler {
     this.maxRestoreAttempts = 3;
     this.deviceReactivated = false;
     this.previousDeviceStatus = null;
+    this.restoreInProgress = false;  // NEW: Prevent double initialization
   }
 
   /**
    * Start the session restore process
    */
   async startRestore() {
+    // Prevent duplicate restore attempts
+    if (this.restoreInProgress) {
+      console.log("⏸️  Restore already in progress, waiting...\n");
+      return;
+    }
+
+    this.restoreInProgress = true;
+
     console.log("\n╔════════════════════════════════════════════════════════════╗");
     console.log("║          🔄 SESSION RESTORE - REACTIVATING DEVICE         ║");
     console.log("╚════════════════════════════════════════════════════════════╝\n");
@@ -76,9 +86,14 @@ export class SessionRestoreHandler {
       }
     });
 
-    // Initialize client (triggers session restore)
-    console.log("🚀 Initializing WhatsApp client with existing session...\n");
-    this.client.initialize();
+    // Important: Only initialize if not already in progress
+    // Client should already be initializing from CreatingNewWhatsAppClient
+    if (!this.client._state) {
+      console.log("🚀 Initializing WhatsApp client with existing session...\n");
+      this.client.initialize();
+    } else {
+      console.log("⏳ Waiting for client initialization with existing session...\n");
+    }
   }
 
   /**
@@ -137,16 +152,57 @@ export class SessionRestoreHandler {
     });
 
     if (this.restoreAttempts < this.maxRestoreAttempts) {
-      console.log("🔄 Attempting restore again...\n");
-      // Will be handled by manager to retry
+      console.log(`🔄 Retrying restore (attempt ${this.restoreAttempts + 1}/${this.maxRestoreAttempts})...\n`);
+      console.log("⏳ Waiting 5 seconds before retry...\n");
+      
+      setTimeout(() => {
+        this.restoreInProgress = false;  // Reset flag for retry
+        this.restoreAttempts++;
+        this.setupRestoreListeners();
+      }, 5000);
     } else {
       console.error("❌ Maximum restore attempts exceeded.");
-      console.error("⚠️  Session may be expired or device was unlinked.\n");
-      console.error("Solutions:\n");
-      console.error("1. Delete sessions folder and restart (fresh authentication)");
-      console.error("2. Check if device is still linked in WhatsApp settings");
-      console.error("3. Verify internet connection\n");
+      console.error("⚠️  Session cannot be reactivated.\n");
+      console.log("╔════════════════════════════════════════════════════════════╗");
+      console.log("║   SESSION REACTIVATION FAILED - REQUESTING FRESH AUTH      ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      
+      console.log("📱 The device link has expired or been removed.\n");
+      console.log("↪️  Bot will now request fresh device authentication.\n");
+      console.log("📋 Steps to Reactivate:");
+      console.log("   1. A QR code will be displayed below");
+      console.log("   2. Open WhatsApp on your phone");
+      console.log("   3. Go to: Settings → Linked Devices");
+      console.log("   4. Tap: Link a Device");
+      console.log("   5. Scan the QR code shown\n");
+      
+      // Trigger fallback to fresh authentication
+      this.triggerFreshAuthentication();
     }
+  }
+
+  /**
+   * Trigger fresh device authentication when restore fails
+   */
+  triggerFreshAuthentication() {
+    // Clear old session data
+    updateDeviceStatus(this.masterNumber, {
+      deviceLinked: false,
+      isActive: false,
+      restoreStatus: "fallback_to_fresh_auth",
+      fallbackTime: new Date().toISOString(),
+    });
+
+    logSessionEvent(this.masterNumber, "restore_fallback_fresh_auth", {
+      reason: "max_attempts_exceeded",
+      timestamp: new Date().toISOString(),
+    });
+
+    // Set up fresh authentication with DeviceLinker
+    const freshLinker = new DeviceLinker(this.client, this.masterNumber, "qr", "new");
+    
+    console.log("🚀 Initializing fresh device linking...\n");
+    freshLinker.startLinking();
   }
 
   /**

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { WhatsAppClientFunctions } from "./code/WhatsAppBot/WhatsAppClientFunctions.js";
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import DeviceLinker from "./code/WhatsAppBot/DeviceLinker.js";
+import SessionRestoreHandler from "./code/WhatsAppBot/SessionRestoreHandler.js";
 import { checkAndHandleExistingSession } from "./code/utils/interactiveSetup.js";
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 import SessionManager from "./code/utils/SessionManager.js";
@@ -55,19 +56,23 @@ async function initializeBot() {
 
     console.log("✅ WhatsApp client created successfully\n");
     
-    // Initialize device linker only if new session
-    // Existing sessions will be restored automatically
+    // Handle new vs restore sessions with different flows
     if (sessionStatus === "new") {
-      console.log("🔄 Initializing device linking...\n");
-      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, sessionStatus);
-      await deviceLinker.startLinking();
+      console.log("🔄 Initializing device linking for NEW session...\n");
+      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, "new");
+      deviceLinker.startLinking();
+      // Don't await - event listeners handle completion
     } else {
-      console.log("✅ Existing session found - Restoring connection...\n");
-      const deviceLinker = new DeviceLinker(Lion0, masterNumber, authMethod, sessionStatus);
-      await deviceLinker.startLinking();
+      console.log("✅ Existing session found - Reactivating device connection...\n");
+      console.log("⏳ Attempting to reactivate previous session (max 3 attempts)...\n");
+      
+      // For restore sessions: use dedicated session restore handler
+      const restoreHandler = new SessionRestoreHandler(Lion0, masterNumber);
+      restoreHandler.startRestore();
+      // Handler manages the entire restore flow including fallback
     }
 
-    // Make bot available globally
+    // Make bot available globally immediately (before session ready)
     global.Lion0 = Lion0;
     global.Lion = Lion0; // Alias for backward compatibility
     global.MasterBot = Lion0; // Alias for clarity
