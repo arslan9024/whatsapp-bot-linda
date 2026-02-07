@@ -35,9 +35,10 @@ async function initializeBot() {
       createDeviceStatusFile(masterNumber);
     }
 
-    // Auto-use 6-digit code for authentication
-    const authMethod = "code"; // Always use 6-digit code
-    console.log(`🔐 Authentication Method: 6-Digit Code (Recommended)\n`);
+    // Use QR code authentication for headless/local development
+    // (6-digit code requires full browser APIs not available in headless mode)
+    const authMethod = "qr"; // Use QR code for local development
+    console.log(`🔐 Authentication Method: QR Code (Headless Mode)\n`);
     
     console.log("⏳ Creating WhatsApp client...\n");
 

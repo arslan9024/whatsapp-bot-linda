@@ -34,19 +34,49 @@ Linda enables intelligent WhatsApp conversation management for business users by
 
 ## ✨ CORE FEATURES (Current & Planned)
 
-### Phase 1-4: Foundation ✅ COMPLETE
-- ✅ WhatsApp Web Integration (whatsapp-web.js)
-- ✅ Session Management & Persistence
-- ✅ Device Linking (6-digit code + QR)
-- ✅ Multi-bot Support Architecture
-- ✅ Error Handling & Recovery
-- ✅ Logging & Monitoring
-- ✅ Code Quality (ESLint, 74/100 score)
+### Phase 1: Master Account WhatsApp Web Session Connection 🔄 CURRENT FOCUS
+**Duration:** 1-2 weeks  
+**Focus:** Local development only (npm run dev)
+
+**Objectives:**
+- ✅ Master account (971505760056) WhatsApp Web session properly connected
+- ✅ Session persists locally in ./sessions/ folder
+- ✅ 6-digit code or QR code device linking works
+- ⏳ Session automatically refreshes if expired
+- ✅ Terminal displays active session status with account number
+- ✅ Ready to listen to incoming messages
+- ⏳ Monitor session health continuously
+
+**Deliverables:**
+- ✅ Working npm run dev command
+- ✅ Device linking via WhatsApp web (6-digit code)
+- ✅ Session persistence system
+- ✅ Terminal status display
+- ⏳ Auto-session refresh mechanism
+- ✅ Message listening capability
+
+### Phase 2: Enhanced Session Management ⏳ PLANNED
+**Focus:** Robust session lifecycle management
+
+**Objectives:**
+- Session expiration detection
+- Automatic session renewal
+- Session health monitoring
+- Database/file-based session storage options
+
+### Phase 3-4: AI Features & Automation ⏳ PLANNED
+**Focus:** Intelligent message handling
+
+**Core Features:**
 - ✅ Campaign Management & Bulk Messaging
 - ✅ Contact Management & Validation
 - ✅ Google Sheets Integration
+- ✅ WhatsApp Web Integration (whatsapp-web.js)
+- ✅ Error Handling & Recovery
+- ✅ Logging & Monitoring
+- ✅ Code Quality (ESLint, 74/100 score)
 
-### Phase 5: AI Features 🔄 IN PROGRESS (Priority)
+### Phase 5: AI Features 🔄 FUTURE (Starting Feb 10 if Phase 1 complete)
 - ⏳ **Conversation Analysis**
   - Extract intent from messages
   - Identify conversation context
@@ -189,8 +219,79 @@ WhatsApp-Bot-Linda/
 
 ## 🚀 IMPLEMENTATION ROADMAP
 
-### Phase 5: AI Features Foundation (Feb-Mar 2026)
-**Duration:** 4-6 weeks  
+### Phase 1: Master Account Session Connection (Feb 7-14, 2026)
+**Duration:** 1 week  
+**Priority:** CRITICAL  
+**Effort:** 30-40 hours  
+**Status:** ✅ IN PROGRESS
+
+#### Objectives:
+- [x] npm run dev starts Linda bot correctly
+- [x] Master account (971505760056) configured in .env
+- [x] 6-digit code device linking works
+- [x] Session persists in ./sessions/session-971505760056/
+- [x] Terminal displays active session status
+- [x] Bot ready to listen to messages
+- [ ] **ENHANCEMENT:** Auto-session refresh without user intervention
+- [ ] **ENHANCEMENT:** Session health monitoring
+
+#### Week 1: Session Connection & Verification
+- [x] Verify npm run dev startup
+- [x] Confirm .env master account setup
+- [x] Test 6-digit code linking
+- [x] Verify session persistence
+- [x] Check terminal status display
+- [x] Confirm message listening
+- [ ] **NEW:** Implement auto-session refresh
+- [ ] **NEW:** Add session health check routine
+
+**Deliverables:**
+- ✅ Working development environment
+- ✅ Device linking via WhatsApp web
+- ✅ Session persistence
+- ✅ Terminal status display
+- ⏳ Auto-refresh mechanism
+- ✅ Verification documentation
+
+**Success Criteria:**
+- ✅ `npm run dev` starts without errors
+- ✅ Shows "LINDA BOT IS READY TO SERVE!" when device is linked
+- ✅ Displays master account number (971505760056)
+- ✅ Shows device status: LINKED & ACTIVE
+- ✅ Session saved in ./sessions/session-971505760056/
+- ✅ Can receive test messages
+- ⏳ Session auto-refreshes if expired
+
+**Enhancements Needed:**
+1. **Session Auto-Refresh** - Detect expiration and refresh without user interaction
+2. **Health Monitoring** - Periodic checks for session validity
+3. **Graceful Reconnect** - If session dies, auto-reconnect with saved credentials
+
+---
+
+### Phase 2: Enhanced Session Management (Feb 15-28, 2026)
+**Duration:** 2 weeks  
+**Priority:** HIGH  
+**Effort:** 40-50 hours
+
+#### Objectives:
+- [ ] Session expiration detection
+- [ ] Automatic session renewal
+- [ ] Session health monitoring utility
+- [ ] Background refresh service
+- [ ] Session status persistence
+
+#### Deliverables:
+- Session health monitoring module
+- Auto-refresh service
+- Health check utilities
+- Monitoring logs
+- Documentation
+
+---
+
+### Phase 3: AI Features Foundation (Mar 1-31, 2026)
+**Duration:** 4 weeks  
 **Priority:** HIGH  
 **Effort:** 60-80 hours
 
@@ -222,12 +323,12 @@ WhatsApp-Bot-Linda/
 - Response templates library
 - Configuration guide
 
-#### Week 4: Quick Replies Feature
+#### Week 4: Quick Replies Feature & Integration
 - [ ] Create `QuickReplyManager.js` module
 - [ ] Implement reply storage (MongoDB/JSON)
 - [ ] Create reply categorization system
 - [ ] Build reply suggestion algorithm
-- [ ] Create management UI (future phase)
+- [ ] Integrate all systems
 
 **Deliverables:**
 - Quick reply manager module
@@ -235,24 +336,14 @@ WhatsApp-Bot-Linda/
 - Category organization
 - Suggestion algorithm
 - REST API endpoints (basic)
-
-#### Week 5-6: Integration & Testing
-- [ ] Integrate all three systems
-- [ ] Build end-to-end workflow tests
-- [ ] Performance optimization
-- [ ] Error handling & recovery
-- [ ] Documentation & examples
-
-**Deliverables:**
 - Integrated system
 - E2E test suite (20+ tests)
 - Performance benchmarks
 - User guide & examples
-- GitHub commit with all features
 
 ---
 
-### Phase 6: Enhancement & Optimization (Apr 2026)
+### Phase 5: Enhancement & Optimization (May 2026)
 **Duration:** 4 weeks  
 **Priority:** MEDIUM
 
@@ -264,7 +355,7 @@ WhatsApp-Bot-Linda/
 
 ---
 
-### Phase 7: Scale & Distribute (May 2026)
+### Phase 6: Scale & Distribute (Jun 2026)
 **Duration:** 4 weeks  
 **Priority:** MEDIUM
 
@@ -279,7 +370,7 @@ WhatsApp-Bot-Linda/
 ## 📈 SUCCESS METRICS
 
 ### Technical Metrics
-| Metric | Current | Phase 5 Target | Phase 7 Target |
+| Metric | Current | Phase 3 Target | Phase 6 Target |
 |--------|---------|----------------|----------------|
 | **Production Readiness** | 80-85% | 90% | 95%+ |
 | **Code Quality Score** | 74/100 | 82/100 | 90/100 |
@@ -289,12 +380,13 @@ WhatsApp-Bot-Linda/
 
 ### Feature Metrics
 | Feature | Status | Completion | Performance |
-|---------|--------|------------|-------------|
-| **Auto-Reply** | ⏳ WIP | 0% | TBD |
-| **Quick Replies** | ⏳ WIP | 0% | TBD |
-| **Conversation Analysis** | ⏳ WIP | 0% | TBD |
+|--------|--------|------------|-------------|
+| **Session Connection** | ✅ Done/🔄 Improving | 90% | Excellent |
+| **Auto-Reply** | ⏳ Phase 3 | 0% | TBD |
+| **Quick Replies** | ⏳ Phase 3 | 0% | TBD |
+| **Conversation Analysis** | ⏳ Phase 3 | 0% | TBD |
 | **Device Linking** | ✅ Complete | 100% | Excellent |
-| **Session Management** | ✅ Complete | 100% | Excellent |
+| **Session Management** | ✅ Complete/⏳ Enhanced | 90% | Excellent |
 | **Bulk Messaging** | ✅ Complete | 100% | Excellent |
 
 ### Business Metrics
@@ -415,21 +507,85 @@ npm run send-hello 971505110636
 
 ---
 
-## 📝 NEXT STEPS (Immediate: Next 2 Weeks)
+---
 
-### Week 1 (Feb 10-14, 2026)
-1. ✅ Create `/plans` documentation structure (TODAY)
-2. ⏳ Design Phase 5 detailed implementation plan
-3. ⏳ Create ConversationAnalyzer module stub
-4. ⏳ Set up test infrastructure for AI features
-5. ⏳ Commit: "Phase 5 preparation - AI features foundation"
+## 📊 TIMELINE & PHASES
 
-### Week 2 (Feb 17-21, 2026)
-1. ⏳ Implement conversation analysis engine
-2. ⏳ Build intent classification system
-3. ⏳ Create 20+ unit tests
-4. ⏳ Test with real conversation examples
-5. ⏳ Commit: "feat: Conversation analyzer - Intent extraction complete"
+### Phase Timeline Visualization
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ LINDA BOT DEVELOPMENT ROADMAP (2026)                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Phase 1: Master Account Session Connection & Status Display                │
+│  ├─ Duration: 1-2 weeks (Current)                                          │
+│  ├─ Status: VERIFICATION IN PROGRESS                                       │
+│  └─ Focus: npm run dev, session management, device linking                 │
+│     ├─ ✅ Documentation reorganized                                         │
+│     ├─ ⏳ npm run dev verification                                          │
+│     ├─ ⏳ Session persistence validation                                    │
+│     ├─ ⏳ Device linking test (6-digit code)                               │
+│     ├─ ⏳ Terminal status display verification                             │
+│     └─ ⏳ Message listening capability test                                │
+│                                                                              │
+│  Phase 2: Enhanced Session Management                                       │
+│  ├─ Duration: 1-2 weeks (Starting after Phase 1)                           │
+│  ├─ Status: PLANNED                                                        │
+│  └─ Focus: Session auto-refresh, health monitoring, recovery               │
+│                                                                              │
+│  Phase 3-4: Campaign & Contact Management                                   │
+│  ├─ Duration: 2-3 weeks                                                    │
+│  ├─ Status: PLANNED                                                        │
+│  └─ Focus: Bulk messaging, contact validation, Google Sheets integration   │
+│                                                                              │
+│  Phase 5: AI Features (Conversation Analysis & Auto-Reply)                  │
+│  ├─ Duration: 4-6 weeks                                                    │
+│  ├─ Status: PLANNED (Starting after Phase 1 complete)                      │
+│  └─ Focus: Intent extraction, reply generation, learning engine            │
+│                                                                              │
+│  Phase 6: Production Hardening & Deployment                                 │
+│  ├─ Duration: 2-3 weeks                                                    │
+│  ├─ Status: PLANNED                                                        │
+│  └─ Focus: Testing, monitoring, documentation, deployment to production    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📝 NEXT STEPS (PHASE 1 VERIFICATION - Immediate)
+
+### Today (February 7, 2026)
+1. ✅ Create `/plans` documentation structure
+2. ✅ Move all markdown files to `/plans`
+3. ✅ Create LINDA_BOT_MASTER_PLAN.md
+4. ✅ Commit initial documentation
+
+### This Week (Phase 1 Verification)
+**Priority 1: npm run dev Verification**
+1. ⏳ Verify npm run dev starts Linda bot successfully
+2. ⏳ Confirm local .env file is being used
+3. ⏳ Check that master account (971505760056) is initialized
+4. ⏳ Verify device linking code/QR code is displayed
+5. ⏳ Test 6-digit code device linking
+6. ⏳ Commit: "Phase 1 verification - npm run dev working"
+
+**Priority 2: Session Management Verification**
+1. ⏳ Verify session persists in ./sessions/ folder
+2. ⏳ Test session auto-refresh when expired
+3. ⏳ Verify terminal displays active session status
+4. ⏳ Confirm account number (971505760056) shown in terminal
+5. ⏳ Test message listening capability
+6. ⏳ Commit: "Phase 1 verification - Session management working"
+
+**Priority 3: Documentation & Sign-off**
+1. ⏳ Update PHASE_1.md with verification results
+2. ⏳ Update PROJECT_STATUS.md with completion metrics
+3. ⏳ Create verification checklist document
+4. ⏳ Commit: "Phase 1 complete - Linda bot ready for Phase 2"
+
+### Following Week (Phase 2 Planning)
+After Phase 1 complete, start Phase 2: Enhanced Session Management
 
 ---
 
