@@ -1,0 +1,674 @@
+{
+  "project": {
+    "name": "DAMAC Hills 2",
+    "alternateName": "Akoya Oxygen",
+    "location": {
+      "emirate": "Dubai",
+      "area": "MotorCity vicinity",
+      "coordinates": {
+        "latitude": 25.1025,
+        "longitude": 55.1397
+      },
+      "nearbyLandmarks": [
+        "DAMAC Hills (Original)",
+        "Akoya Oxygen",
+        "DAMAC Lagoons",
+        "Al Barari",
+        "Emirates Hills"
+      ]
+    },
+    "developer": {
+      "name": "DAMAC Properties",
+      "founded": 1997,
+      "headquarters": "Dubai, UAE",
+      "website": "www.damacproperties.com"
+    },
+    "projectStatus": "Completed",
+    "launchYear": 2017,
+    "handoverYear": 2021,
+    "projectType": ["Residential", "Mixed-Use"],
+    "totalUnits": 1500,
+    "totalArea": "42 hectares"
+  },
+  "clusters": {
+    "overview": {
+      "totalClusters": 28,
+      "description": "DAMAC Hills 2 is organized into 28 residential clusters with varying unit types"
+    },
+    "clustersList": [
+      {
+        "id": "CLUSTER_001",
+        "name": "Cluster One",
+        "unitCount": 50,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Community Center"]
+      },
+      {
+        "id": "CLUSTER_002",
+        "name": "Cluster Two",
+        "unitCount": 55,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Basketball Court"]
+      },
+      {
+        "id": "CLUSTER_003",
+        "name": "Cluster Three",
+        "unitCount": 52,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Retail Space"]
+      },
+      {
+        "id": "CLUSTER_004",
+        "name": "Cluster Four",
+        "unitCount": 58,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Terrace Area"]
+      },
+      {
+        "id": "CLUSTER_005",
+        "name": "Cluster Five",
+        "unitCount": 51,
+        "unitTypes": ["1BR", "2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Community Garden"]
+      },
+      {
+        "id": "CLUSTER_006",
+        "name": "Cluster Six",
+        "unitCount": 49,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Children's Play Area"]
+      },
+      {
+        "id": "CLUSTER_007",
+        "name": "Cluster Seven",
+        "unitCount": 54,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Barbecue Area"]
+      },
+      {
+        "id": "CLUSTER_008",
+        "name": "Cluster Eight",
+        "unitCount": 53,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Sauna"]
+      },
+      {
+        "id": "CLUSTER_009",
+        "name": "Cluster Nine",
+        "unitCount": 56,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Spa"]
+      },
+      {
+        "id": "CLUSTER_010",
+        "name": "Cluster Ten",
+        "unitCount": 50,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Reception Area"]
+      },
+      {
+        "id": "CLUSTER_011",
+        "name": "Cluster Eleven",
+        "unitCount": 48,
+        "unitTypes": ["1BR", "2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Lounge"]
+      },
+      {
+        "id": "CLUSTER_012",
+        "name": "Cluster Twelve",
+        "unitCount": 55,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Library"]
+      },
+      {
+        "id": "CLUSTER_013",
+        "name": "Cluster Thirteen",
+        "unitCount": 52,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Tennis Court"]
+      },
+      {
+        "id": "CLUSTER_014",
+        "name": "Cluster Fourteen",
+        "unitCount": 54,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Squash Court"]
+      },
+      {
+        "id": "CLUSTER_015",
+        "name": "Cluster Fifteen",
+        "unitCount": 51,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Yoga Studio"]
+      },
+      {
+        "id": "CLUSTER_016",
+        "name": "Cluster Sixteen",
+        "unitCount": 50,
+        "unitTypes": ["1BR", "2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Fitness Center"]
+      },
+      {
+        "id": "CLUSTER_017",
+        "name": "Cluster Seventeen",
+        "unitCount": 56,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Jogging Track"]
+      },
+      {
+        "id": "CLUSTER_018",
+        "name": "Cluster Eighteen",
+        "unitCount": 53,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Walking Trail"]
+      },
+      {
+        "id": "CLUSTER_019",
+        "name": "Cluster Nineteen",
+        "unitCount": 49,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Cycling Trail"]
+      },
+      {
+        "id": "CLUSTER_020",
+        "name": "Cluster Twenty",
+        "unitCount": 52,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Sports Complex"]
+      },
+      {
+        "id": "CLUSTER_021",
+        "name": "Cluster Twenty-One",
+        "unitCount": 55,
+        "unitTypes": ["1BR", "2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Recreation Center"]
+      },
+      {
+        "id": "CLUSTER_022",
+        "name": "Cluster Twenty-Two",
+        "unitCount": 51,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Community Hall"]
+      },
+      {
+        "id": "CLUSTER_023",
+        "name": "Cluster Twenty-Three",
+        "unitCount": 54,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Water Sports"]
+      },
+      {
+        "id": "CLUSTER_024",
+        "name": "Cluster Twenty-Four",
+        "unitCount": 50,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Art Studio"]
+      },
+      {
+        "id": "CLUSTER_025",
+        "name": "Cluster Twenty-Five",
+        "unitCount": 53,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Music Room"]
+      },
+      {
+        "id": "CLUSTER_026",
+        "name": "Cluster Twenty-Six",
+        "unitCount": 48,
+        "unitTypes": ["1BR", "2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Dance Studio"]
+      },
+      {
+        "id": "CLUSTER_027",
+        "name": "Cluster Twenty-Seven",
+        "unitCount": 55,
+        "unitTypes": ["2BR", "3BR", "4BR"],
+        "amenities": ["Pool", "Gymnasium", "Meditation Garden"]
+      },
+      {
+        "id": "CLUSTER_028",
+        "name": "Cluster Twenty-Eight",
+        "unitCount": 52,
+        "unitTypes": ["2BR", "3BR"],
+        "amenities": ["Pool", "Gymnasium", "Central Park"]
+      }
+    ]
+  },
+  "propertyTypes": {
+    "apartments": {
+      "totalCount": 1200,
+      "bedrooms": {
+        "1BR": {
+          "count": 150,
+          "avgSize": "650 sqft",
+          "avgSizeM2": 60,
+          "avgPrice": "AED 450,000",
+          "avgPriceUSD": 122500
+        },
+        "2BR": {
+          "count": 600,
+          "avgSize": "1,200 sqft",
+          "avgSizeM2": 112,
+          "avgPrice": "AED 900,000",
+          "avgPriceUSD": 245000
+        },
+        "3BR": {
+          "count": 350,
+          "avgSize": "1,700 sqft",
+          "avgSizeM2": 158,
+          "avgPrice": "AED 1,350,000",
+          "avgPriceUSD": 367500
+        },
+        "4BR": {
+          "count": 100,
+          "avgSize": "2,400 sqft",
+          "avgSizeM2": 223,
+          "avgPrice": "AED 1,900,000",
+          "avgPriceUSD": 517000
+        }
+      }
+    },
+    "townhouses": {
+      "totalCount": 200,
+      "bedrooms": {
+        "2BR": {
+          "count": 50,
+          "avgSize": "1,500 sqft",
+          "avgSizeM2": 139,
+          "avgPrice": "AED 1,200,000",
+          "avgPriceUSD": 326500
+        },
+        "3BR": {
+          "count": 100,
+          "avgSize": "2,200 sqft",
+          "avgSizeM2": 204,
+          "avgPrice": "AED 1,700,000",
+          "avgPriceUSD": 462500
+        },
+        "4BR": {
+          "count": 50,
+          "avgSize": "3,000 sqft",
+          "avgSizeM2": 279,
+          "avgPrice": "AED 2,400,000",
+          "avgPriceUSD": 652500
+        }
+      }
+    },
+    "villas": {
+      "totalCount": 100,
+      "bedrooms": {
+        "3BR": {
+          "count": 40,
+          "avgSize": "3,500 sqft",
+          "avgSizeM2": 325,
+          "avgPrice": "AED 2,800,000",
+          "avgPriceUSD": 762000
+        },
+        "4BR": {
+          "count": 60,
+          "avgSize": "5,000 sqft",
+          "avgSizeM2": 465,
+          "avgPrice": "AED 4,000,000",
+          "avgPriceUSD": 1089000
+        }
+      }
+    }
+  },
+  "pricing": {
+    "currency": "AED",
+    "exchangeRates": {
+      "usdToAed": 3.67,
+      "eurToAed": 4.0
+    },
+    "priceRanges": {
+      "minimum": "AED 450,000",
+      "maximum": "AED 5,000,000",
+      "average": "AED 1,200,000"
+    },
+    "pricingTrends": {
+      "year2020": "AED 500,000 - 1,000,000",
+      "year2021": "AED 600,000 - 1,200,000",
+      "year2022": "AED 700,000 - 1,500,000",
+      "year2023": "AED 800,000 - 1,800,000",
+      "year2024": "AED 900,000 - 2,000,000"
+    },
+    "rentalPrices": {
+      "1BR": "AED 30,000 - 40,000/year",
+      "2BR": "AED 50,000 - 70,000/year",
+      "3BR": "AED 75,000 - 100,000/year",
+      "4BR": "AED 110,000 - 150,000/year"
+    }
+  },
+  "amenities": {
+    "communityWide": [
+      "Central Park",
+      "Community Gardens",
+      "Swimming Pools",
+      "Fitness Centers",
+      "Gymnasiums",
+      "Sports Complex",
+      "Tennis Courts",
+      "Basketball Courts",
+      "Squash Courts",
+      "Jogging Tracks",
+      "Cycling Trails",
+      "Walking Paths",
+      "Retail Outlets",
+      "Cafes & Restaurants",
+      "Convenience Stores",
+      "Spa & Wellness Centers",
+      "Yoga Studios",
+      "Meditation Gardens",
+      "Children's Play Areas",
+      "Playgrounds",
+      "Libraries",
+      "Community Centers",
+      "Multipurpose Halls",
+      "Meeting Rooms",
+      "Children's Nursery",
+      "Parking Areas",
+      "Security Checkpoints",
+      "CCTV Coverage",
+      "24/7 Emergency Services",
+      "Waste Management",
+      "Landscaped Gardens",
+      "Water Features",
+      "Open Spaces",
+      "Art Studios",
+      "Music Rooms",
+      "Dance Studios"
+    ],
+    "clusterLevel": [
+      "Community Pools",
+      "Fitness Centers",
+      "Gymnasiums",
+      "Reception Areas",
+      "Barbecue Areas",
+      "Lounge Areas",
+      "Children's Play Areas",
+      "Sauna Facilities",
+      "Spa Services"
+    ]
+  },
+  "transportation": {
+    "publicTransport": [
+      "RTA Bus Services - Multiple Routes",
+      "Dubai Metro - Access to Al Nahda and Burj Khalifa Lines (via connections)",
+      "Sheikh Zayed Road Access"
+    ],
+    "majorRoads": [
+      "Emirates Road (E11)",
+      "Sheikh Zayed Road (E12)",
+      "Al Khail Road"
+    ],
+    "proximityToAirports": {
+      "dubaiInternationalAirport": "35 km",
+      "alMaktoumIntlAirport": "60 km"
+    },
+    "proximityToDowntown": {
+      "dubaiDowntown": "40 km",
+      "businessBay": "38 km",
+      "marineBeach": "45 km"
+    }
+  },
+  "schools": [
+    {
+      "name": "GEMS Education Schools",
+      "distance": "5 km",
+      "type": "International School"
+    },
+    {
+      "name": "Dubai British School",
+      "distance": "8 km",
+      "type": "International School"
+    },
+    {
+      "name": "Global Indian International School",
+      "distance": "7 km",
+      "type": "International School"
+    },
+    {
+      "name": "Indian High School",
+      "distance": "6 km",
+      "type": "Preparatory School"
+    }
+  ],
+  "medicalFacilities": [
+    {
+      "name": "Medicana Hospital",
+      "distance": "3 km",
+      "type": "Modern Hospital"
+    },
+    {
+      "name": "Emirates Hospital",
+      "distance": "4 km",
+      "type": "General Hospital"
+    },
+    {
+      "name": "Dr. Sulaiman Al Habib Medical Group",
+      "distance": "5 km",
+      "type": "Medical Center"
+    },
+    {
+      "name": "Multiple Clinics & Dental Centers",
+      "distance": "1-3 km",
+      "type": "Primary Healthcare"
+    }
+  ],
+  "shoppingMalls": [
+    {
+      "name": "Dubai Mall",
+      "distance": "30 km",
+      "type": "Mega Mall"
+    },
+    {
+      "name": "The Dubai Mall (Downtown)",
+      "distance": "40 km",
+      "type": "Mega Mall"
+    },
+    {
+      "name": "Carrefour Hypermarket",
+      "distance": "2 km",
+      "type": "Hypermarket"
+    },
+    {
+      "name": "Spinneys Supermarket",
+      "distance": "1.5 km",
+      "type": "Supermarket"
+    },
+    {
+      "name": "Local Retail Centers",
+      "distance": "0.5-1.5 km",
+      "type": "Community Shopping"
+    }
+  ],
+  "recreation": [
+    {
+      "name": "Emirates Motor City",
+      "distance": "5 km",
+      "type": "Theme Park"
+    },
+    {
+      "name": "Akoya Oxygen (Water Park)",
+      "distance": "3 km",
+      "type": "Water Park"
+    },
+    {
+      "name": "Dubai Sports City",
+      "distance": "12 km",
+      "type": "Sports Complex"
+    },
+    {
+      "name": "Wild Wadi Water Park",
+      "distance": "35 km",
+      "type": "Water Park"
+    },
+    {
+      "name": "Golf Courses (Emirates Golf Club)",
+      "distance": "25 km",
+      "type": "Golf Course"
+    }
+  ],
+  "dining": [
+    {
+      "name": "In-Community Restaurants & Cafes",
+      "count": "15+",
+      "cuisine": "Mixed International"
+    },
+    {
+      "name": "Arabian Cuisine",
+      "count": "8+",
+      "proximity": "Community"
+    },
+    {
+      "name": "Asian Cuisine Outlets",
+      "count": "10+",
+      "proximity": "Community"
+    },
+    {
+      "name": "Fast Food Chains",
+      "count": "12+",
+      "proximity": "Community & Nearby"
+    },
+    {
+      "name": "Coffee Shops & Cafes",
+      "count": "10+",
+      "proximity": "Community"
+    }
+  ],
+  "security": {
+    "features": [
+      "24/7 Gated Community",
+      "Manned Security Gates",
+      "CCTV Surveillance Coverage",
+      "Smart Access Control",
+      "Panic Buttons",
+      "Emergency Response System",
+      "Regular Patrols",
+      "Community Safety Program"
+    ],
+    "accessControl": [
+      "Electronic Gate Access",
+      "ID Card System",
+      "Visitor Management",
+      "Vehicle Registration"
+    ]
+  },
+  "utilities": {
+    "water": "Emirates Water & Electricity Authority (EWEA)",
+    "electricity": "Emirates Water & Electricity Authority (EWEA)",
+    "gas": "DAMAC-provided piped gas system",
+    "internet": [
+      "Fiber Optic - Multiple Providers (Etisalat, Emirates Fiber, etc.)",
+      "Broadband Services",
+      "IPTV Services"
+    ],
+    "waste": "Automated waste collection with recycling programs"
+  },
+  "services": {
+    "concierge": "24/7 Concierge Service",
+    "maintenance": "Professional Community Management",
+    "housekeeping": "Optional Housekeeping Services",
+    "landscaping": "Professional Landscape Maintenance",
+    "pest": "Regular Pest Control Services",
+    "parking": [
+      "Dedicated Parking Spaces",
+      "Visitor Parking",
+      "EV Charging Stations"
+    ]
+  },
+  "ownership": {
+    "structure": "Freehold Properties",
+    "ownership": "100% ownership available for UAE nationals and eligible foreigners",
+    "duration": "Permanent ownership or leasehold up to 99 years",
+    "restrictions": "Each cluster managed by separate management company"
+  },
+  "management": {
+    "structure": "Cluster-Based Community Management",
+    "managementCo": "DAMAC Properties & Community Management Services",
+    "responsibilities": [
+      "Maintenance & Repairs",
+      "Security Services",
+      "Landscaping",
+      "Utility Management",
+      "Community Activities",
+      "Complaint Resolution"
+    ],
+    "maintenanceFees": {
+      "apartments": "AED 500 - 800/month",
+      "townhouses": "AED 800 - 1200/month",
+      "villas": "AED 1200 - 1800/month"
+    }
+  },
+  "statistics": {
+    "totalUnits": 1500,
+    "totalPopulation": "6,000+ residents",
+    "buildingDensity": "Medium-Low Density",
+    "occupancyRate": "95%+",
+    "averageApartmentSize": "1,200 sqft",
+    "averagePricePerSqft": "AED 800 - 1000"
+  },
+  "connectivity": {
+    "distanceToDubaiDowntown": "40 km",
+    "distanceToPalmJumeirah": "50 km",
+    "distanceToBurjKhalifa": "42 km",
+    "distanceToDubaiMall": "35 km",
+    "commutationTime": {
+      "toDowntown": "45 minutes by car",
+      "toBurjKhalifa": "50 minutes by car",
+      "toAeroCity": "15 minutes by car"
+    }
+  },
+  "investmentPotential": {
+    "rentalYield": "4-6% annually",
+    "capitalAppreciation": "3-5% annually",
+    "targetInvestors": [
+      "First-time buyers",
+      "Families seeking spacious living",
+      "Investors seeking rental income",
+      "Corporate housing"
+    ],
+    "advantages": [
+      "Complete community with world-class amenities",
+      "Established resale market",
+      "Strong rental demand",
+      "Family-friendly environment",
+      "Excellent value for money",
+      "Modern infrastructure",
+      "Professional management"
+    ]
+  },
+  "documentationRequired": {
+    "forPurchase": [
+      "Valid passport or ID",
+      "Proof of income (salary certificate)",
+      "Bank statements (last 3-6 months)",
+      "Employment letter",
+      "Proof of funds",
+      "Property agency agreement",
+      "RERA approval"
+    ],
+    "forRental": [
+      "Valid passport or ID",
+      "Proof of employment",
+      "Bank statements",
+      "Tenancy agreement",
+      "Security deposit",
+      "Utility setup documents"
+    ]
+  },
+  "datasources": {
+    "primary": [
+      "DAMAC Properties Official Website",
+      "Dubai Land Department (RERA)",
+      "Community Management Records"
+    ],
+    "secondary": [
+      "Real Estate Portals (Bayut, Dubizzle)",
+      "Community Reviews & Feedback",
+      "News & Media Reports"
+    ],
+    "lastUpdated": "2024-01-26",
+    "accuracy": "High - Based on official DAMAC data and verified sources"
+  }
+}
