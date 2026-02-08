@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-02-08T22:02:22.799Z",
+  "version": "1.0",
+  "accounts": {
+    "account-+971505760056": {
+      "phoneNumber": "+971505760056",
+      "displayName": "Test Account",
+      "deviceLinked": true,
+      "isActive": true,
+      "sessionPath": "sessions/session-+971505760056",
+      "lastKnownState": "authenticated",
+      "lastPing": "2026-02-08T22:02:22.799Z",
+      "recoveryAttempts": 0,
+      "lastAuthenticated": "2026-02-08T22:02:22.799Z",
+      "lastError": null
+    }
+  }
+}
