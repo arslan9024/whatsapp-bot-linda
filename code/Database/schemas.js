@@ -298,6 +298,76 @@ const syncLogSchema = new Schema({
 // ============================================
 // CREATE MODELS
 // ============================================
+// CONTACT REFERENCE SCHEMA (Lightweight Phone Registry)
+// ============================================
+const contactReferenceSchema = new Schema({
+  phoneNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
+    trim: true,
+  },
+  countryCode: {
+    type: String,
+    default: '971', // UAE default
+  },
+  formattedPhone: {
+    type: String, // +971 50 123 4567 format
+    index: true,
+  },
+  googleContactId: {
+    type: String, // Link to Google Contacts resource
+    default: null,
+    index: true,
+  },
+  syncedToGoogle: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  lastSyncedAt: {
+    type: Date,
+    default: null,
+  },
+  source: {
+    type: String, // e.g., 'whatsapp_message', 'manual_import', 'sheet_import'
+    default: 'whatsapp_message',
+  },
+  name: {
+    type: String, // Optional: cached name from Google
+    default: null,
+  },
+  email: {
+    type: String, // Optional: cached email from Google
+    default: null,
+  },
+  interactionCount: {
+    type: Number,
+    default: 0,
+  },
+  lastInteractionAt: {
+    type: Date,
+    default: null,
+  },
+  metadata: {
+    importedFrom: String, // Sheet name, bot name, etc.
+    notes: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, { collection: 'contact_references' });
+
+// ============================================
+// MODEL DEFINITIONS
+// ============================================
 const Project = mongoose.model('Project', projectSchema);
 const Cluster = mongoose.model('Cluster', clusterSchema);
 const Property = mongoose.model('Property', propertySchema);
@@ -305,6 +375,7 @@ const Amenity = mongoose.model('Amenity', amenitySchema);
 const Pricing = mongoose.model('Pricing', pricingSchema);
 const Location = mongoose.model('Location', locationSchema);
 const SyncLog = mongoose.model('SyncLog', syncLogSchema);
+const ContactReference = mongoose.model('ContactReference', contactReferenceSchema);
 
 // ============================================
 // CREATE INDEXES
@@ -315,6 +386,11 @@ async function createIndexes() {
     await Property.collection.createIndex({ clusterId: 1, propertyType: 1, bedrooms: 1 });
     await Property.collection.createIndex({ 'price.aed': 1, status: 1 });
     await Cluster.collection.createIndex({ projectId: 1, name: 1 });
+    
+    // Contact reference indexes
+    await ContactReference.collection.createIndex({ phoneNumber: 1 }, { unique: true });
+    await ContactReference.collection.createIndex({ googleContactId: 1 });
+    await ContactReference.collection.createIndex({ syncedToGoogle: 1, createdAt: -1 });
     
     console.log('✅ Database indexes created');
   } catch (error) {
@@ -330,6 +406,7 @@ export {
   Pricing,
   Location,
   SyncLog,
+  ContactReference,
   createIndexes,
 };
 
@@ -341,4 +418,5 @@ export const schemas = {
   pricingSchema,
   locationSchema,
   syncLogSchema,
+  contactReferenceSchema,
 };

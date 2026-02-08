@@ -1,14 +1,28 @@
 {
-  "watch": ["index.js", "code/", ".env"],
-  "ignore": ["node_modules", "sessions", "*.log"],
-  "ext": "js,json",
+  "watch": [
+    "index.js",
+    "code/**/*.js",
+    ".env"
+  ],
+  "ignore": [
+    "sessions/**/*",
+    "logs/**/*",
+    "node_modules/**/*",
+    ".git/**/*",
+    "**/*.json~",
+    "device-status.json",
+    "session-state.json"
+  ],
   "delay": 2000,
   "env": {
     "NODE_ENV": "development"
   },
-  "exec": "node",
+  "ext": "js,json",
+  "exec": "node index.js",
   "events": {
-    "restart": "echo '🔄 Bot restarted'"
+    "restart": "echo '🔄 Bot restarting...'",
+    "crash": "echo '💥 Bot crashed!'"
   },
-  "exitcrash": true
+  "quiet": false,
+  "verbose": false
 }

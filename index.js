@@ -3,6 +3,7 @@ import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAp
 import { createDeviceStatusFile } from "./code/utils/deviceStatus.js";
 import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from "./code/utils/browserCleanup.js";
 import SessionManager from "./code/utils/SessionManager.js";
+import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 
 // Initialize Conversation Analyzer (Session 18 - February 7, 2026)
@@ -16,6 +17,10 @@ import { quickValidateSheet } from "./code/utils/sheetValidation.js";
 import { OperationalAnalytics } from "./code/Services/OperationalAnalytics.js";
 import { OrganizedSheets } from "./code/DamacHills2List.js";
 
+// GOOGLE CONTACTS INTEGRATION (Phase B - February 2026)
+// Contact lookup and management for WhatsApp bot
+import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
+
 import fs from "fs";
 import path from "path";
 
@@ -24,6 +29,12 @@ let Lion0 = null;
 let isInitializing = false;
 let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 2;
+
+// Global contact handler (Phase B)
+let contactHandler = null;
+
+// All initialized accounts for graceful shutdown
+let allInitializedAccounts = [];
 
 // Simple console logging without interactive prompts
 function logBot(msg, type = "info") {
@@ -50,6 +61,21 @@ async function initializeBot() {
   initAttempts++;
 
   try {
+    // Initialize session state manager (loads previous session state)
+    if (initAttempts === 1) {
+      const initialized = await sessionStateManager.initialize();
+      if (!initialized) {
+        logBot("Failed to initialize SessionStateManager", "warn");
+      } else {
+        // Log recovered accounts
+        const healthReport = sessionStateManager.getHealthReport();
+        logBot(`Session state loaded: ${healthReport.activeAccounts}/${healthReport.totalAccounts} accounts active`, "info");
+        if (healthReport.linkedDevices > 0) {
+          logBot(`Found ${healthReport.linkedDevices} linked device(s) to recover`, "success");
+        }
+      }
+    }
+
     const masterNumber = process.env.BOT_MASTER_NUMBER || "971505760056";
     
     if (initAttempts === 1) {
@@ -205,15 +231,40 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
       authMethod: deviceStatus.authMethod || "qr",
       deviceStatus: deviceStatus
     });
+    // Also update SessionStateManager
+    sessionStateManager.saveAccountState(masterNumber, {
+      phoneNumber: masterNumber,
+      displayName: "Master Account",
+      deviceLinked: true,
+      isActive: false,
+      sessionPath: `sessions/session-${masterNumber}`,
+      lastKnownState: "authenticated"
+    });
   });
 
-  client.once("ready", () => {
+  client.once("ready", async () => {
     if (readyFired) return;
     readyFired = true;
     
     logBot("🟢 READY - Bot is online and listening", "ready");
     logBot(`Auth Method: ${deviceStatus.authMethod === "code" ? "6-Digit Code" : "QR Code"}`, "success");
     logBot("Waiting for messages...", "info");
+    
+    // Mark account as active and save state
+    allInitializedAccounts.push(Lion0);
+    await sessionStateManager.markRecoverySuccess(masterNumber);
+    
+    // Initialize contact lookup handler (Phase B - Google Contacts Integration)
+    try {
+      contactHandler = new ContactLookupHandler();
+      await contactHandler.initialize();
+      logBot("✅ Contact lookup handler initialized (Google Contacts API ready)", "success");
+      global.contactHandler = contactHandler; // Make globally available
+    } catch (error) {
+      logBot(`⚠️  Contact handler initialization failed: ${error.message}`, "warn");
+      logBot("Bot will continue without contact lookup functionality", "info");
+      contactHandler = null;
+    }
     
     // Save session backup for emergency recovery
     SessionManager.backupSession(masterNumber);
@@ -300,6 +351,16 @@ function setupNewLinkingFlow(client, masterNumber) {
       authMethod: "qr",
       linkedAt: new Date().toISOString()
     });
+    
+    // Update SessionStateManager with linked device
+    sessionStateManager.saveAccountState(masterNumber, {
+      phoneNumber: masterNumber,
+      displayName: "Master Account",
+      deviceLinked: true,
+      isActive: false,
+      sessionPath: `sessions/session-${masterNumber}`,
+      lastKnownState: "authenticated"
+    });
   });
 
   client.once("ready", () => {
@@ -309,6 +370,10 @@ function setupNewLinkingFlow(client, masterNumber) {
     
     // Create session backup for emergency recovery
     SessionManager.backupSession(masterNumber);
+    
+    // Mark account as active in state
+    allInitializedAccounts.push(Lion0);
+    sessionStateManager.markRecoverySuccess(masterNumber);
     
     // Set up message listening
     setupMessageListeners(client);
@@ -337,11 +402,24 @@ function setupNewLinkingFlow(client, masterNumber) {
  * Setup message listening
  */
 function setupMessageListeners(client) {
-  client.on("message", (msg) => {
+  client.on("message", async (msg) => {
     const timestamp = new Date().toLocaleTimeString();
     const from = msg.from.includes("@g.us") ? `Group: ${msg.from}` : `User: ${msg.from}`;
     
     logBot(`📨 [${timestamp}] ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
+
+    // Phase B: Contact lookup integration
+    try {
+      if (contactHandler && !msg.from.includes("@g.us")) {
+        // Try to lookup contact for this user
+        const contact = await contactHandler.getContact(msg.from);
+        if (contact) {
+          logBot(`✅ Contact found: ${contact.displayName || contact.phoneNumber}`, "success");
+        }
+      }
+    } catch (error) {
+      logBot(`⚠️  Contact lookup error: ${error.message}`, "warn");
+    }
 
     // Test ping command
     if (msg.body === "!ping") {
@@ -354,24 +432,66 @@ function setupMessageListeners(client) {
 }
 
 /**
- * Graceful shutdown
+ * Graceful shutdown with session state persistence
  */
 process.on("SIGINT", async () => {
   console.log("\n");
   logBot("Received shutdown signal", "warn");
+  logBot("Initiating graceful shutdown...", "info");
   
-  if (Lion0) {
-    try {
-      logBot("Closing WhatsApp connection...", "info");
-      await Lion0.destroy();
-      logBot("WhatsApp connection closed", "success");
-    } catch (e) {
-      logBot(`Error closing connection: ${e.message}`, "error");
+  try {
+    // 1. Save all account states
+    logBot("Saving session states", "info");
+    for (const [accountId, state] of Object.entries(sessionStateManager.getAllAccountStates())) {
+      await sessionStateManager.saveAccountState(accountId, { ...state, isActive: false });
     }
+    
+    // 2. Close all WhatsApp connections
+    logBot(`Closing ${allInitializedAccounts.length} WhatsApp connection(s)`, "info");
+    for (const account of allInitializedAccounts) {
+      try {
+        await account.destroy();
+      } catch (e) {
+        // Ignore individual connection errors
+      }
+    }
+    
+    // 3. Write safe point file
+    logBot("Writing session checkpoint", "info");
+    await sessionStateManager.writeSafePointFile();
+    
+    // 4. Final cleanup
+    logBot("Closing database connections", "info");
+    if (global.databaseContext && global.databaseContext.close) {
+      try {
+        await global.databaseContext.close();
+      } catch (e) {
+        // Ignore database close errors
+      }
+    }
+    
+    logBot("✅ Graceful shutdown complete", "success");
+  } catch (error) {
+    logBot(`Error during shutdown: ${error.message}`, "error");
   }
-
-  logBot("Bot stopped", "success");
+  
+  logBot("Bot stopped. Nodemon will restart on code changes...", "info");
   process.exit(0);
+});
+
+/**
+ * Handle unhandled rejections
+ */
+process.on("unhandledRejection", (error) => {
+  logBot(`Unhandled rejection: ${error.message}`, "error");
+});
+
+/**
+ * Handle uncaught exceptions  
+ */
+process.on("uncaughtException", (error) => {
+  logBot(`Uncaught exception: ${error.message}`, "error");
+  // Continue running instead of exiting
 });
 
 // Start the bot

@@ -1,0 +1,524 @@
+{
+  "timestamp": "2026-02-08T08:20:28.424Z",
+  "summary": {
+    "totalProjects": 30,
+    "totalUnits": 10383,
+    "projectsWithUnits": 30,
+    "projectsWithoutUnits": 0,
+    "averageUnitsPerProject": 346
+  },
+  "projects": [
+    {
+      "projectCode": "PJ001",
+      "projectName": "ACUNA @ AKOYA OXYGEN",
+      "gateNumber": "1",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 39
+    },
+    {
+      "projectCode": "PJ002",
+      "projectName": "ALBIZIA@AKOYA OXYGEN",
+      "gateNumber": "2",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 652
+    },
+    {
+      "projectCode": "PJ003",
+      "projectName": "AMARGO @ AKOYA OXYGEN",
+      "gateNumber": "3",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 360
+    },
+    {
+      "projectCode": "PJ004",
+      "projectName": "AMAZONIA @ AKOYA OXYGEN",
+      "gateNumber": "4",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 228
+    },
+    {
+      "projectCode": "PJ005",
+      "projectName": "AMAZONIA-EX @ AKOYA OXYGEN",
+      "gateNumber": "5",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 159
+    },
+    {
+      "projectCode": "PJ006",
+      "projectName": "AQUILEGIA @ AKOYA OXYGEN",
+      "gateNumber": "6",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 220
+    },
+    {
+      "projectCode": "PJ007",
+      "projectName": "ASTER @ AKOYA OXYGEN",
+      "gateNumber": "7",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 394
+    },
+    {
+      "projectCode": "PJ008",
+      "projectName": "Avencia @ Akoya Oxygen",
+      "gateNumber": "8",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 59
+    },
+    {
+      "projectCode": "PJ009",
+      "projectName": "AVENCIA-2 @ AKOYA OXYGEN",
+      "gateNumber": "9",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 240
+    },
+    {
+      "projectCode": "PJ010",
+      "projectName": "BASSWOOD@AKOYA OXYGEN",
+      "gateNumber": "10",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 444
+    },
+    {
+      "projectCode": "PJ011",
+      "projectName": "CENTAURY @ AKOYA OXYGEN",
+      "gateNumber": "11",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 427
+    },
+    {
+      "projectCode": "PJ012",
+      "projectName": "CLARET @ AKOYA OXYGEN",
+      "gateNumber": "12",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 333
+    },
+    {
+      "projectCode": "PJ013",
+      "projectName": "COURSETIA @ AKOYA OXYGEN",
+      "gateNumber": "13",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 168
+    },
+    {
+      "projectCode": "PJ014",
+      "projectName": "HAWTHORN @ AKOYA OXYGEN",
+      "gateNumber": "14",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 1
+    },
+    {
+      "projectCode": "PJ015",
+      "projectName": "JANUSIA @ AKOYA OXYGEN",
+      "gateNumber": "15",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 538
+    },
+    {
+      "projectCode": "PJ016",
+      "projectName": "JUNIPER @ AKOYA OXYGEN",
+      "gateNumber": "16",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 312
+    },
+    {
+      "projectCode": "PJ017",
+      "projectName": "MIMOSA @ AKOYA OXYGEN",
+      "gateNumber": "17",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 351
+    },
+    {
+      "projectCode": "PJ018",
+      "projectName": "MULBERRY @ AKOYA OXYGEN",
+      "gateNumber": "18",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 285
+    },
+    {
+      "projectCode": "PJ019",
+      "projectName": "NAVITAS @ AKOYA OXYGEN",
+      "gateNumber": "19",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 371
+    },
+    {
+      "projectCode": "PJ020",
+      "projectName": "ODORA @ AKOYA OXYGEN",
+      "gateNumber": "20",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 280
+    },
+    {
+      "projectCode": "PJ021",
+      "projectName": "PACIFICA @ AKOYA OXYGEN",
+      "gateNumber": "21",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 707
+    },
+    {
+      "projectCode": "PJ022",
+      "projectName": "PRIMROSE @ AKOYA OXYGEN",
+      "gateNumber": "22",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 355
+    },
+    {
+      "projectCode": "PJ023",
+      "projectName": "SANCTNARY @ AKOYA OXYGEN",
+      "gateNumber": "23",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 441
+    },
+    {
+      "projectCode": "PJ024",
+      "projectName": "SYCAMORE @ AKOYA OXYGEN",
+      "gateNumber": "24",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 206
+    },
+    {
+      "projectCode": "PJ025",
+      "projectName": "TRIXIS @ AKOYA OXYGEN",
+      "gateNumber": "25",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 151
+    },
+    {
+      "projectCode": "PJ026",
+      "projectName": "Vardon @ Akoya Oxygen",
+      "gateNumber": "26",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 765
+    },
+    {
+      "projectCode": "PJ027",
+      "projectName": "VICTORIA @ AKOYA OXYGEN",
+      "gateNumber": "27",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 316
+    },
+    {
+      "projectCode": "PJ028",
+      "projectName": "VIRIDIS @ AKOYA OXYGEN",
+      "gateNumber": "28",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 642
+    },
+    {
+      "projectCode": "PJ029",
+      "projectName": "ZINNIA @ AKOYA OXYGEN",
+      "gateNumber": "29",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 519
+    },
+    {
+      "projectCode": "PJ030",
+      "projectName": ".",
+      "gateNumber": "30",
+      "location": "",
+      "developer": "",
+      "status": "Active",
+      "startDate": "",
+      "completionDate": "",
+      "totalUnits": 420
+    }
+  ],
+  "unitDistribution": [
+    {
+      "projectCode": "PJ026",
+      "projectName": "Vardon @ Akoya Oxygen",
+      "gateNumber": "26",
+      "units": 765
+    },
+    {
+      "projectCode": "PJ021",
+      "projectName": "PACIFICA @ AKOYA OXYGEN",
+      "gateNumber": "21",
+      "units": 707
+    },
+    {
+      "projectCode": "PJ002",
+      "projectName": "ALBIZIA@AKOYA OXYGEN",
+      "gateNumber": "2",
+      "units": 652
+    },
+    {
+      "projectCode": "PJ028",
+      "projectName": "VIRIDIS @ AKOYA OXYGEN",
+      "gateNumber": "28",
+      "units": 642
+    },
+    {
+      "projectCode": "PJ015",
+      "projectName": "JANUSIA @ AKOYA OXYGEN",
+      "gateNumber": "15",
+      "units": 538
+    },
+    {
+      "projectCode": "PJ029",
+      "projectName": "ZINNIA @ AKOYA OXYGEN",
+      "gateNumber": "29",
+      "units": 519
+    },
+    {
+      "projectCode": "PJ010",
+      "projectName": "BASSWOOD@AKOYA OXYGEN",
+      "gateNumber": "10",
+      "units": 444
+    },
+    {
+      "projectCode": "PJ023",
+      "projectName": "SANCTNARY @ AKOYA OXYGEN",
+      "gateNumber": "23",
+      "units": 441
+    },
+    {
+      "projectCode": "PJ011",
+      "projectName": "CENTAURY @ AKOYA OXYGEN",
+      "gateNumber": "11",
+      "units": 427
+    },
+    {
+      "projectCode": "PJ030",
+      "projectName": ".",
+      "gateNumber": "30",
+      "units": 420
+    },
+    {
+      "projectCode": "PJ007",
+      "projectName": "ASTER @ AKOYA OXYGEN",
+      "gateNumber": "7",
+      "units": 394
+    },
+    {
+      "projectCode": "PJ019",
+      "projectName": "NAVITAS @ AKOYA OXYGEN",
+      "gateNumber": "19",
+      "units": 371
+    },
+    {
+      "projectCode": "PJ003",
+      "projectName": "AMARGO @ AKOYA OXYGEN",
+      "gateNumber": "3",
+      "units": 360
+    },
+    {
+      "projectCode": "PJ022",
+      "projectName": "PRIMROSE @ AKOYA OXYGEN",
+      "gateNumber": "22",
+      "units": 355
+    },
+    {
+      "projectCode": "PJ017",
+      "projectName": "MIMOSA @ AKOYA OXYGEN",
+      "gateNumber": "17",
+      "units": 351
+    },
+    {
+      "projectCode": "PJ012",
+      "projectName": "CLARET @ AKOYA OXYGEN",
+      "gateNumber": "12",
+      "units": 333
+    },
+    {
+      "projectCode": "PJ027",
+      "projectName": "VICTORIA @ AKOYA OXYGEN",
+      "gateNumber": "27",
+      "units": 316
+    },
+    {
+      "projectCode": "PJ016",
+      "projectName": "JUNIPER @ AKOYA OXYGEN",
+      "gateNumber": "16",
+      "units": 312
+    },
+    {
+      "projectCode": "PJ018",
+      "projectName": "MULBERRY @ AKOYA OXYGEN",
+      "gateNumber": "18",
+      "units": 285
+    },
+    {
+      "projectCode": "PJ020",
+      "projectName": "ODORA @ AKOYA OXYGEN",
+      "gateNumber": "20",
+      "units": 280
+    },
+    {
+      "projectCode": "PJ009",
+      "projectName": "AVENCIA-2 @ AKOYA OXYGEN",
+      "gateNumber": "9",
+      "units": 240
+    },
+    {
+      "projectCode": "PJ004",
+      "projectName": "AMAZONIA @ AKOYA OXYGEN",
+      "gateNumber": "4",
+      "units": 228
+    },
+    {
+      "projectCode": "PJ006",
+      "projectName": "AQUILEGIA @ AKOYA OXYGEN",
+      "gateNumber": "6",
+      "units": 220
+    },
+    {
+      "projectCode": "PJ024",
+      "projectName": "SYCAMORE @ AKOYA OXYGEN",
+      "gateNumber": "24",
+      "units": 206
+    },
+    {
+      "projectCode": "PJ013",
+      "projectName": "COURSETIA @ AKOYA OXYGEN",
+      "gateNumber": "13",
+      "units": 168
+    },
+    {
+      "projectCode": "PJ005",
+      "projectName": "AMAZONIA-EX @ AKOYA OXYGEN",
+      "gateNumber": "5",
+      "units": 159
+    },
+    {
+      "projectCode": "PJ025",
+      "projectName": "TRIXIS @ AKOYA OXYGEN",
+      "gateNumber": "25",
+      "units": 151
+    },
+    {
+      "projectCode": "PJ008",
+      "projectName": "Avencia @ Akoya Oxygen",
+      "gateNumber": "8",
+      "units": 59
+    },
+    {
+      "projectCode": "PJ001",
+      "projectName": "ACUNA @ AKOYA OXYGEN",
+      "gateNumber": "1",
+      "units": 39
+    },
+    {
+      "projectCode": "PJ014",
+      "projectName": "HAWTHORN @ AKOYA OXYGEN",
+      "gateNumber": "14",
+      "units": 1
+    }
+  ]
+}

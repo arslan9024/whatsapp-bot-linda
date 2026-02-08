@@ -1,0 +1,186 @@
+{
+  "timestamp": "2026-02-08T08:11:31.415Z",
+  "totalProjects": 30,
+  "projects": [
+    {
+      "projectCode": "PJ001",
+      "projectNumber": "1",
+      "projectName": "ACUNA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ002",
+      "projectNumber": "2",
+      "projectName": "ALBIZIA@AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ003",
+      "projectNumber": "3",
+      "projectName": "AMARGO @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ004",
+      "projectNumber": "4",
+      "projectName": "AMAZONIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ005",
+      "projectNumber": "5",
+      "projectName": "AMAZONIA-EX @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ006",
+      "projectNumber": "6",
+      "projectName": "AQUILEGIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ007",
+      "projectNumber": "7",
+      "projectName": "ASTER @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ008",
+      "projectNumber": "8",
+      "projectName": "Avencia @ Akoya Oxygen",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ009",
+      "projectNumber": "9",
+      "projectName": "AVENCIA-2 @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ010",
+      "projectNumber": "10",
+      "projectName": "BASSWOOD@AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ011",
+      "projectNumber": "11",
+      "projectName": "CENTAURY @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ012",
+      "projectNumber": "12",
+      "projectName": "CLARET @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ013",
+      "projectNumber": "13",
+      "projectName": "COURSETIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ014",
+      "projectNumber": "14",
+      "projectName": "HAWTHORN @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ015",
+      "projectNumber": "15",
+      "projectName": "JANUSIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ016",
+      "projectNumber": "16",
+      "projectName": "JUNIPER @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ017",
+      "projectNumber": "17",
+      "projectName": "MIMOSA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ018",
+      "projectNumber": "18",
+      "projectName": "MULBERRY @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ019",
+      "projectNumber": "19",
+      "projectName": "NAVITAS @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ020",
+      "projectNumber": "20",
+      "projectName": "ODORA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ021",
+      "projectNumber": "21",
+      "projectName": "PACIFICA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ022",
+      "projectNumber": "22",
+      "projectName": "PRIMROSE @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ023",
+      "projectNumber": "23",
+      "projectName": "SANCTNARY @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ024",
+      "projectNumber": "24",
+      "projectName": "SYCAMORE @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ025",
+      "projectNumber": "25",
+      "projectName": "TRIXIS @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ026",
+      "projectNumber": "26",
+      "projectName": "Vardon @ Akoya Oxygen",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ027",
+      "projectNumber": "27",
+      "projectName": "VICTORIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ028",
+      "projectNumber": "28",
+      "projectName": "VIRIDIS @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ029",
+      "projectNumber": "29",
+      "projectName": "ZINNIA @ AKOYA OXYGEN",
+      "status": "Active"
+    },
+    {
+      "projectCode": "PJ030",
+      "projectNumber": "30",
+      "projectName": ".",
+      "status": "Active"
+    }
+  ]
+}

@@ -409,6 +409,258 @@ class AnalyticsService {
 
     return recommendations;
   }
+
+  /**
+   * Analyze organized sheet data from Google Sheets
+   */
+  analyzeOrganizedSheetData(data, headers) {
+    if (!data || data.length === 0) {
+      return { error: 'No data provided for analysis' };
+    }
+
+    const analysis = {
+      totalRecords: data.length,
+      timestamp: new Date().toISOString(),
+      recordTypes: this._analyzeRecordTypes(data),
+      locations: this._analyzeLocations(data, headers),
+      contacts: this._analyzeContactInfo(data, headers),
+      pricing: this._analyzePricingData(data, headers),
+      dataQuality: this._analyzeDataQuality(data, headers)
+    };
+
+    logger.info('✅ Sheet analysis complete:');
+    logger.info(`   Total Records: ${analysis.totalRecords}`);
+    logger.info(`   Record Types: P=${analysis.recordTypes.properties}, C=${analysis.recordTypes.contacts}, F=${analysis.recordTypes.financial}`);
+    logger.info(`   Data Quality: ${analysis.dataQuality.quality}`);
+
+    return analysis;
+  }
+
+  /**
+   * Analyze record types (P, C, F codes)
+   */
+  _analyzeRecordTypes(data) {
+    const types = { P: 0, C: 0, F: 0, Other: 0 };
+
+    data.forEach(row => {
+      if (row && row[0]) {
+        const code = String(row[0]).charAt(0);
+        if (types.hasOwnProperty(code)) {
+          types[code]++;
+        } else {
+          types.Other++;
+        }
+      }
+    });
+
+    return {
+      properties: types.P,
+      contacts: types.C,
+      financial: types.F,
+      other: types.Other,
+      total: data.length,
+      distribution: {
+        properties: ((types.P / data.length) * 100).toFixed(1) + '%',
+        contacts: ((types.C / data.length) * 100).toFixed(1) + '%',
+        financial: ((types.F / data.length) * 100).toFixed(1) + '%'
+      }
+    };
+  }
+
+  /**
+   * Analyze location distribution
+   */
+  _analyzeLocations(data, headers) {
+    const locations = {};
+    const locationIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('location')) : 2;
+
+    data.forEach(row => {
+      if (row && row[locationIdx]) {
+        const loc = String(row[locationIdx]).trim();
+        if (loc) {
+          locations[loc] = (locations[loc] || 0) + 1;
+        }
+      }
+    });
+
+    // Sort and get top 20
+    const sorted = Object.entries(locations)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20);
+
+    return {
+      totalLocations: Object.keys(locations).length,
+      topLocations: Object.fromEntries(sorted)
+    };
+  }
+
+  /**
+   * Analyze contact information availability
+   */
+  _analyzeContactInfo(data, headers) {
+    let phones = 0, emails = 0, whatsapp = 0;
+
+    const phoneIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('phone')) : -1;
+    const emailIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('email')) : -1;
+    const whatsappIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('whatsapp')) : -1;
+
+    data.forEach(row => {
+      if (row) {
+        if (phoneIdx >= 0 && row[phoneIdx]) phones++;
+        if (emailIdx >= 0 && row[emailIdx]) emails++;
+        if (whatsappIdx >= 0 && row[whatsappIdx]) whatsapp++;
+      }
+    });
+
+    return {
+      withPhone: phones,
+      withEmail: emails,
+      withWhatsApp: whatsapp,
+      phonePercentage: ((phones / data.length) * 100).toFixed(1) + '%',
+      emailPercentage: ((emails / data.length) * 100).toFixed(1) + '%',
+      whatsAppPercentage: ((whatsapp / data.length) * 100).toFixed(1) + '%'
+    };
+  }
+
+  /**
+   * Analyze pricing and budget data
+   */
+  _analyzePricingData(data, headers) {
+    const prices = [];
+    const priceIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('price')) : -1;
+    const budgetIdx = headers ? headers.findIndex(h => h && h.toLowerCase().includes('budget')) : -1;
+
+    data.forEach(row => {
+      if (row) {
+        if (priceIdx >= 0 && row[priceIdx]) {
+          const p = parseFloat(String(row[priceIdx]).replace(/[^\d.-]/g, ''));
+          if (!isNaN(p)) prices.push(p);
+        }
+        if (budgetIdx >= 0 && row[budgetIdx]) {
+          const b = parseFloat(String(row[budgetIdx]).replace(/[^\d.-]/g, ''));
+          if (!isNaN(b)) prices.push(b);
+        }
+      }
+    });
+
+    if (prices.length === 0) return null;
+
+    const sorted = prices.sort((a, b) => a - b);
+    return {
+      count: prices.length,
+      min: Math.min(...prices).toFixed(0),
+      max: Math.max(...prices).toFixed(0),
+      avg: (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(0),
+      median: sorted[Math.floor(sorted.length / 2)].toFixed(0),
+      currency: 'AED'
+    };
+  }
+
+  /**
+   * Analyze data quality
+   */
+  _analyzeDataQuality(data, headers) {
+    let totalCells = 0;
+    let filledCells = 0;
+    let duplicateCodes = new Set();
+    const seenCodes = {};
+
+    data.forEach(row => {
+      if (row) {
+        totalCells += row.length;
+        row.forEach((cell, idx) => {
+          if (cell && String(cell).trim()) {
+            filledCells++;
+          }
+          if (idx === 0) {
+            const code = String(cell).trim();
+            if (seenCodes[code]) {
+              duplicateCodes.add(code);
+            }
+            seenCodes[code] = true;
+          }
+        });
+      }
+    });
+
+    const fillRate = ((filledCells / totalCells) * 100).toFixed(1);
+    const quality = fillRate > 70 ? 'Good' : fillRate > 50 ? 'Fair' : 'Poor';
+
+    return {
+      totalCells,
+      filledCells,
+      emptyCells: totalCells - filledCells,
+      fillRate: fillRate + '%',
+      duplicateCodeCount: duplicateCodes.size,
+      quality,
+      completeness: fillRate + '%'
+    };
+  }
+
+  /**
+   * Generate formatted text report
+   */
+  generateSheetReport(analysis) {
+    if (!analysis || analysis.error) {
+      return `❌ Unable to generate report: ${analysis?.error || 'Unknown error'}`;
+    }
+
+    let report = `
+╔════════════════════════════════════════════════════════════════╗
+║        AKOYA ORGANIZED SHEET - ANALYTICS REPORT                ║
+╚════════════════════════════════════════════════════════════════╝
+
+Generated: ${new Date(analysis.timestamp).toLocaleString()}
+Total Records: ${analysis.totalRecords}
+
+📊 RECORD TYPES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Properties (P):  ${analysis.recordTypes.properties} (${analysis.recordTypes.distribution.properties})
+  Contacts (C):    ${analysis.recordTypes.contacts} (${analysis.recordTypes.distribution.contacts})
+  Financial (F):   ${analysis.recordTypes.financial} (${analysis.recordTypes.distribution.financial})
+
+📍 TOP LOCATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+    Object.entries(analysis.locations.topLocations)
+      .slice(0, 10)
+      .forEach(([loc, count]) => {
+        report += `  ${loc}: ${count} records\n`;
+      });
+
+    report += `
+📞 CONTACT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Phone Numbers:   ${analysis.contacts.withPhone} (${analysis.contacts.phonePercentage})
+  Email Addresses: ${analysis.contacts.withEmail} (${analysis.contacts.emailPercentage})
+  WhatsApp:        ${analysis.contacts.withWhatsApp} (${analysis.contacts.whatsAppPercentage})
+
+💰 PRICING ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+    if (analysis.pricing) {
+      report += `  Min: AED ${analysis.pricing.min}
+  Max: AED ${analysis.pricing.max}
+  Avg: AED ${analysis.pricing.avg}
+  Median: AED ${analysis.pricing.median}
+`;
+    } else {
+      report += `  No pricing data available\n`;
+    }
+
+    report += `
+📈 DATA QUALITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Fill Rate:       ${analysis.dataQuality.fillRate}
+  Quality:         ${analysis.dataQuality.quality}
+  Completeness:    ${analysis.dataQuality.completeness}
+  Duplicate Codes: ${analysis.dataQuality.duplicateCodeCount}
+
+`;
+    return report;
+  }
 }
 
 export { AnalyticsService };

@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "source": "Oxygen2023 Google Sheet",
+    "extraction_date": "2026-02-08T18:00:59.383Z",
+    "total_records": 10658,
+    "total_columns": 1,
+    "headers": [
+      "FILTERS & SEARCH"
+    ]
+  },
+  "project_stats": {
+    "total_units": 10658,
+    "unique_projects": 0,
+    "projects_list": [],
+    "unique_clusters": 0,
+    "clusters_list": [],
+    "property_statuses": [],
+    "bedroom_types": []
+  },
+  "pricing_analysis": {
+    "average_price_aed": 0,
+    "average_price_usd": 0,
+    "total_records_with_price": 0,
+    "currency_usd_to_aed_rate": 3.67
+  },
+  "sample_records": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+  ]
+}

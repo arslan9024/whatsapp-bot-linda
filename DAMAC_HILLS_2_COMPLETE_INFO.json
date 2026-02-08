@@ -1,0 +1,263 @@
+{
+  "area_name": "DAMAC Hills 2",
+  "location": {
+    "emirate": "Dubai",
+    "zone": "Mohammed Bin Rashid City",
+    "latitude": 25.1234,
+    "longitude": 55.2456
+  },
+  "developer": {
+    "name": "DAMAC Properties",
+    "established": 2002,
+    "website": "www.damacproperties.com"
+  },
+  "project_overview": {
+    "total_units": 10654,
+    "launch_year": 2015,
+    "completion_status": "Completed",
+    "property_styles": ["Villas", "Townhouses", "Apartments"]
+  },
+  "clusters": {
+    "akoya": {
+      "id": "C001",
+      "units": 2500,
+      "description": "Signature luxury cluster with 18-hole golf course",
+      "property_types": ["Villa", "Townhouse", "Apartment"]
+    },
+    "sidra": {
+      "id": "C002",
+      "units": 1800,
+      "description": "Upscale residential enclave",
+      "property_types": ["Villa", "Townhouse"]
+    },
+    "rosa": {
+      "id": "C003",
+      "units": 1500,
+      "description": "Modern villa community",
+      "property_types": ["Villa"]
+    },
+    "iris": {
+      "id": "C004",
+      "units": 1200,
+      "description": "Contemporary residential cluster",
+      "property_types": ["Townhouse", "Apartment"]
+    },
+    "verona": {
+      "id": "C005",
+      "units": 1100,
+      "description": "European-inspired living",
+      "property_types": ["Villa", "Townhouse"]
+    },
+    "layan": {
+      "id": "C006",
+      "units": 950,
+      "description": "Beachfront luxury villas",
+      "property_types": ["Villa"]
+    },
+    "villanova": {
+      "id": "C007",
+      "units": 800,
+      "description": "Mediterranean-style villas",
+      "property_types": ["Villa"]
+    },
+    "artesia": {
+      "id": "C008",
+      "units": 750,
+      "description": "Contemporary apartment cluster",
+      "property_types": ["Apartment"]
+    },
+    "manara": {
+      "id": "C009",
+      "units": 700,
+      "description": "Waterfront living community",
+      "property_types": ["Apartment", "Townhouse"]
+    },
+    "burj": {
+      "id": "C010",
+      "units": 680,
+      "description": "High-rise residential towers",
+      "property_types": ["Apartment"]
+    }
+  },
+  "property_layouts": {
+    "villas": [
+      {
+        "layout_id": "V001",
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "area_sqm": 325,
+        "price_aed_start": 3000000,
+        "price_usd_start": 816000
+      },
+      {
+        "layout_id": "V002",
+        "bedrooms": 4,
+        "bathrooms": 4,
+        "area_sqm": 418,
+        "price_aed_start": 4500000,
+        "price_usd_start": 1224000
+      },
+      {
+        "layout_id": "V003",
+        "bedrooms": 5,
+        "bathrooms": 5,
+        "area_sqm": 510,
+        "price_aed_start": 6000000,
+        "price_usd_start": 1632000
+      }
+    ],
+    "townhouses": [
+      {
+        "layout_id": "T001",
+        "bedrooms": 3,
+        "bathrooms": 2.5,
+        "area_sqm": 185,
+        "price_aed_start": 1200000,
+        "price_usd_start": 326000
+      },
+      {
+        "layout_id": "T002",
+        "bedrooms": 4,
+        "bathrooms": 3,
+        "area_sqm": 232,
+        "price_aed_start": 1800000,
+        "price_usd_start": 489000
+      }
+    ],
+    "apartments": [
+      {
+        "layout_id": "A001",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "area_sqm": 65,
+        "price_aed_start": 350000,
+        "price_usd_start": 95000
+      },
+      {
+        "layout_id": "A002",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "area_sqm": 102,
+        "price_aed_start": 600000,
+        "price_usd_start": 163000
+      },
+      {
+        "layout_id": "A003",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "area_sqm": 139,
+        "price_aed_start": 900000,
+        "price_usd_start": 245000
+      }
+    ]
+  },
+  "amenities": {
+    "sports_recreation": [
+      "18-Hole Golf Course",
+      "Golf Academy",
+      "Fitness Centers",
+      "Tennis Courts",
+      "Swimming Pools",
+      "Jogging Tracks",
+      "Cycling Paths"
+    ],
+    "retail_dining": [
+      "Shopping Mall",
+      "Restaurants",
+      "Cafes",
+      "Grocery Stores",
+      "Pharmacy"
+    ],
+    "education": [
+      "Nurseries",
+      "Primary Schools",
+      "Secondary Schools"
+    ],
+    "healthcare": [
+      "Medical Clinics",
+      "Dentistry",
+      "Wellness Centers"
+    ],
+    "community": [
+      "Parks",
+      "Playgrounds",
+      "BBQ Areas",
+      "Event Venues",
+      "Spa Facilities"
+    ]
+  },
+  "property_status_codes": {
+    "ST001": "Available",
+    "ST002": "Under Offer",
+    "ST003": "Sold",
+    "ST004": "Let",
+    "ST005": "Rented",
+    "ST006": "Off Market",
+    "ST007": "Upcoming",
+    "ST008": "Under Construction"
+  },
+  "payment_options": [
+    {
+      "id": "P001",
+      "name": "Flexible Payment Plan",
+      "down_payment": "10-20%",
+      "tenure": "6-8 years"
+    },
+    {
+      "id": "P002",
+      "name": "Bulk Payment",
+      "down_payment": "50%",
+      "tenure": "2-3 years"
+    },
+    {
+      "id": "P003",
+      "name": "Immediate Payment",
+      "down_payment": "100%",
+      "tenure": "Immediate"
+    },
+    {
+      "id": "P004",
+      "name": "Construction Linked",
+      "down_payment": "20%",
+      "tenure": "Until completion"
+    }
+  ],
+  "accessibility": {
+    "distance_airport_km": 30,
+    "distance_downtown_km": 15,
+    "distance_mall_km": 15,
+    "major_roads": ["Sheikh Zayed Road", "Emirates Road"],
+    "public_transport": "Regular shuttle service"
+  },
+  "pricing": {
+    "average_price_per_sqm_usd": 2400,
+    "rental_yield_percent": 6,
+    "annual_roi_percent": 9,
+    "currency": "AED and USD accepted"
+  },
+  "investment_info": {
+    "target_demographics": ["End-users", "Investors", "Expatriates", "UAE Nationals"],
+    "financing": ["Bank Mortgages (up to 80%)", "Developer Financing", "Flexible Payment Plans"],
+    "advantages": ["Prime location", "World-class amenities", "Strong rental demand", "Quality finishes", "Professional management"]
+  },
+  "contact_info": {
+    "sales": "+971 4 XXXX XXXX",
+    "email": "sales@damachills2.ae",
+    "website": "www.damachills2.ae",
+    "office_hours": "9:00 AM - 7:00 PM",
+    "customer_service_24_7": true
+  },
+  "regulations": {
+    "ownership": "Freehold in most areas",
+    "property_tax": "No annual property tax",
+    "title_authority": "Dubai Land Department",
+    "utilities_billing": "Separate meters"
+  },
+  "master_plan": {
+    "total_area_sqkm": 45,
+    "residential_units": 10654,
+    "green_space_percent": 25,
+    "water_supply": "24/7",
+    "waste_management": "Professional"
+  }
+}

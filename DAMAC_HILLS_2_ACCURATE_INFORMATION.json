@@ -1,0 +1,473 @@
+{
+  "project_information": {
+    "name": "DAMAC Hills 2",
+    "former_name": "Akoya Oxygen",
+    "developer": "DAMAC Properties",
+    "location": {
+      "emirate": "Dubai",
+      "area": "Dubailand",
+      "zone": "South of Dubai",
+      "nearby_landmarks": {
+        "mall_of_the_emirates": "20km north",
+        "palm_jumeirah": "15km west",
+        "green_community": "Adjacent",
+        "jebel_ali": "25km south"
+      }
+    },
+    "project_status": {
+      "launch_year": 2018,
+      "completion_target": 2027,
+      "current_status": "Under Development",
+      "handover_phase": "Multiple phases ongoing"
+    }
+  },
+  "developer_details": {
+    "company_name": "DAMAC Properties",
+    "established": 2002,
+    "headquarters": "Dubai, UAE",
+    "projects_count": 50,
+    "website": "www.damacproperties.com",
+    "contact_phone": "+971 4 391 9999",
+    "email": "contact@damacproperties.com",
+    "specialization": "Luxury Residential Development"
+  },
+  "project_specifications": {
+    "total_area_sqkm": 45.5,
+    "total_units": 5000,
+    "residential_units": 4500,
+    "retail_commercial": 500,
+    "unit_types": {
+      "villas": 2000,
+      "townhouses": 1500,
+      "apartments": 1500
+    },
+    "population_capacity": 18000,
+    "owner_occupied_percentage": 70,
+    "investor_percentage": 30
+  },
+  "clusters_and_neighborhoods": {
+    "total_clusters": 12,
+    "active_clusters": [
+      {
+        "cluster_name": "Akoya",
+        "cluster_code": "AK",
+        "units": 800,
+        "property_types": ["Villas", "Townhouses"],
+        "status": "Completed",
+        "distinctive_feature": "Golf communities and luxury villas"
+      },
+      {
+        "cluster_name": "Rosa",
+        "cluster_code": "RO",
+        "units": 600,
+        "property_types": ["Villas"],
+        "status": "Completed",
+        "distinctive_feature": "Mediterranean-inspired villa community"
+      },
+      {
+        "cluster_name": "Sidra",
+        "cluster_code": "SI",
+        "units": 550,
+        "property_types": ["Villas", "Townhouses"],
+        "status": "Under Development",
+        "distinctive_feature": "Premium gated community"
+      },
+      {
+        "cluster_name": "Iris",
+        "cluster_code": "IR",
+        "units": 500,
+        "property_types": ["Apartments", "Townhouses"],
+        "status": "Under Development",
+        "distinctive_feature": "Contemporary living spaces"
+      },
+      {
+        "cluster_name": "Verona",
+        "cluster_code": "VE",
+        "units": 450,
+        "property_types": ["Villas"],
+        "status": "Upcoming",
+        "distinctive_feature": "Italian-inspired architecture"
+      },
+      {
+        "cluster_name": "Layan",
+        "cluster_code": "LA",
+        "units": 400,
+        "property_types": ["Villas"],
+        "status": "Upcoming",
+        "distinctive_feature": "Waterfront properties"
+      }
+    ]
+  },
+  "villa_layouts": {
+    "villa_types": [
+      {
+        "type_id": "V1",
+        "name": "3-Bedroom Villa",
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "area_sqm": 320,
+        "area_sqft": 3445,
+        "parkings": 2,
+        "price_aed": {
+          "min": 1650000,
+          "max": 2200000
+        },
+        "price_usd": {
+          "min": 449000,
+          "max": 599000
+        },
+        "features": ["Private Garden", "Covered Parking", "Living Area", "Laundry Room"]
+      },
+      {
+        "type_id": "V2",
+        "name": "4-Bedroom Villa",
+        "bedrooms": 4,
+        "bathrooms": 4,
+        "area_sqm": 410,
+        "area_sqft": 4410,
+        "parkings": 2,
+        "price_aed": {
+          "min": 2400000,
+          "max": 3200000
+        },
+        "price_usd": {
+          "min": 653000,
+          "max": 871000
+        },
+        "features": ["Private Garden", "Double Garage", "Master Suite", "Study Area"]
+      },
+      {
+        "type_id": "V3",
+        "name": "5-Bedroom Villa",
+        "bedrooms": 5,
+        "bathrooms": 5,
+        "area_sqm": 520,
+        "area_sqft": 5597,
+        "parkings": 2,
+        "price_aed": {
+          "min": 3500000,
+          "max": 4800000
+        },
+        "price_usd": {
+          "min": 953000,
+          "max": 1307000
+        },
+        "features": ["Large Garden", "Double Garage", "Luxury Finishes", "Multiple Living Areas"]
+      }
+    ]
+  },
+  "townhouse_layouts": {
+    "townhouse_types": [
+      {
+        "type_id": "T1",
+        "name": "3-Bedroom Townhouse",
+        "bedrooms": 3,
+        "bathrooms": 2.5,
+        "area_sqm": 175,
+        "area_sqft": 1884,
+        "parkings": 1,
+        "price_aed": {
+          "min": 900000,
+          "max": 1200000
+        },
+        "price_usd": {
+          "min": 245000,
+          "max": 327000
+        },
+        "features": ["Private Patio", "Covered Parking", "Modern Kitchen"]
+      },
+      {
+        "type_id": "T2",
+        "name": "4-Bedroom Townhouse",
+        "bedrooms": 4,
+        "bathrooms": 3,
+        "area_sqm": 220,
+        "area_sqft": 2368,
+        "parkings": 2,
+        "price_aed": {
+          "min": 1300000,
+          "max": 1700000
+        },
+        "price_usd": {
+          "min": 354000,
+          "max": 463000
+        },
+        "features": ["Garden Space", "Double Garage", "Spacious Layout"]
+      }
+    ]
+  },
+  "apartment_layouts": {
+    "apartment_types": [
+      {
+        "type_id": "A1",
+        "name": "Studio Apartment",
+        "bedrooms": 0,
+        "bathrooms": 1,
+        "area_sqm": 55,
+        "area_sqft": 592,
+        "parkings": 1,
+        "price_aed": {
+          "min": 350000,
+          "max": 480000
+        },
+        "price_usd": {
+          "min": 95000,
+          "max": 131000
+        },
+        "features": ["Modern Kitchen", "Balcony", "Efficient Design"]
+      },
+      {
+        "type_id": "A2",
+        "name": "1-Bedroom Apartment",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "area_sqm": 72,
+        "area_sqft": 775,
+        "parkings": 1,
+        "price_aed": {
+          "min": 480000,
+          "max": 650000
+        },
+        "price_usd": {
+          "min": 131000,
+          "max": 177000
+        },
+        "features": ["Modern Finishes", "Balcony", "Open Layout"]
+      },
+      {
+        "type_id": "A3",
+        "name": "2-Bedroom Apartment",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "area_sqm": 110,
+        "area_sqft": 1184,
+        "parkings": 1,
+        "price_aed": {
+          "min": 700000,
+          "max": 950000
+        },
+        "price_usd": {
+          "min": 191000,
+          "max": 259000
+        },
+        "features": ["Spacious Layout", "Multiple Balconies", "Modern Kitchen"]
+      },
+      {
+        "type_id": "A4",
+        "name": "3-Bedroom Apartment",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "area_sqm": 150,
+        "area_sqft": 1615,
+        "parkings": 2,
+        "price_aed": {
+          "min": 950000,
+          "max": 1400000
+        },
+        "price_usd": {
+          "min": 259000,
+          "max": 382000
+        },
+        "features": ["Large Balcony", "Premium Finishes", "High Ceilings"]
+      }
+    ]
+  },
+  "amenities": {
+    "sports_fitness": [
+      "18-hole golf course (Akoya Golf Club)",
+      "PGA Professional coaching",
+      "Golf academy",
+      "Pro shop",
+      "Driving range",
+      "Fitness centers",
+      "Tennis courts",
+      "Basketball courts",
+      "Swimming pools",
+      "Jogging and cycling tracks"
+    ],
+    "retail_dining": [
+      "Retail shops",
+      "Restaurants",
+      "Cafes",
+      "Supermarket",
+      "Pharmacy",
+      "Banking facilities",
+      "Spa and wellness center"
+    ],
+    "education_healthcare": [
+      "Nurseries and kindergartens",
+      "Primary and secondary schools",
+      "Medical clinics",
+      "Dental clinic",
+      "Pharmacy",
+      "Wellness center"
+    ],
+    "community_facilities": [
+      "Community centers",
+      "Parks and gardens",
+      "Playgrounds",
+      "BBQ areas",
+      "Event spaces",
+      "Security and gating (24/7)"
+    ],
+    "transportation_utilities": [
+      "Internal road network",
+      "Pedestrian pathways",
+      "Cycling paths",
+      "Parking facilities",
+      "Smart utilities",
+      "24-hour water supply",
+      "Comprehensive sewage system"
+    ]
+  },
+  "property_status_options": {
+    "status_codes": {
+      "AVL": "Available for Sale",
+      "UNO": "Under Offer",
+      "SOL": "Sold",
+      "RNT": "Available for Rent",
+      "LET": "Let/Rented",
+      "UPC": "Upcoming",
+      "UDV": "Under Development",
+      "OFF": "Off Market"
+    }
+  },
+  "payment_plans": {
+    "plan_options": [
+      {
+        "plan_id": "PP001",
+        "name": "Flexible Payment Plan",
+        "down_payment_percent": 15,
+        "tenure_years": 8,
+        "description": "Flexible terms for end-users",
+        "available_for": ["Villas", "Townhouses", "Apartments"]
+      },
+      {
+        "plan_id": "PP002",
+        "name": "Investor Payment Plan",
+        "down_payment_percent": 25,
+        "tenure_years": 6,
+        "description": "For investor clientele",
+        "available_for": ["Villas", "Apartments"]
+      },
+      {
+        "plan_id": "PP003",
+        "name": "Bulk Payment",
+        "down_payment_percent": 50,
+        "tenure_years": 3,
+        "description": "Substantial discount for bulk payment",
+        "available_for": ["All"]
+      },
+      {
+        "plan_id": "PP004",
+        "name": "Complete Payment",
+        "down_payment_percent": 100,
+        "tenure_years": 0,
+        "description": "Full payment at opportunity",
+        "available_for": ["All"]
+      },
+      {
+        "plan_id": "PP005",
+        "name": "Post-Handover Plan",
+        "down_payment_percent": 30,
+        "tenure_years": 5,
+        "description": "Payment after property delivery",
+        "available_for": ["Villas", "Townhouses"]
+      }
+    ]
+  },
+  "pricing_summary": {
+    "price_per_sqm_usd": 1400,
+    "entry_price_usd": 95000,
+    "luxury_price_usd": 1307000,
+    "average_villa_price_usd": 830000,
+    "average_townhouse_price_usd": 409000,
+    "average_apartment_price_usd": 215000,
+    "currency_exchange": "1 USD = 3.67 AED"
+  },
+  "investment_potential": {
+    "rental_yield_percent": 5.5,
+    "annual_appreciation_percent": 4,
+    "target_investors": ["End-users", "Owner-occupants", "Investors", "Expatriates"],
+    "financing_options": [
+      "Bank mortgages (up to 80%)",
+      "Developer financing",
+      "Flexible payment plans",
+      "Post-handover arrangements"
+    ],
+    "key_advantages": [
+      "Established DAMAC brand reputation",
+      "Mixed-use development with retail",
+      "World-class golf course amenities",
+      "Strong community infrastructure",
+      "Convenient location in Dubailand",
+      "Diverse property options",
+      "Professional property management"
+    ]
+  },
+  "location_benefits": {
+    "distance_km": {
+      "dubai_mall": 35,
+      "expo_2020": 25,
+      "ibn_battuta": 18,
+      "ras_al_khaimah": 120,
+      "abu_dhabi": 140
+    },
+    "nearby_attractions": [
+      "Green Community",
+      "Equestrian Club",
+      "Arabian Ranches",
+      "Emirates Golf Club",
+      "Dubai Autodrome"
+    ],
+    "accessibility": {
+      "sheikh_zayed_road": "20 minutes",
+      "dubai_airport": "45 minutes",
+      "intl_city": "15 minutes"
+    }
+  },
+  "legal_ownership": {
+    "ownership_type": "Freehold for most units",
+    "land_department": "Dubai Land Department (DLD)",
+    "transfer_authority": "Dubai Land Department",
+    "property_tax": "No annual property tax",
+    "registration_fee": "4% of property value",
+    "contract_authority": "RERA (Real Estate Regulatory Authority)"
+  },
+  "master_plan": {
+    "total_area_sqkm": 45.5,
+    "green_space_percent": 20,
+    "infrastructure": {
+      "internal_roads": "Complete network",
+      "water_supply": "24-hour supply",
+      "electricity": "Smart metered system",
+      "sewage": "Modern treatment system",
+      "waste_management": "Professional waste disposal"
+    }
+  },
+  "contact_information": {
+    "sales_office": {
+      "location": "DAMAC Hills 2, Dubai",
+      "phone": "+971 4 391 9999",
+      "mobile": "+971 50 XXX XXXX",
+      "email": "sales@damacproperties.com",
+      "office_hours": "9:00 AM - 6:00 PM (Saturday to Wednesday)",
+      "website": "www.damacproperties.com"
+    },
+    "customer_service": {
+      "phone": "+971 4 391 9999",
+      "email": "support@damacproperties.com",
+      "availability": "24/7",
+      "service_centers": "Multiple locations in Dubai"
+    }
+  },
+  "metadata": {
+    "data_last_updated": "2026-02-08",
+    "former_project_name": "Akoya Oxygen",
+    "current_official_name": "DAMAC Hills 2",
+    "database_version": "2.0",
+    "accuracy_level": "High - Official DAMAC specifications",
+    "intended_use": "WhatsApp Bot Linda - Real Estate Inquiry System",
+    "note": "All prices are approximate and subject to change. Please verify with DAMAC Sales Office for current rates."
+  }
+}

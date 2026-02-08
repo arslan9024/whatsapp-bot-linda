@@ -1,0 +1,49 @@
+{
+  "accounts": {
+    "PowerAgent": {
+      "id": "poweragent",
+      "name": "arslanpoweragent@gmail.com",
+      "type": "service_account",
+      "description": "Service account for Google Sheets and Drive",
+      "keyPath": "keys.json",
+      "scopes": [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "active",
+      "createdAt": "2024-01-01",
+      "lastUsed": "2026-02-08"
+    },
+    "GorahaBot": {
+      "id": "gorahabot",
+      "name": "gorahabot@white-caves-fb-486818.iam.gserviceaccount.com",
+      "displayName": "goraha.properties@gmail.com",
+      "type": "service_account",
+      "description": "Service account for Google Contacts management (goraha.properties)",
+      "keyPath": "keys-goraha.json",
+      "scopes": [
+        "https://www.googleapis.com/auth/contacts",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "active",
+      "createdAt": "2026-02-08",
+      "lastUsed": "2026-02-08",
+      "capabilities": {
+        "contacts": true,
+        "sheets": true,
+        "drive": true
+      }
+    }
+  },
+  "default": "PowerAgent",
+  "version": "1.0",
+  "format": "Multi-Account Google Services Registry",
+  "notes": "Update status to 'active' after OAuth2 setup for GorahaBot",
+  "metadata": {
+    "totalAccounts": 2,
+    "serviceAccounts": 1,
+    "oauthAccounts": 1,
+    "lastModified": "2026-02-08T12:00:00Z"
+  }
+}
