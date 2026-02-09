@@ -6,6 +6,11 @@ import SessionManager from "./code/utils/SessionManager.js";
 import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 
+// PHASE 4: Multi-Account Orchestration (February 9, 2026)
+// Bootstrap and recovery managers for multi-account WhatsApp bot system
+import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.js";
+import DeviceRecoveryManager from "./code/utils/DeviceRecoveryManager.js";
+
 // Initialize Conversation Analyzer (Session 18 - February 7, 2026)
 // This sets up message type logging and global statistics functions
 import "./code/WhatsAppBot/AnalyzerGlobals.js";
@@ -24,11 +29,16 @@ import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
 import fs from "fs";
 import path from "path";
 
-// Global bot instance
-let Lion0 = null;
+// Global bot instances (single master + multi-account support)
+let Lion0 = null; // Master account (backwards compatibility)
+let accountClients = new Map(); // Map: phoneNumber → client instance (Phase 4)
 let isInitializing = false;
 let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 2;
+
+// Phase 4 Managers
+let bootstrapManager = null;
+let recoveryManager = null;
 
 // Global contact handler (Phase B)
 let contactHandler = null;
@@ -50,6 +60,11 @@ function logBot(msg, type = "info") {
   console.log(`[${timestamp}] ${prefix} ${msg}`);
 }
 
+/**
+ * PHASE 4: Multi-Account Bot Initialization
+ * Orchestrates SessionStateManager, AccountBootstrapManager, and DeviceRecoveryManager
+ * Ensures seamless recovery across restarts
+ */
 async function initializeBot() {
   // Prevent multiple simultaneous initializations
   if (isInitializing) {
@@ -61,87 +76,158 @@ async function initializeBot() {
   initAttempts++;
 
   try {
-    // Initialize session state manager (loads previous session state)
+    // STEP 1: Initialize Phase 4 Managers
+    if (initAttempts === 1) {
+      bootstrapManager = new AccountBootstrapManager();
+      recoveryManager = new DeviceRecoveryManager();
+      logBot("Phase 4 managers initialized (Bootstrap + Recovery)", "success");
+    }
+
+    // STEP 2: Load Session State (Phase 1)
     if (initAttempts === 1) {
       const initialized = await sessionStateManager.initialize();
       if (!initialized) {
         logBot("Failed to initialize SessionStateManager", "warn");
       } else {
-        // Log recovered accounts
         const healthReport = sessionStateManager.getHealthReport();
-        logBot(`Session state loaded: ${healthReport.activeAccounts}/${healthReport.totalAccounts} accounts active`, "info");
+        logBot(`Session state loaded: ${healthReport.activeAccounts}/${healthReport.totalAccounts} accounts`, "success");
         if (healthReport.linkedDevices > 0) {
-          logBot(`Found ${healthReport.linkedDevices} linked device(s) to recover`, "success");
+          logBot(`Found ${healthReport.linkedDevices} linked device(s) ready for recovery`, "success");
         }
       }
     }
 
-    const masterNumber = process.env.BOT_MASTER_NUMBER || "971505760056";
+    // STEP 3: Load Multi-Account Configuration (Phase 2)
+    logBot("Loading multi-account configuration...", "info");
+    await bootstrapManager.loadBotsConfig();
+    const accountConfigs = bootstrapManager.getAccountConfigs();
+    const orderedAccounts = bootstrapManager.getOrderedAccounts();
     
+    logBot(`Found ${accountConfigs.length} configured account(s)`, "info");
+    orderedAccounts.forEach((config, idx) => {
+      logBot(`  [${idx + 1}] ${config.displayName} (${config.phoneNumber}) - ${config.role}`, "info");
+    });
+
+    // STEP 4: Display Banner (first initialization only)
     if (initAttempts === 1) {
-      console.log("\n╔════════════════════════════════════════════════════════════╗");
-      console.log("║         🤖 LINDA - WhatsApp Bot Background Service        ║");
-      console.log("╚════════════════════════════════════════════════════════════╝\n");
+      console.log("\n╔═══════════════════════════════════════════════════════════════╗");
+      console.log("║       🤖 LINDA - Multi-Account WhatsApp Bot Service         ║");
+      console.log("║              Phase 4: Multi-Account Bootstrap               ║");
+      console.log("╚═══════════════════════════════════════════════════════════════╝\n");
     }
 
-    logBot(`Master Account: ${masterNumber}`, "info");
     logBot(`Initialization Attempt: ${initAttempts}/${MAX_INIT_ATTEMPTS}`, "info");
+    logBot("Starting sequential account initialization...", "info");
 
-    // Check session restoration capability (NEW: Enhanced session manager)
-    const sessionInfo = SessionManager.getSessionInfo(masterNumber);
-    const canRestoreSession = SessionManager.canRestoreSession(masterNumber);
-    const savedState = SessionManager.loadSessionState();
+    // STEP 5: Sequential Account Initialization
+    for (const config of orderedAccounts) {
+      if (!config.enabled) {
+        logBot(`⏭️  Skipping disabled account: ${config.displayName}`, "warn");
+        continue;
+      }
 
-    logBot(`Session Folder Exists: ${sessionInfo.sessionFolderExists}`, "info");
-    logBot(`Can Restore Immediately: ${canRestoreSession}`, "info");
-
-    // Check session folder (legacy compatibility)
-    const sessionFolder = path.join(process.cwd(), "sessions", `session-${masterNumber}`);
-    const sessionExists = fs.existsSync(sessionFolder);
-    const deviceStatusPath = path.join(sessionFolder, "device-status.json");
-    let deviceStatus = null;
-
-    // Try to read device status if session exists
-    if (sessionExists) {
+      logBot(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, "info");
+      logBot(`Initializing: ${config.displayName} (${config.phoneNumber})`, "info");
+      
       try {
-        deviceStatus = JSON.parse(fs.readFileSync(deviceStatusPath, "utf8"));
-        logBot(`Session found - Device linked: ${deviceStatus.deviceLinked}`, "info");
-      } catch (e) {
-        logBot(`Session folder exists but no valid device-status.json`, "warn");
+        // Create WhatsApp client
+        const client = await CreatingNewWhatsAppClient(config.phoneNumber);
+        if (!client) {
+          throw new Error("Failed to create WhatsApp client");
+        }
+
+        accountClients.set(config.phoneNumber, client);
+        allInitializedAccounts.push(client);
+        
+        // Set Lion0 to first/primary account for backwards compatibility
+        if (!Lion0) {
+          Lion0 = client;
+          global.Lion0 = Lion0;
+          global.Linda = Lion0;
+        }
+
+        logBot(`✅ Client created for ${config.displayName}`, "success");
+
+        // STEP 6: Check for Device Recovery (Phase 3)
+        logBot(`Checking for linked devices (${config.phoneNumber})...`, "info");
+        const wasLinked = await recoveryManager.wasDevicePreviouslyLinked(config.phoneNumber);
+        const savedState = sessionStateManager.getAccountState(config.phoneNumber);
+
+        if (wasLinked && savedState?.deviceLinked) {
+          logBot(`Found previous device session - attempting recovery`, "success");
+          setupRestoreFlow(client, config.phoneNumber, config);
+        } else if (savedState?.deviceLinked) {
+          logBot(`Device linked but session needs verification`, "warn");
+          setupNewLinkingFlow(client, config.phoneNumber);
+        } else {
+          logBot(`No previous session - new device linking required`, "info");
+          createDeviceStatusFile(config.phoneNumber);
+          setupNewLinkingFlow(client, config.phoneNumber);
+        }
+
+        // Record initialization
+        await bootstrapManager.recordInitialization(config.id, true);
+
+      } catch (error) {
+        logBot(`Failed to initialize ${config.displayName}: ${error.message}`, "error");
+        await bootstrapManager.recordInitialization(config.id, false);
+        continue;
       }
     }
 
-    // Create WhatsApp client
-    logBot("Creating WhatsApp client...", "info");
-    Lion0 = await CreatingNewWhatsAppClient(masterNumber);
+    logBot(`\nInitialization sequence complete`, "success");
 
-    if (!Lion0) {
-      throw new Error("Failed to create WhatsApp client");
-    }
+    // STEP 7: Initialize Database (Phase 2 continuation)
+    await initializeDatabase();
 
-    logBot("WhatsApp client created", "success");
+    logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
+    logBot("║              🟢 PHASE 4 INITIALIZATION COMPLETE              ║", "success");
+    logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
 
-    // ═══════════════════════════════════════════════════════════════
-    // DATABASE INITIALIZATION (Session 16 - Akoya Organized Sheet)
-    // ═══════════════════════════════════════════════════════════════
+  } catch (error) {
+    logBot(`Initialization Error: ${error.message}`, "error");
     
+    // Check if this is a browser lock error
+    if (error.message.includes("browser is already running") && initAttempts < MAX_INIT_ATTEMPTS) {
+      logBot("Browser is locked from previous session - cleaning up...", "warn");
+      await killBrowserProcesses();
+      await sleep(2000);
+      isInitializing = false;
+      return initializeBot();
+    } else if (initAttempts < MAX_INIT_ATTEMPTS) {
+      logBot(`Retrying in 5 seconds... (Attempt ${initAttempts + 1}/${MAX_INIT_ATTEMPTS})`, "warn");
+      isInitializing = false;
+      return setTimeout(initializeBot, 5000);
+    } else {
+      logBot("Max initialization attempts reached. Please restart manually.", "error");
+      isInitializing = false;
+    }
+  }
+}
+
+/**
+ * Initialize database and analytics (from original flow)
+ */
+async function initializeDatabase() {
+  logBot("Initializing database and analytics...", "info");
+
+  try {
+    // DATABASE INITIALIZATION (Session 16 - Akoya Organized Sheet)
     let contextIntegration = null;
     let operationalAnalytics = null;
-    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID || OrganizedSheets.Akoya;
+    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID || (await import("./code/DamacHills2List.js")).OrganizedSheets?.Akoya;
 
     if (AKOYA_SHEET_ID) {
-      logBot("Initializing organized sheet database (Akoya)...", "info");
-
-      // Step 1: Validate sheet access
+      const { quickValidateSheet } = await import("./code/utils/sheetValidation.js");
       const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
       
       if (sheetValid) {
-        // Step 2: Initialize context integration (loads data into memory)
+        const { AIContextIntegration } = await import("./code/Services/AIContextIntegration.js");
         contextIntegration = new AIContextIntegration();
         try {
           await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
-          logBot("Database context loaded into memory ✅", "success");
-          global.databaseContext = contextIntegration;  // Make globally available
+          logBot("Database context loaded into memory", "success");
+          global.databaseContext = contextIntegration;
         } catch (error) {
           logBot(`Context initialization failed: ${error.message}`, "warn");
           contextIntegration = null;
@@ -149,95 +235,40 @@ async function initializeBot() {
 
         // Step 3: Initialize analytics
         try {
+          const { OperationalAnalytics } = await import("./code/Services/OperationalAnalytics.js");
           operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
-          global.analytics = operationalAnalytics;  // Make globally available
-          logBot("Analytics service initialized ✅", "success");
+          global.analytics = operationalAnalytics;
+          logBot("Analytics service initialized", "success");
         } catch (error) {
           logBot(`Analytics initialization failed: ${error.message}`, "warn");
           operationalAnalytics = null;
         }
       } else {
-        logBot("Sheet validation failed - bot will use LEGACY MODE (old sheets)", "warn");
-        logBot("Run: npm run organize-sheet to set up organized database", "info");
+        logBot("Sheet validation failed - using LEGACY MODE", "warn");
       }
-    } else {
-      logBot("⚠️  No organized sheet ID configured (AKOYA_ORGANIZED_SHEET_ID env var)", "warn");
-      logBot("Bot will operate in LEGACY MODE", "info");
     }
-
-    // ═══════════════════════════════════════════════════════════════
-
-    // NEW: Route based on enhanced session restoration capability
-    if (canRestoreSession && (sessionExists && deviceStatus && deviceStatus.deviceLinked)) {
-      // Session exists, can be restored, and device was already linked
-
-      logBot("Restoring previous session...", "info");
-      setupRestoreFlow(Lion0, masterNumber, deviceStatus);
-    } else if (sessionExists) {
-      // Session folder exists but not properly linked
-      logBot("Session exists but device not linked - requesting new auth", "warn");
-      setupNewLinkingFlow(Lion0, masterNumber);
-    } else {
-      // Brand new session
-      logBot("NEW SESSION - Device linking required", "info");
-      createDeviceStatusFile(masterNumber);
-      setupNewLinkingFlow(Lion0, masterNumber);
-    }
-
-    // Make bot available globally
-    global.Lion0 = Lion0;
-    global.Linda = Lion0;
-
-    // Setup shutdown handlers for this client
-    setupShutdownHandlers(Lion0);
-
   } catch (error) {
-    logBot(`Initialization Error: ${error.message}`, "error");
-    
-    // Check if this is a browser lock error
-    if (error.message.includes("browser is already running") && initAttempts < MAX_INIT_ATTEMPTS) {
-      logBot("Browser is locked - cleaning up and retrying...", "warn");
-      await killBrowserProcesses();
-      await sleep(2000);
-      isInitializing = false;
-      initializeBot();
-    } else if (initAttempts < MAX_INIT_ATTEMPTS) {
-      logBot(`Retrying in 5 seconds... (Attempt ${initAttempts + 1}/${MAX_INIT_ATTEMPTS})`, "warn");
-      isInitializing = false;
-      setTimeout(initializeBot, 5000);
-    } else {
-      logBot("Max initialization attempts reached. Bot will remain idle.", "error");
-      logBot("Fix the issue and restart with: npm run dev", "warn");
-      isInitializing = false;
-      // Don't exit - let bot stay alive for monitoring
-    }
+    logBot(`Database initialization error: ${error.message}`, "warn");
   }
 }
 
 /**
- * Setup restore flow for existing linked devices
+ * Setup restore flow for existing linked devices (Phase 3 integration)
  */
-function setupRestoreFlow(client, masterNumber, deviceStatus) {
-  logBot("Setting up session restore...", "info");
+function setupRestoreFlow(client, phoneNumber, configOrStatus) {
+  logBot("Setting up session restore for " + phoneNumber, "info");
 
-  // Set up event listeners BEFORE initialization
   let readyFired = false;
+  const config = configOrStatus.displayName ? configOrStatus : null; // Check if it's a config object
 
   client.once("authenticated", () => {
-    logBot("Session authenticated successfully", "success");
-    // Save session state for future restores
-    SessionManager.saveSessionState(masterNumber, {
-      isLinked: true,
-      authMethod: deviceStatus.authMethod || "qr",
-      deviceStatus: deviceStatus
-    });
-    // Also update SessionStateManager
-    sessionStateManager.saveAccountState(masterNumber, {
-      phoneNumber: masterNumber,
-      displayName: "Master Account",
+    logBot(`✅ Session authenticated (${phoneNumber})`, "success");
+    sessionStateManager.saveAccountState(phoneNumber, {
+      phoneNumber: phoneNumber,
+      displayName: config?.displayName || "Unknown Account",
       deviceLinked: true,
       isActive: false,
-      sessionPath: `sessions/session-${masterNumber}`,
+      sessionPath: `sessions/session-${phoneNumber}`,
       lastKnownState: "authenticated"
     });
   });
@@ -246,68 +277,49 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
     if (readyFired) return;
     readyFired = true;
     
-    logBot("🟢 READY - Bot is online and listening", "ready");
-    logBot(`Auth Method: ${deviceStatus.authMethod === "code" ? "6-Digit Code" : "QR Code"}`, "success");
-    logBot("Waiting for messages...", "info");
+    logBot(`🟢 READY - ${phoneNumber} is online`, "ready");
     
-    // Mark account as active and save state
-    allInitializedAccounts.push(Lion0);
-    await sessionStateManager.markRecoverySuccess(masterNumber);
+    // Mark account as active
+    allInitializedAccounts.push(client);
+    await sessionStateManager.markRecoverySuccess(phoneNumber);
     
-    // Initialize contact lookup handler (Phase B - Google Contacts Integration)
+    // Initialize contact lookup handler (Phase B)
     try {
-      contactHandler = new ContactLookupHandler();
-      await contactHandler.initialize();
-      logBot("✅ Contact lookup handler initialized (Google Contacts API ready)", "success");
-      global.contactHandler = contactHandler; // Make globally available
+      if (!contactHandler) {
+        const { default: ContactLookupHandler } = await import("./code/WhatsAppBot/ContactLookupHandler.js");
+        contactHandler = new ContactLookupHandler();
+        await contactHandler.initialize();
+        logBot("✅ Contact lookup handler ready", "success");
+        global.contactHandler = contactHandler;
+      }
     } catch (error) {
-      logBot(`⚠️  Contact handler initialization failed: ${error.message}`, "warn");
-      logBot("Bot will continue without contact lookup functionality", "info");
-      contactHandler = null;
+      logBot(`⚠️  Contact handler error: ${error.message}`, "warn");
     }
     
-    // Save session backup for emergency recovery
-    SessionManager.backupSession(masterNumber);
-    
-    // Set up message listening
-    setupMessageListeners(client);
+    setupMessageListeners(client, phoneNumber);
     isInitializing = false;
   });
 
   client.once("auth_failure", (msg) => {
-    logBot(`Session restore failed: ${msg}`, "error");
-    logBot("Attempting to restore from backup...", "warn");
-    
-    // Try to restore from backup if available
-    if (SessionManager.restoreFromBackup(masterNumber)) {
-      logBot("Session restored from backup - retrying...", "warn");
-      isInitializing = false;
-      setTimeout(() => {
-        isInitializing = false;
-        initializeBot();
-      }, 3000);
-    } else {
-      logBot("Will need to re-authenticate with new QR code on next restart", "warn");
-      isInitializing = false;
-    }
+    logBot(`Session restore failed for ${phoneNumber}: ${msg}`, "error");
+    logBot("Will need to re-authenticate with new QR code", "warn");
+    isInitializing = false;
   });
 
   client.on("disconnected", (reason) => {
-    logBot(`Disconnected: ${reason}`, "warn");
+    logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
   });
 
   client.on("error", (error) => {
-    logBot(`Client error: ${error.message}`, "error");
+    logBot(`Client error (${phoneNumber}): ${error.message}`, "error");
   });
 
-  // Initialize client to restore session
-  logBot("Initializing with existing session...", "info");
+  logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
   try {
     client.initialize();
   } catch (error) {
     if (error.message.includes("browser is already running")) {
-      logBot("Browser already locked - this is a nodemon restart", "warn");
-      logBot("Waiting for existing browser to connect...", "info");
+      logBot("Browser already locked (nodemon restart detected)", "warn");
     } else {
       throw error;
     }
@@ -315,10 +327,10 @@ function setupRestoreFlow(client, masterNumber, deviceStatus) {
 }
 
 /**
- * Setup new device linking flow
+ * Setup new device linking flow (Phase 4 multi-account version)
  */
-function setupNewLinkingFlow(client, masterNumber) {
-  logBot("Setting up device linking...", "info");
+function setupNewLinkingFlow(client, phoneNumber) {
+  logBot(`Setting up device linking for ${phoneNumber}...`, "info");
 
   let qrShown = false;
   let authComplete = false;
@@ -326,99 +338,82 @@ function setupNewLinkingFlow(client, masterNumber) {
   client.on("qr", async (qr) => {
     if (!qrShown) {
       qrShown = true;
-      
-      // Use improved QR code display with Windows compatibility
       try {
         await QRCodeDisplay.display(qr, {
-          method: 'auto',        // Primary: qrcode-terminal, then fallbacks
-          fallback: true,        // Use fallbacks if needed
-          masterAccount: masterNumber
+          method: 'auto',
+          fallback: true,
+          masterAccount: phoneNumber
         });
       } catch (error) {
         logBot("QR display error: " + error.message, "error");
-        logBot("Please manually link device via WhatsApp Settings → Linked Devices", "warn");
+        logBot("Please link device manually via WhatsApp Settings", "warn");
       }
     }
   });
 
   client.once("authenticated", () => {
     authComplete = true;
-    logBot("✅ Device linked successfully!", "success");
+    logBot(`✅ Device linked (${phoneNumber})`, "success");
     
-    // Save session state for restoration on restart
-    SessionManager.saveSessionState(masterNumber, {
-      isLinked: true,
-      authMethod: "qr",
-      linkedAt: new Date().toISOString()
-    });
-    
-    // Update SessionStateManager with linked device
-    sessionStateManager.saveAccountState(masterNumber, {
-      phoneNumber: masterNumber,
-      displayName: "Master Account",
+    sessionStateManager.saveAccountState(phoneNumber, {
+      phoneNumber: phoneNumber,
+      displayName: "WhatsApp Account",
       deviceLinked: true,
       isActive: false,
-      sessionPath: `sessions/session-${masterNumber}`,
+      sessionPath: `sessions/session-${phoneNumber}`,
       lastKnownState: "authenticated"
     });
   });
 
-  client.once("ready", () => {
-    logBot("🟢 READY - Bot is online and listening", "ready");
+  client.once("ready", async () => {
+    logBot(`🟢 READY - ${phoneNumber} is online`, "ready");
     logBot("Session saved for future restarts", "success");
-    logBot("Waiting for messages...", "info");
     
-    // Create session backup for emergency recovery
-    SessionManager.backupSession(masterNumber);
+    allInitializedAccounts.push(client);
+    await sessionStateManager.markRecoverySuccess(phoneNumber);
     
-    // Mark account as active in state
-    allInitializedAccounts.push(Lion0);
-    sessionStateManager.markRecoverySuccess(masterNumber);
-    
-    // Set up message listening
-    setupMessageListeners(client);
+    setupMessageListeners(client, phoneNumber);
     isInitializing = false;
   });
 
   client.once("auth_failure", (msg) => {
-    logBot(`Authentication failed: ${msg}`, "error");
+    logBot(`Authentication failed for ${phoneNumber}: ${msg}`, "error");
     logBot("Please restart and scan QR code again", "warn");
     isInitializing = false;
   });
 
   client.on("disconnected", (reason) => {
-    logBot(`Disconnected: ${reason}`, "warn");
+    logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
   });
 
   client.on("error", (error) => {
-    logBot(`Error during linking: ${error.message}`, "error");
+    logBot(`Error during linking (${phoneNumber}): ${error.message}`, "error");
   });
 
-  logBot("Initializing WhatsApp client for new device link...", "info");
+  logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
   client.initialize();
 }
 
 /**
- * Setup message listening
+ * Setup message listening for individual account (Phase 4 - multi-account)
  */
-function setupMessageListeners(client) {
+function setupMessageListeners(client, phoneNumber = "Unknown") {
   client.on("message", async (msg) => {
     const timestamp = new Date().toLocaleTimeString();
     const from = msg.from.includes("@g.us") ? `Group: ${msg.from}` : `User: ${msg.from}`;
     
-    logBot(`📨 [${timestamp}] ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
+    logBot(`📨 [${timestamp}] (${phoneNumber}) ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
 
     // Phase B: Contact lookup integration
     try {
       if (contactHandler && !msg.from.includes("@g.us")) {
-        // Try to lookup contact for this user
         const contact = await contactHandler.getContact(msg.from);
         if (contact) {
-          logBot(`✅ Contact found: ${contact.displayName || contact.phoneNumber}`, "success");
+          logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, "success");
         }
       }
     } catch (error) {
-      logBot(`⚠️  Contact lookup error: ${error.message}`, "warn");
+      logBot(`⚠️ Contact lookup error: ${error.message}`, "warn");
     }
 
     // Test ping command
@@ -428,31 +423,32 @@ function setupMessageListeners(client) {
     }
   });
 
-  logBot("Message listeners ready", "success");
+  logBot(`Message listeners ready for ${phoneNumber}`, "success");
 }
 
 /**
- * Graceful shutdown with session state persistence
+ * Graceful shutdown with multi-account support (Phase 4)
  */
 process.on("SIGINT", async () => {
   console.log("\n");
   logBot("Received shutdown signal", "warn");
-  logBot("Initiating graceful shutdown...", "info");
+  logBot("Initiating graceful shutdown (Phase 4 - Multi-Account)...", "info");
   
   try {
     // 1. Save all account states
-    logBot("Saving session states", "info");
+    logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, "info");
     for (const [accountId, state] of Object.entries(sessionStateManager.getAllAccountStates())) {
       await sessionStateManager.saveAccountState(accountId, { ...state, isActive: false });
     }
     
     // 2. Close all WhatsApp connections
     logBot(`Closing ${allInitializedAccounts.length} WhatsApp connection(s)`, "info");
-    for (const account of allInitializedAccounts) {
+    for (const [phoneNumber, client] of accountClients.entries()) {
       try {
-        await account.destroy();
+        logBot(`  Disconnecting ${phoneNumber}...`, "info");
+        await client.destroy();
       } catch (e) {
-        // Ignore individual connection errors
+        logBot(`  Warning: Error closing ${phoneNumber}`, "warn");
       }
     }
     

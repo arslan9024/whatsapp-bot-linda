@@ -61,6 +61,32 @@ class AccountBootstrapManager {
   }
 
   /**
+   * Get all account configurations (Phase 4 - Multi-Account)
+   */
+  getAccountConfigs() {
+    if (!this.botsConfig) return [];
+    return Object.values(this.botsConfig.whatsappBots || {});
+  }
+
+  /**
+   * Get ordered list of accounts for priority-based initialization (Phase 4)
+   */
+  getOrderedAccounts() {
+    return this.getEnabledBotsList();
+  }
+
+  /**
+   * Record account initialization result (Phase 4)
+   */
+  async recordInitialization(accountId, success) {
+    if (success) {
+      this.initializationProgress.completed = (this.initializationProgress.completed || 0) + 1;
+    } else {
+      this.initializationProgress.failed = (this.initializationProgress.failed || 0) + 1;
+    }
+  }
+
+  /**
    * Get list of enabled bots in priority order
    */
   getEnabledBotsList() {
