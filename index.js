@@ -11,6 +11,10 @@ import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.js";
 import DeviceRecoveryManager from "./code/utils/DeviceRecoveryManager.js";
 
+// PHASE 5: Account Health Monitoring (February 9, 2026)
+// Health checks and auto-recovery for all WhatsApp accounts
+import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
+
 // Initialize Conversation Analyzer (Session 18 - February 7, 2026)
 // This sets up message type logging and global statistics functions
 import "./code/WhatsAppBot/AnalyzerGlobals.js";
@@ -180,8 +184,17 @@ async function initializeBot() {
     // STEP 7: Initialize Database (Phase 2 continuation)
     await initializeDatabase();
 
+    // STEP 8: Initialize Health Monitoring (Phase 5)
+    logBot("Starting account health monitoring...", "info");
+    accountHealthMonitor.startHealthChecks();
+    logBot("✅ Account health monitoring active (5-minute intervals)", "success");
+    
+    // Make health monitor globally available
+    global.healthMonitor = accountHealthMonitor;
+
     logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
-    logBot("║              🟢 PHASE 4 INITIALIZATION COMPLETE              ║", "success");
+    logBot("║              🟢 PHASE 5 INITIALIZATION COMPLETE              ║", "success");
+    logBot("║        Session, Bootstrap, Recovery & Health Monitoring      ║", "success");
     logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
 
   } catch (error) {
@@ -283,6 +296,9 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
     allInitializedAccounts.push(client);
     await sessionStateManager.markRecoverySuccess(phoneNumber);
     
+    // PHASE 5: Register account for health monitoring
+    accountHealthMonitor.registerAccount(phoneNumber, client);
+    
     // Initialize contact lookup handler (Phase B)
     try {
       if (!contactHandler) {
@@ -372,6 +388,9 @@ function setupNewLinkingFlow(client, phoneNumber) {
     allInitializedAccounts.push(client);
     await sessionStateManager.markRecoverySuccess(phoneNumber);
     
+    // PHASE 5: Register account for health monitoring
+    accountHealthMonitor.registerAccount(phoneNumber, client);
+    
     setupMessageListeners(client, phoneNumber);
     isInitializing = false;
   });
@@ -432,9 +451,13 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
 process.on("SIGINT", async () => {
   console.log("\n");
   logBot("Received shutdown signal", "warn");
-  logBot("Initiating graceful shutdown (Phase 4 - Multi-Account)...", "info");
+  logBot("Initiating graceful shutdown (Phase 4 + Phase 5)...", "info");
   
   try {
+    // 0. Stop health monitoring (Phase 5)
+    logBot("Stopping health monitoring...", "info");
+    accountHealthMonitor.stopHealthChecks();
+    
     // 1. Save all account states
     logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, "info");
     for (const [accountId, state] of Object.entries(sessionStateManager.getAllAccountStates())) {

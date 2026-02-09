@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-08T22:02:22.799Z",
+  "timestamp": "2026-02-09T06:18:41.036Z",
   "version": "1.0",
   "accounts": {
     "account-+971505760056": {
@@ -12,6 +12,18 @@
       "lastPing": "2026-02-08T22:02:22.799Z",
       "recoveryAttempts": 0,
       "lastAuthenticated": "2026-02-08T22:02:22.799Z",
+      "lastError": null
+    },
+    "test-phone-12345": {
+      "phoneNumber": "test-phone-12345",
+      "displayName": "Test Account",
+      "deviceLinked": true,
+      "isActive": false,
+      "sessionPath": "sessions/test",
+      "lastKnownState": "authenticated",
+      "lastPing": "2026-02-09T06:18:41.033Z",
+      "recoveryAttempts": 0,
+      "lastAuthenticated": null,
       "lastError": null
     }
   }
