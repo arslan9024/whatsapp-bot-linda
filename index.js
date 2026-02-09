@@ -30,6 +30,10 @@ import { OrganizedSheets } from "./code/DamacHills2List.js";
 // Contact lookup and management for WhatsApp bot
 import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
 
+// GORAHA CONTACT VERIFICATION SERVICE (Phase C - February 2026)
+// Verifies all Goraha contacts in Google and checks WhatsApp presence
+import GorahaContactVerificationService from "./code/WhatsAppBot/GorahaContactVerificationService.js";
+
 import fs from "fs";
 import path from "path";
 
@@ -46,6 +50,9 @@ let recoveryManager = null;
 
 // Global contact handler (Phase B)
 let contactHandler = null;
+
+// Goraha contact verification service (Phase C)
+let gorahaVerificationService = null;
 
 // All initialized accounts for graceful shutdown
 let allInitializedAccounts = [];
@@ -439,6 +446,68 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
     if (msg.body === "!ping") {
       msg.reply("pong");
       logBot("📤 Ping reply sent", "success");
+    }
+
+    // Phase C: Goraha contact verification command
+    if (msg.body === "!verify-goraha") {
+      logBot("📌 Goraha verification requested", "info");
+      
+      try {
+        // Initialize service if needed
+        if (!gorahaVerificationService) {
+          gorahaVerificationService = new GorahaContactVerificationService(client);
+          await gorahaVerificationService.initialize();
+          logBot("✅ GorahaContactVerificationService initialized", "success");
+          global.gorahaVerificationService = gorahaVerificationService;
+        }
+
+        // Send start message
+        await msg.reply("🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI'll send results when complete.");
+        logBot("Starting Goraha verification for all contacts...", "info");
+
+        // Run verification
+        const report = await gorahaVerificationService.verifyAllContacts({
+          autoFetch: true,
+          checkWhatsApp: true,
+          saveResults: true
+        });
+
+        // Print report
+        gorahaVerificationService.printReport(report);
+
+        // Send summary to user
+        const summary = report.summary;
+        let resultMessage = `✅ GORAHA VERIFICATION COMPLETE\n\n`;
+        resultMessage += `📊 Summary:\n`;
+        resultMessage += `• Contacts Checked: ${summary.totalContacts}\n`;
+        resultMessage += `• Valid Numbers: ${summary.validPhoneNumbers}\n`;
+        resultMessage += `• With WhatsApp: ${summary.withWhatsApp}\n`;
+        resultMessage += `• WITHOUT WhatsApp: ${summary.withoutWhatsApp}\n`;
+        resultMessage += `• Coverage: ${summary.percentageWithWhatsApp}\n`;
+
+        if (summary.withoutWhatsApp > 0) {
+          resultMessage += `\n⚠️ ${summary.withoutWhatsApp} number(s) need attention\n`;
+          
+          const numbersList = gorahaVerificationService.getNumbersSansWhatsApp();
+          if (numbersList.length > 0 && numbersList.length <= 10) {
+            resultMessage += `\nNumbers without WhatsApp:\n`;
+            numbersList.forEach((item, idx) => {
+              resultMessage += `${idx + 1}. ${item.name}: ${item.number}\n`;
+            });
+          } else if (numbersList.length > 10) {
+            resultMessage += `\nToo many to list (${numbersList.length} total). Check logs.\n`;
+          }
+        } else {
+          resultMessage += `\n✅ All contacts have WhatsApp accounts!`;
+        }
+
+        await msg.reply(resultMessage);
+        logBot("Verification results sent to user", "success");
+
+      } catch (error) {
+        logBot(`❌ Verification error: ${error.message}`, "error");
+        await msg.reply(`❌ Verification failed: ${error.message}`);
+      }
     }
   });
 
