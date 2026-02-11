@@ -15,6 +15,7 @@ import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
 import SessionKeepAliveManager from "./code/utils/SessionKeepAliveManager.js";
 import DeviceLinkedManager from "./code/utils/DeviceLinkedManager.js";  // NEW: Device tracking manager
 import { AccountConfigManager } from "./code/utils/AccountConfigManager.js";  // NEW: Dynamic account management
+import { DynamicAccountManager } from "./code/utils/DynamicAccountManager.js";  // NEW: Runtime account manager
 
 // DATABASE & ANALYTICS (Phase 2)
 import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
@@ -53,6 +54,7 @@ let recoveryManager = null;
 let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
 let deviceLinkedManager = null;  // NEW: Device linking tracker
 let accountConfigManager = null;  // NEW: Dynamic account configuration manager
+let dynamicAccountManager = null;  // NEW: Runtime account manager (add/remove accounts)
 let commandHandler = null;  // NEW: Linda AI Command Handler
 
 // Feature handlers
@@ -239,6 +241,26 @@ async function initializeBot() {
       } else {
         logBot(`✅ Master account configured: ${masterAccount.displayName} (${masterPhone})`, "success");
       }
+    }
+
+    // ============================================
+    // STEP 1D: Initialize Dynamic Account Manager (NEW - Feb 11, 2026)
+    // ============================================
+    if (!dynamicAccountManager) {
+      dynamicAccountManager = new DynamicAccountManager(logBot);
+      logBot("✅ DynamicAccountManager initialized", "success");
+      global.dynamicAccountManager = dynamicAccountManager;
+      
+      // Register callbacks for account add/remove events
+      dynamicAccountManager.onAccountAdded((account) => {
+        logBot(`📱 New account detected: ${account.displayName}`, "success");
+        // The account will be initialized in the next startup
+        // Or could trigger immediate initialization here if needed
+      });
+      
+      dynamicAccountManager.onAccountRemoved((account) => {
+        logBot(`📱 Account removed: ${account.displayName}`, "success");
+      });
     }
 
     // ============================================

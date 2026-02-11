@@ -1,12 +1,12 @@
 {
   "whatsappBots": {
-    "ArslaMalik": {
+    "arslan-malik": {
       "id": "arslan-malik",
       "phoneNumber": "+971505760056",
       "displayName": "Arslan Malik",
-      "description": "Master/Primary WhatsApp Bot Account",
+      "description": "Master WhatsApp Account - Linda AI Assistant",
       "role": "primary",
-      "sessionPath": "sessions/session-971505760056",
+      "sessionPath": "sessions/session-arslan-malik",
       "enabled": true,
       "features": {
         "messaging": true,
@@ -15,66 +15,26 @@
         "analytics": true,
         "scheduling": true
       },
-      "googleAccount": "GorahaBot",
-      "status": "active",
-      "createdAt": "2026-02-09",
-      "lastSync": "2026-02-09T10:00:00Z"
-    },
-    "BigBroker": {
-      "id": "big-broker",
-      "phoneNumber": "+971553633595",
-      "displayName": "Big Broker",
-      "description": "Secondary WhatsApp Bot Account - Sales/Brokerage",
-      "role": "secondary",
-      "sessionPath": "sessions/session-971553633595",
-      "enabled": true,
-      "features": {
-        "messaging": true,
-        "contacts": true,
-        "campaigns": true,
-        "analytics": true,
-        "scheduling": true
-      },
-      "googleAccount": "GorahaBot",
       "status": "pending",
-      "createdAt": "2026-02-09",
-      "lastSync": null
-    },
-    "ManagerWhiteCaves": {
-      "id": "manager-white-caves",
-      "phoneNumber": "+971505110636",
-      "displayName": "Manager White Caves",
-      "description": "Tertiary WhatsApp Bot Account - Management",
-      "role": "tertiary",
-      "sessionPath": "sessions/session-971505110636",
-      "enabled": true,
-      "features": {
-        "messaging": true,
-        "contacts": true,
-        "campaigns": true,
-        "analytics": true,
-        "scheduling": true
-      },
-      "googleAccount": "GorahaBot",
-      "status": "pending",
-      "createdAt": "2026-02-09",
+      "createdAt": "2026-02-11",
       "lastSync": null
     }
   },
-  "default": "ArslaMalik",
-  "primaryAccount": "ArslaMalik",
-  "version": "1.0",
-  "format": "WhatsApp Bot Accounts Registry",
+  "default": "arslan-malik",
+  "primaryAccount": "arslan-malik",
+  "version": "2.0",
+  "format": "Dynamic WhatsApp Bot Accounts Registry",
   "metadata": {
-    "totalBots": 3,
-    "activeBots": 1,
-    "pendingBots": 2,
-    "lastModified": "2026-02-09T10:00:00Z",
-    "managedBy": "MultiAccountWhatsAppBotManager",
-    "notes": "All bots use GorahaBot service account for Google Contacts management"
+    "totalBots": 1,
+    "activeBots": 0,
+    "pendingBots": 1,
+    "lastModified": "2026-02-11T00:00:00Z",
+    "managedBy": "DynamicAccountManager",
+    "notes": "Master account only. Secondary accounts added dynamically via WhatsApp commands: /add-account <phone> <name>"
   },
   "capabilities": {
     "multi-account": true,
+    "dynamic-management": true,
     "contact-sync": true,
     "campaign-management": true,
     "message-routing": true,

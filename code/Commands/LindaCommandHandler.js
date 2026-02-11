@@ -616,8 +616,8 @@ export class LindaCommandHandler {
    * Add a new WhatsApp account
    */
   async handleAddAccount({ msg, args, context }) {
-    const accountConfigManager = global.accountConfigManager;
-    if (!accountConfigManager) {
+    const dynamicAccountManager = global.dynamicAccountManager;
+    if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
     }
@@ -625,7 +625,7 @@ export class LindaCommandHandler {
     if (args.length < 2) {
       await msg.reply(
         `Usage: \`!add-account <phone> <name>\`\n\n` +
-        `Example: \`!add-account +971501234567 'My Main Account'\``
+        `Example: \`!add-account +971501234567 'My Branch Account'\``
       );
       return;
     }
@@ -633,10 +633,7 @@ export class LindaCommandHandler {
     const phone = args[0];
     const name = args.slice(1).join(' ').replace(/['"]/g, '');
 
-    const result = await accountConfigManager.addAccount({
-      phone,
-      displayName: name,
-      accountId: `account-${Date.now()}`,
+    const result = await dynamicAccountManager.addAccount(phone, name, {
       role: 'secondary'
     });
 
@@ -647,8 +644,13 @@ export class LindaCommandHandler {
         `📱 Name: ${account.displayName}\n` +
         `☎️  Phone: ${account.phoneNumber}\n` +
         `🆔 ID: ${account.id}\n` +
-        `⚙️  Status: ${account.status}\n\n` +
-        `💡 Next: Scan QR code to link this account`
+        `⚙️  Role: ${account.role}\n` +
+        `📊 Status: ${account.status}\n\n` +
+        `💡 **Next Steps:**\n` +
+        `1️⃣  This account will be initialized on next bot restart\n` +
+        `2️⃣  QR code will display for device linking\n` +
+        `3️⃣  Scan with your WhatsApp phone\n\n` +
+        `🔗 To initialize now, restart the bot`
       );
     } else {
       await msg.reply(`❌ Error: ${result.error}`);
@@ -660,72 +662,81 @@ export class LindaCommandHandler {
    * List all configured accounts
    */
   async handleListAccounts({ msg }) {
-    const accountConfigManager = global.accountConfigManager;
-    if (!accountConfigManager) {
+    const dynamicAccountManager = global.dynamicAccountManager;
+    if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
     }
 
-    const accounts = accountConfigManager.getAllAccounts();
-    const masterAccount = accountConfigManager.getMasterAccount();
+    const accounts = dynamicAccountManager.getAllAccounts();
+    const masterAccount = dynamicAccountManager.getMasterAccount();
 
     if (accounts.length === 0) {
       await msg.reply(
         `📱 **No Accounts Configured**\n\n` +
         `Use: \`!add-account <phone> <name>\`\n` +
-        `Example: \`!add-account +971501234567 'My Account'\``
+        `Example: \`!add-account +971501234567 'My Sales Account'\``
       );
       return;
     }
 
-    let text = `\n📱 **CONFIGURED ACCOUNTS** (${accounts.length})\n\n`;
-    text += `Master Account: ${masterAccount?.displayName || 'Not Set'}\n\n`;
+    let text = `\n📱 **WHATSAPP ACCOUNTS** (${accounts.length})\n`;
+    text += `════════════════════════════════════\n\n`;
+    text += `👑 Master: ${masterAccount?.displayName || 'Not Configured'}\n\n`;
 
     accounts.forEach((account, idx) => {
       const roleIcon = account.role === 'primary' ? '👑' : '📱';
-      const statusIcon = account.status === 'active' ? '✅' : '⏳';
+      const statusIcon = account.status === 'active' || account.status === 'linked' ? '✅' : '⏳';
       const enabledIcon = account.enabled ? '🟢' : '🔴';
 
       text += `${idx + 1}. ${roleIcon} ${account.displayName}\n`;
       text += `   ID: \`${account.id}\`\n`;
       text += `   Phone: ${account.phoneNumber}\n`;
       text += `   Status: ${statusIcon} ${account.status || 'pending'}\n`;
-      text += `   Enabled: ${enabledIcon} ${account.enabled ? 'Yes' : 'No'}\n\n`;
+      text += `   Role: ${account.role}\n`;
+      text += `   Active: ${enabledIcon}\n\n`;
     });
 
-    text += `💡 Commands:\n`;
-    text += `• Remove: \`!remove-account <id>\`\n`;
-    text += `• Master: \`!set-master <id>\`\n`;
+    text += `\n💡 **Available Commands:**\n`;
+    text += `• Add Account: \`!add-account <phone> <name>\`\n`;
+    text += `• Remove: \`!remove-account <phone>\`\n`;
     text += `• Enable: \`!enable-account <id>\`\n`;
-    text += `• Disable: \`!disable-account <id>\``;
+    text += `• Disable: \`!disable-account <id>\`\n`;
+    text += `• Set Master: \`!set-master <id>\``;
 
     await msg.reply(text);
   }
 
   /**
-   * !remove-account <account-id>
+   * !remove-account <phone>
    * Remove an account
    */
   async handleRemoveAccount({ msg, args }) {
-    const accountConfigManager = global.accountConfigManager;
-    if (!accountConfigManager) {
+    const dynamicAccountManager = global.dynamicAccountManager;
+    if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
     }
 
     if (args.length === 0) {
-      await msg.reply(`Usage: \`!remove-account <account-id>\``);
+      await msg.reply(
+        `Usage: \`!remove-account <phone>\`\n\n` +
+        `Example: \`!remove-account +971501234567\``
+      );
       return;
     }
 
-    const accountId = args[0];
-    const result = await accountConfigManager.removeAccount(accountId);
+    const phone = args[0];
+    const result = await dynamicAccountManager.removeAccount(phone);
 
     if (result.success) {
       await msg.reply(
-        `✅ ${result.message}\n\n` +
-        `📝 Note: Device session still exists on WhatsApp\n` +
-        `Use WhatsApp Settings > Linked Devices to revoke access`
+        `✅ **Account Removed Successfully**\n\n` +
+        `Account: ${result.account.displayName}\n` +
+        `Phone: ${result.account.phoneNumber}\n\n` +
+        `📝 **Note:** WhatsApp Web session still active\n` +
+        `To revoke access: WhatsApp Settings > Linked Devices\n` +
+        `Bot will stop monitoring this account on next restart`
       );
     } else {
       await msg.reply(`❌ Error: ${result.error}`);
