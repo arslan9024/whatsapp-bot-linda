@@ -28,6 +28,11 @@ import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
 // GORAHA VERIFICATION (Phase C - Contact Verification)
 import GorahaContactVerificationService from "./code/WhatsAppBot/GorahaContactVerificationService.js";
 
+// LINDA AI COMMAND SYSTEM (February 11, 2026)
+// Command parsing, routing, conversation learning, ML foundation
+import LindaCommandHandler from "./code/Commands/LindaCommandHandler.js";
+import LindaCommandRegistry from "./code/Commands/LindaCommandRegistry.js";
+
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
 import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
 
@@ -46,6 +51,7 @@ let bootstrapManager = null;
 let recoveryManager = null;
 let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
 let deviceLinkedManager = null;  // NEW: Device linking tracker
+let commandHandler = null;  // NEW: Linda AI Command Handler
 
 // Feature handlers
 let contactHandler = null;
@@ -289,9 +295,22 @@ async function initializeBot() {
     logBot("✅ Account health monitoring active (5-minute intervals)", "success");
     global.healthMonitor = accountHealthMonitor;
 
+    // ============================================
+    // STEP 6.5: Initialize Linda AI Command System
+    // ============================================
+    if (!commandHandler) {
+      commandHandler = new LindaCommandHandler(logBot);
+      logBot("✅ Linda Command Handler initialized (31 commands available)", "success");
+      global.commandHandler = commandHandler;
+      logBot(`   - Command Registry: ${LindaCommandRegistry.getCommandCount()} commands`, "info");
+      logBot(`   - Categories: ${LindaCommandRegistry.getCategoryCount()} command types`, "info");
+      logBot(`   - Type !help in chat to see all commands`, "info");
+    }
+
     logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
     logBot("║           🚀 INITIALIZATION COMPLETE - 24/7 ACTIVE            ║", "success");
     logBot("║        All enabled accounts initialized with keep-alive       ║", "success");
+    logBot("║              Linda AI Assistant System Ready!                 ║", "success");
     logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
 
     // ============================================
@@ -300,6 +319,7 @@ async function initializeBot() {
     setupTerminalInputListener();
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit'", "info");
+    logBot("   Chat commands: Type !help for full command list", "info");
 
     isInitializing = false;
 
@@ -570,97 +590,119 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
     logBot(`📨 [${timestamp}] (${phoneNumber}) ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
 
     try {
-      // Phase 3: Conversation type analysis (if enabled)
-      if (typeof logMessageTypeCompact === 'function') {
-        logMessageTypeCompact(msg);
-      }
-    } catch (error) {
-      // Silent fail on analyzer
-    }
+      // ═════════════════════════════════════════════════════════════════════════════
+      // LINDA AI COMMAND SYSTEM - Check for commands first (! prefix)
+      // ═════════════════════════════════════════════════════════════════════════════
+      if (commandHandler && msg.body.startsWith('!')) {
+        const context = {
+          deviceCount: deviceLinkedManager ? deviceLinkedManager.getLinkedDevices().length : 0,
+          accountCount: accountClients.size,
+          client: client,
+          phoneNumber: phoneNumber
+        };
 
-    // Phase B: Contact lookup integration
-    try {
-      if (contactHandler && !msg.from.includes("@g.us")) {
-        const contact = await contactHandler.getContact(msg.from);
-        if (contact) {
-          logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, "success");
+        const cmdResult = await commandHandler.processMessage(msg, phoneNumber, context);
+        
+        if (cmdResult.processed) {
+          // Command was processed successfully
+          logBot(`✅ Command processed: ${cmdResult.command}`, "success");
+          return; // Stop further processing
+        } else if (cmdResult.isCommand) {
+          // It was a command but had an error (already replied in handler)
+          return;
         }
+        // Otherwise, continue to conversation processing
       }
-    } catch (error) {
-      logBot(`⚠️ Contact lookup error: ${error.message}`, "warn");
-    }
 
-    // Test ping command
-    if (msg.body === "!ping") {
-      msg.reply("pong");
-      logBot("📤 Ping reply sent", "success");
-    }
-
-    // Status command (new)
-    if (msg.body === "!status") {
-      displayStatus();
-    }
-
-    // Phase C: Goraha contact verification command
-    if (msg.body === "!verify-goraha") {
-      logBot("📌 Goraha verification requested", "info");
+      // ═════════════════════════════════════════════════════════════════════════════
+      // CONVERSATION ANALYSIS & LEARNING
+      // ═════════════════════════════════════════════════════════════════════════════
       
       try {
-        // Initialize service if needed
-        if (!gorahaVerificationService) {
-          gorahaVerificationService = new GorahaContactVerificationService(client);
-          await gorahaVerificationService.initialize();
-          logBot("✅ GorahaContactVerificationService initialized", "success");
-          global.gorahaVerificationService = gorahaVerificationService;
+        // Phase 3: Conversation type analysis (if enabled)
+        if (typeof logMessageTypeCompact === 'function') {
+          logMessageTypeCompact(msg);
         }
-
-        // Send start message
-        await msg.reply("🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI'll send results when complete.");
-        logBot("Starting Goraha verification for all contacts...", "info");
-
-        // Run verification
-        const report = await gorahaVerificationService.verifyAllContacts({
-          autoFetch: true,
-          checkWhatsApp: true,
-          saveResults: true
-        });
-
-        // Print report
-        gorahaVerificationService.printReport(report);
-
-        // Send summary to user
-        const summary = report.summary;
-        let resultMessage = `✅ GORAHA VERIFICATION COMPLETE\n\n`;
-        resultMessage += `📊 Summary:\n`;
-        resultMessage += `• Contacts Checked: ${summary.totalContacts}\n`;
-        resultMessage += `• Valid Numbers: ${summary.validPhoneNumbers}\n`;
-        resultMessage += `• With WhatsApp: ${summary.withWhatsApp}\n`;
-        resultMessage += `• WITHOUT WhatsApp: ${summary.withoutWhatsApp}\n`;
-        resultMessage += `• Coverage: ${summary.percentageWithWhatsApp}\n`;
-
-        if (summary.withoutWhatsApp > 0) {
-          resultMessage += `\n⚠️ ${summary.withoutWhatsApp} number(s) need attention\n`;
-          
-          const numbersList = gorahaVerificationService.getNumbersSansWhatsApp();
-          if (numbersList.length > 0 && numbersList.length <= 10) {
-            resultMessage += `\nNumbers without WhatsApp:\n`;
-            numbersList.forEach((item, idx) => {
-              resultMessage += `${idx + 1}. ${item.name}: ${item.number}\n`;
-            });
-          } else if (numbersList.length > 10) {
-            resultMessage += `\nToo many to list (${numbersList.length} total). Check logs.\n`;
-          }
-        } else {
-          resultMessage += `\n✅ All contacts have WhatsApp accounts!`;
-        }
-
-        await msg.reply(resultMessage);
-        logBot("Verification results sent to user", "success");
-
       } catch (error) {
-        logBot(`❌ Verification error: ${error.message}`, "error");
-        await msg.reply(`❌ Verification failed: ${error.message}`);
+        // Silent fail on analyzer
       }
+
+      // Phase B: Contact lookup integration
+      try {
+        if (contactHandler && !msg.from.includes("@g.us")) {
+          const contact = await contactHandler.getContact(msg.from);
+          if (contact) {
+            logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, "success");
+          }
+        }
+      } catch (error) {
+        logBot(`⚠️ Contact lookup error: ${error.message}`, "warn");
+      }
+
+      // Phase C: Goraha contact verification command (backward compatible)
+      if (msg.body === "!verify-goraha") {
+        logBot("📌 Goraha verification requested", "info");
+        
+        try {
+          // Initialize service if needed
+          if (!gorahaVerificationService) {
+            gorahaVerificationService = new GorahaContactVerificationService(client);
+            await gorahaVerificationService.initialize();
+            logBot("✅ GorahaContactVerificationService initialized", "success");
+            global.gorahaVerificationService = gorahaVerificationService;
+          }
+
+          // Send start message
+          await msg.reply("🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI'll send results when complete.");
+          logBot("Starting Goraha verification for all contacts...", "info");
+
+          // Run verification
+          const report = await gorahaVerificationService.verifyAllContacts({
+            autoFetch: true,
+            checkWhatsApp: true,
+            saveResults: true
+          });
+
+          // Print report
+          gorahaVerificationService.printReport(report);
+
+          // Send summary to user
+          const summary = report.summary;
+          let resultMessage = `✅ GORAHA VERIFICATION COMPLETE\n\n`;
+          resultMessage += `📊 Summary:\n`;
+          resultMessage += `• Contacts Checked: ${summary.totalContacts}\n`;
+          resultMessage += `• Valid Numbers: ${summary.validPhoneNumbers}\n`;
+          resultMessage += `• With WhatsApp: ${summary.withWhatsApp}\n`;
+          resultMessage += `• WITHOUT WhatsApp: ${summary.withoutWhatsApp}\n`;
+          resultMessage += `• Coverage: ${summary.percentageWithWhatsApp}\n`;
+
+          if (summary.withoutWhatsApp > 0) {
+            resultMessage += `\n⚠️ ${summary.withoutWhatsApp} number(s) need attention\n`;
+            
+            const numbersList = gorahaVerificationService.getNumbersSansWhatsApp();
+            if (numbersList.length > 0 && numbersList.length <= 10) {
+              resultMessage += `\nNumbers without WhatsApp:\n`;
+              numbersList.forEach((item, idx) => {
+                resultMessage += `${idx + 1}. ${item.name}: ${item.number}\n`;
+              });
+            } else if (numbersList.length > 10) {
+              resultMessage += `\nToo many to list (${numbersList.length} total). Check logs.\n`;
+            }
+          } else {
+            resultMessage += `\n✅ All contacts have WhatsApp accounts!`;
+          }
+
+          await msg.reply(resultMessage);
+          logBot("Verification results sent to user", "success");
+
+        } catch (error) {
+          logBot(`❌ Verification error: ${error.message}`, "error");
+          await msg.reply(`❌ Verification failed: ${error.message}`);
+        }
+      }
+
+    } catch (error) {
+      logBot(`Error processing message: ${error.message}`, "error");
     }
   });
 
