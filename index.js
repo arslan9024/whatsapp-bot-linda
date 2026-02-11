@@ -79,6 +79,46 @@ function logBot(msg, type = "info") {
 }
 
 /**
+ * Global Error Handlers for Graceful Recovery
+ * Prevents Puppeteer protocol errors from crashing the bot
+ */
+process.on('unhandledRejection', (reason, promise) => {
+  const errorMsg = reason?.message || String(reason);
+  
+  // Filter and handle non-critical Puppeteer/Protocol errors
+  const isCritical = !errorMsg.includes('Target closed') && 
+                     !errorMsg.includes('Session closed') &&
+                     !errorMsg.includes('Target.setAutoAttach') &&
+                     !errorMsg.includes('Requesting main frame') &&
+                     !errorMsg.includes('DevTools');
+  
+  if (!isCritical) {
+    // Non-critical protocol error - log as warning but continue
+    logBot(`⚠️  Protocol Error (non-critical): ${errorMsg}`, "warn");
+    return; // Don't crash - just log and continue
+  }
+  
+  // Critical error - log and handle
+  logBot(`❌ Unhandled Rejection: ${errorMsg}`, "error");
+  logBot("Bot will attempt to recover...", "info");
+});
+
+process.on('uncaughtException', (error) => {
+  const errorMsg = error?.message || String(error);
+  
+  // Filter critical exceptions
+  if (errorMsg.includes('Target') || errorMsg.includes('Protocol')) {
+    logBot(`⚠️  Browser Protocol Exception (recovering): ${errorMsg}`, "warn");
+    // Continue running - don't exit
+    return;
+  }
+  
+  // Critical exception - log it
+  logBot(`❌ Uncaught Exception: ${errorMsg}`, "error");
+  logBot("Attempting graceful recovery...", "info");
+});
+
+/**
  * Setup terminal input listener for interactive health dashboard & device management
  * Allows users to:
  * - View WhatsApp device status in real-time

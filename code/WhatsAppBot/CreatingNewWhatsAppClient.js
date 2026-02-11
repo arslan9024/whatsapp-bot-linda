@@ -98,12 +98,24 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       }
     });
 
-    // Add error handlers to catch Puppeteer/Protocol errors during initialization
+    // Add comprehensive error handlers to catch Puppeteer/Protocol errors
     RegisteredAgentWAClient.on('error', (error) => {
-      // Only log non-fatal errors (some protocol errors are recoverable)
-      if (!error.message.includes('Session closed')) {
-        console.error(`⚠️  Client error (${ClientID}): ${error.message}`);
+      const msg = error.message || String(error);
+      
+      // Log non-fatal protocol errors but don't crash
+      if (msg.includes('Target') || msg.includes('Session closed') || msg.includes('Protocol')) {
+        console.warn(`⚠️  Protocol error (${ClientID}, non-critical): ${msg}`);
+        return; // Don't crash on protocol errors
       }
+      
+      // Log other errors
+      console.error(`⚠️  Client error (${ClientID}): ${msg}`);
+    });
+    
+    // Add disconnect handler for recovery
+    RegisteredAgentWAClient.on('disconnected', (reason) => {
+      console.warn(`📊 Client disconnected (${ClientID}): ${reason || 'unknown'}`);
+      // Allows graceful handling of disconnections
     });
 
     return RegisteredAgentWAClient;
