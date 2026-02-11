@@ -1,0 +1,145 @@
+{
+  "masterAccountScenarios": [
+    {
+      "name": "Master Account Can Create Secondary",
+      "accountId": "master-001",
+      "role": "master",
+      "action": "createAccount",
+      "expectedOutcome": "success",
+      "shouldHaveAccess": true
+    },
+    {
+      "name": "Master Account Can Delete Secondary",
+      "accountId": "master-001",
+      "role": "master",
+      "action": "deleteAccount",
+      "targetAccountId": "secondary-001",
+      "expectedOutcome": "success",
+      "shouldHaveAccess": true
+    },
+    {
+      "name": "Master Account Can Read All Data",
+      "accountId": "master-001",
+      "role": "master",
+      "action": "readData",
+      "scope": "all",
+      "expectedOutcome": "success",
+      "shouldHaveAccess": true
+    },
+    {
+      "name": "Master Account Can Manage Permissions",
+      "accountId": "master-001",
+      "role": "master",
+      "action": "managePermissions",
+      "expectedOutcome": "success",
+      "shouldHaveAccess": true
+    }
+  ],
+  "secondaryAccountScenarios": [
+    {
+      "name": "Secondary Cannot Create Account",
+      "accountId": "secondary-001",
+      "role": "secondary",
+      "action": "createAccount",
+      "expectedOutcome": "forbidden",
+      "shouldHaveAccess": false
+    },
+    {
+      "name": "Secondary Cannot Delete Accounts",
+      "accountId": "secondary-001",
+      "role": "secondary",
+      "action": "deleteAccount",
+      "targetAccountId": "secondary-002",
+      "expectedOutcome": "forbidden",
+      "shouldHaveAccess": false
+    },
+    {
+      "name": "Secondary Can Only Read Own Data",
+      "accountId": "secondary-001",
+      "role": "secondary",
+      "action": "readData",
+      "scope": "own",
+      "expectedOutcome": "success",
+      "shouldHaveAccess": true
+    },
+    {
+      "name": "Secondary Cannot Access Other Account Data",
+      "accountId": "secondary-001",
+      "role": "secondary",
+      "action": "readData",
+      "targetAccountId": "secondary-002",
+      "expectedOutcome": "forbidden",
+      "shouldHaveAccess": false
+    }
+  ],
+  "sessionScenarios": [
+    {
+      "name": "Valid Session Access Granted",
+      "sessionId": "valid-session-001",
+      "accountId": "account-001",
+      "status": "active",
+      "expiresAt": "2099-12-31T23:59:59Z",
+      "expectedOutcome": "success",
+      "shouldAuthorize": true
+    },
+    {
+      "name": "Expired Session Access Denied",
+      "sessionId": "expired-session-001",
+      "accountId": "account-001",
+      "status": "expired",
+      "expiresAt": "2020-01-01T00:00:00Z",
+      "expectedOutcome": "unauthorized",
+      "shouldAuthorize": false
+    },
+    {
+      "name": "Invalid Session Token Rejected",
+      "sessionId": "invalid-token-xyz123",
+      "accountId": "account-001",
+      "status": "invalid",
+      "expectedOutcome": "unauthorized",
+      "shouldAuthorize": false
+    },
+    {
+      "name": "Cross-Account Session Isolated",
+      "sessionId": "session-account-a",
+      "requestingAccountId": "account-b",
+      "owningAccountId": "account-a",
+      "expectedOutcome": "forbidden",
+      "shouldAuthorize": false
+    }
+  ],
+  "commandAuthorizationScenarios": [
+    {
+      "name": "Master Can Execute Admin Commands",
+      "role": "master",
+      "command": "ADMIN_UPDATE_CONFIG",
+      "privilege": "admin",
+      "expectedOutcome": "success",
+      "shouldExecute": true
+    },
+    {
+      "name": "Secondary Cannot Execute Admin Commands",
+      "role": "secondary",
+      "command": "ADMIN_UPDATE_CONFIG",
+      "privilege": "admin",
+      "expectedOutcome": "forbidden",
+      "shouldExecute": false
+    },
+    {
+      "name": "Secondary Can Execute User Commands",
+      "role": "secondary",
+      "command": "SEND_MESSAGE",
+      "privilege": "user",
+      "expectedOutcome": "success",
+      "shouldExecute": true
+    },
+    {
+      "name": "Privilege Escalation Prevented",
+      "role": "secondary",
+      "command": "DELETE_ACCOUNT",
+      "privilege": "admin",
+      "expectedOutcome": "forbidden",
+      "shouldExecute": false
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "xssPayloads": [
+    "<script>alert('xss')</script>",
+    "<img src=x onerror=alert('xss')>",
+    "<svg onload=alert('xss')>",
+    "javascript:alert('xss')",
+    "<iframe src='javascript:alert(\"xss\")'></iframe>",
+    "<body onload=alert('xss')>",
+    "<input onfocus=alert('xss') autofocus>",
+    "<marquee onstart=alert('xss')></marquee>"
+  ],
+  "sqlInjectionPayloads": [
+    "1' OR '1'='1",
+    "admin' --",
+    "1'; DROP TABLE users--",
+    "1' UNION SELECT NULL--",
+    "1' AND 1=1--",
+    "' OR 1=1 --",
+    "admin'; DELETE FROM users WHERE ''='",
+    "1' OR 'a'='a"
+  ],
+  "commandInjectionPayloads": [
+    "$(rm -rf /)",
+    "; rm -rf /",
+    "| cat /etc/passwd",
+    "& whoami",
+    "`whoami`",
+    "$(whoami)",
+    "; nc -e /bin/sh",
+    "|| cat /etc/shadow"
+  ],
+  "pathTraversalPayloads": [
+    "../../../etc/passwd",
+    "..\\..\\..\\windows\\system32\\",
+    "....//....//....//etc/passwd",
+    "...;/...;/...;/etc/passwd",
+    "%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+    "..%252f..%252fetc%252fpasswd"
+  ],
+  "validMessages": [
+    "Hello, how are you?",
+    "Simple text message",
+    "Text with 123 numbers",
+    "Message with @mention and #hashtag",
+    "Text with emoji 😊",
+    "Multi\nline\nmessage"
+  ],
+  "invalidMessages": [
+    "",
+    "   ",
+    "\n\n\n",
+    "\t\t\t"
+  ],
+  "validPhoneNumbers": [
+    "+94712345678",
+    "0712345678",
+    "+1234567890",
+    "+442071838750",
+    "+33123456789",
+    "+971501234567"
+  ],
+  "invalidPhoneNumbers": [
+    "12345",
+    "abc123def",
+    "+++1234567890",
+    "0123456789a",
+    "phone",
+    "",
+    "1234567890000000"
+  ]
+}

