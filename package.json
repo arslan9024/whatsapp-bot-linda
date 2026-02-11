@@ -14,7 +14,9 @@
         "list-sessions": "node tools/listSessions.js",
         "send-hello": "node tools/sendHelloMessage.js",
         "status": "node tools/showStatus.js",
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write ."
@@ -52,8 +54,12 @@
         "xlsx": "^0.18.5"
     },
     "devDependencies": {
+        "@babel/core": "^7.29.0",
+        "@babel/preset-env": "^7.29.0",
+        "babel-jest": "^30.2.0",
         "eslint": "^8.54.0",
         "eslint-config-prettier": "^9.0.0",
+        "jest": "^30.2.0",
         "nodemon": "^3.0.1",
         "prettier": "^3.1.0"
     }

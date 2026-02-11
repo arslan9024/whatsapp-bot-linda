@@ -1,0 +1,66 @@
+{
+  "mockSheetData": {
+    "properties": [
+      {
+        "id": "unit_123",
+        "unitNumber": "123",
+        "project": "Damac Hills 2",
+        "type": "apartment",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "priceAED": "450000",
+        "pricePerSqft": "1250",
+        "area": "950",
+        "features": ["gym", "pool", "parking"],
+        "available": true
+      },
+      {
+        "id": "unit_456",
+        "unitNumber": "456",
+        "project": "Damac Hills 2",
+        "type": "villa",
+        "bedrooms": 4,
+        "bathrooms": 4,
+        "priceAED": "2500000",
+        "pricePerSqft": "1800",
+        "area": "1400",
+        "features": ["private pool", "garden", "maid room"],
+        "available": true
+      }
+    ],
+    "contacts": [
+      {
+        "id": "contact_001",
+        "phone": "+971505760056",
+        "name": "Ahmed Al Maktoum",
+        "email": "ahmed@example.com",
+        "company": "Real Estate Solutions",
+        "lastInteraction": "2026-02-10"
+      }
+    ],
+    "interactions": [
+      {
+        "id": "interaction_001",
+        "contactPhone": "+971505760056",
+        "messageType": "inquiry",
+        "content": "Interested in units around 500k",
+        "timestamp": "2026-02-10T10:00:00Z",
+        "entitiesFound": ["budget:500k", "project:damac hills 2"],
+        "responseGenerated": true
+      }
+    ]
+  },
+  "testConfig": {
+    "googleSheetId": "test-sheet-id-12345",
+    "sheetTabs": {
+      "properties": "Property Data",
+      "contacts": "Contact Data",
+      "interactions": "Interaction Records"
+    },
+    "timeouts": {
+      "sheetRead": 2000,
+      "sheetWrite": 3000,
+      "aiResponse": 5000
+    }
+  }
+}

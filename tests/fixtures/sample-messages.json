@@ -1,0 +1,60 @@
+{
+  "text_inquiry": {
+    "type": "text",
+    "body": "Hi, I'm interested in units at Damac Hills 2, budget around 500k AED",
+    "from": "+971505760056",
+    "id": "msg_001",
+    "timestamp": 1707734400000
+  },
+  "text_with_unit": {
+    "type": "text",
+    "body": "Can you tell me more about unit 123? Available soon?",
+    "from": "+971505760057",
+    "id": "msg_002",
+    "timestamp": 1707734460000
+  },
+  "text_with_phone": {
+    "type": "text",
+    "body": "My broker is calling 0504567890, can they reach you?",
+    "from": "+971505760058",
+    "id": "msg_003",
+    "timestamp": 1707734520000
+  },
+  "text_with_project": {
+    "type": "text",
+    "body": "Looking for properties in Damac Hills 2 or Downtown Dubai",
+    "from": "+971505760059",
+    "id": "msg_004",
+    "timestamp": 1707734580000
+  },
+  "text_with_property_type": {
+    "type": "text",
+    "body": "Interested in villas and townhouses, not apartments",
+    "from": "+971505760060",
+    "id": "msg_005",
+    "timestamp": 1707734640000
+  },
+  "image_message": {
+    "type": "image",
+    "caption": "Floor plan for villa unit 456",
+    "from": "+971505760061",
+    "id": "msg_006",
+    "hasMedia": true,
+    "timestamp": 1707734700000
+  },
+  "document_message": {
+    "type": "document",
+    "caption": "Property brochure and legal documents",
+    "from": "+971505760062",
+    "id": "msg_007",
+    "hasMedia": true,
+    "timestamp": 1707734760000
+  },
+  "confirmation": {
+    "type": "text",
+    "body": "Yes, let's proceed with the viewing tomorrow at 3 PM",
+    "from": "+971505760056",
+    "id": "msg_008",
+    "timestamp": 1707734820000
+  }
+}
