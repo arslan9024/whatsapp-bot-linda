@@ -1,14 +1,16 @@
 /**
  * TerminalHealthDashboard.js
  * 
- * Interactive health dashboard for terminal monitoring
+ * Interactive health dashboard for terminal monitoring with device tracking
  * - Display WhatsApp and Google account status
+ * - Real-time device linking status and metadata
  * - Prompt for account re-linking
- * - Health summary with account details
+ * - Health summary with auto-refresh every 60 seconds
+ * - Device management commands
  * 
- * Version: 1.0
- * Created: February 9, 2026
- * Status: Production Ready
+ * Version: 2.0
+ * Created: February 11, 2026
+ * Status: Production Ready - Enhanced with Device Tracking
  */
 
 import readline from 'readline';
@@ -18,6 +20,24 @@ class TerminalHealthDashboard {
   constructor() {
     this.rl = null;
     this.isMonitoring = false;
+    this.deviceManager = null; // Will be set by index.js
+    this.autoRefreshInterval = null;
+    this.autoRefreshDelay = 60000; // 60 seconds
+    this.masterPhoneNumber = null; // Set by index.js
+  }
+
+  /**
+   * Set device manager reference
+   */
+  setDeviceManager(deviceManager) {
+    this.deviceManager = deviceManager;
+  }
+
+  /**
+   * Set master phone number for re-link commands
+   */
+  setMasterPhoneNumber(phoneNumber) {
+    this.masterPhoneNumber = phoneNumber;
   }
 
   /**
@@ -35,52 +55,76 @@ class TerminalHealthDashboard {
   }
 
   /**
-   * Display comprehensive health dashboard
+   * Display comprehensive health dashboard with device tracking
    */
   displayHealthDashboard() {
     const report = accountHealthMonitor.generateDetailedHealthReport();
+    const timestamp = new Date().toLocaleTimeString();
     
-    console.log(`\n${'╔'.padEnd(60, '═').replace(/./g, (m, i) => i === 0 ? '╔' : i === 59 ? '╗' : '═')}`);
-    console.log(`║ ${'LINDA BOT - COMPREHENSIVE HEALTH DASHBOARD'.padEnd(56)} ║`);
-    console.log(`╠${Array(59).fill('═').join('')}╣`);
+    console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+    console.log(`║         📱 LINDA BOT - REAL-TIME DEVICE DASHBOARD         ║`);
+    console.log(`║              Last Updated: ${timestamp.padEnd(42)} ║`);
+    console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+    
+    // Device Summary (if device manager available)
+    if (this.deviceManager) {
+      const deviceCount = this.deviceManager.getDeviceCount();
+      console.log(`📊 DEVICE SUMMARY`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Total Devices: ${deviceCount.total} | Linked: ${deviceCount.linked} | Unlinked: ${deviceCount.unlinked} | Linking: ${deviceCount.linking}`);
+      console.log(`  System Uptime: ${report.systemStatus.uptime} | Server Status: 🟢 HEALTHY\n`);
+    }
+    
+    // Linked Devices
+    if (this.deviceManager) {
+      const linkedDevices = this.deviceManager.getLinkedDevices();
+      if (linkedDevices.length > 0) {
+        console.log(`🔗 LINKED DEVICES (${linkedDevices.length})`);
+        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        linkedDevices.forEach(device => {
+          const formatted = this.deviceManager.formatDeviceForDisplay(device.phoneNumber);
+          if (formatted) {
+            console.log(`  ${formatted.main}`);
+            formatted.details.forEach(detail => console.log(`  ${detail}`));
+          }
+        });
+        console.log();
+      }
+    }
+    
+    // Unlinked Devices
+    if (this.deviceManager) {
+      const unlinkedDevices = this.deviceManager.getUnlinkedDevices();
+      if (unlinkedDevices.length > 0) {
+        console.log(`🔴 UNLINKED DEVICES (${unlinkedDevices.length})`);
+        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        unlinkedDevices.forEach(device => {
+          const formatted = this.deviceManager.formatDeviceForDisplay(device.phoneNumber);
+          if (formatted) {
+            console.log(`  ${formatted.main}`);
+            formatted.details.forEach(detail => console.log(`  ${detail}`));
+          }
+        });
+        console.log();
+      }
+    }
     
     // System Status
-    console.log(`║ 🤖 SYSTEM STATUS`.padEnd(60) + `║`);
-    console.log(`║ ${'─'.repeat(55)} ║`);
-    console.log(`║   Uptime: ${report.systemStatus.uptime.padEnd(45)} ║`);
-    console.log(`║   Total Health Checks: ${report.systemStatus.totalChecks.toString().padEnd(34)} ║`);
-    console.log(`║   Recovery Success Rate: ${report.systemStatus.recoverySuccess.padEnd(32)} ║`);
+    console.log(`🤖 SYSTEM STATUS`);
+    console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`  Uptime: ${report.systemStatus.uptime} | Health Checks: ${report.systemStatus.totalChecks}`);
+    console.log(`  Recovery Success Rate: ${report.systemStatus.recoverySuccess}\n`);
     
-    // WhatsApp Accounts
-    console.log(`║ ${'─'.repeat(55)} ║`);
-    console.log(`║ 📱 WHATSAPP ACCOUNTS (${report.whatsappAccounts.total} total)`.padEnd(60) + `║`);
-    console.log(`║ ${'─'.repeat(55)} ║`);
-    console.log(`║   Active: ${report.whatsappAccounts.active.toString().padEnd(10)} | Inactive: ${report.whatsappAccounts.inactive.toString().padEnd(10)} | Warning: ${report.whatsappAccounts.warning.toString().padEnd(10)} ║`);
-    
-    if (report.whatsappAccounts.details.length > 0) {
-      console.log(`║ ${'─'.repeat(55)} ║`);
-      report.whatsappAccounts.details.forEach(account => {
-        const status = account.status === 'healthy' ? '✅' : account.status === 'unhealthy' ? '❌' : '⚠️';
-        const phoneDisplay = account.phoneNumber.slice(-10);
-        const uptimeStr = `${account.uptime}%`;
-        console.log(`║   ${status} ${phoneDisplay.padEnd(15)} Uptime: ${uptimeStr.padEnd(8)} Status: ${account.status.padEnd(10)} ║`);
-      });
-    }
-    
-    // Google Accounts
-    if (report.googleAccounts.total > 0) {
-      console.log(`║ ${'─'.repeat(55)} ║`);
-      console.log(`║ 🔗 GOOGLE ACCOUNTS (${report.googleAccounts.total} total)`.padEnd(60) + `║`);
-      console.log(`║ ${'─'.repeat(55)} ║`);
-      console.log(`║   Connected: ${report.googleAccounts.connected.toString().padEnd(15)} | Services: ${report.googleAccounts.details.reduce((sum, a) => sum + a.services, 0).toString().padEnd(10)} ║`);
-      
-      report.googleAccounts.details.forEach(account => {
-        const status = account.enabled ? '✅' : '⚠️';
-        console.log(`║   ${status} ${account.name.padEnd(35)} (${account.services} services) ║`);
-      });
-    }
-    
-    console.log(`╚${Array(59).fill('═').join('')}╝\n`);
+    // Available Commands
+    console.log(`⚙️  AVAILABLE COMMANDS`);
+    console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`  'status' / 'health'         → Show this dashboard`);
+    console.log(`  'relink master'             → Re-link master account`);
+    console.log(`  'relink <phone>'            → Re-link specific device`);
+    console.log(`  'device <phone>'            → Show device details`);
+    console.log(`  'code <phone>'              → Switch to 6-digit auth`);
+    console.log(`  'list'                      → List all devices`);
+    console.log(`  'quit' / 'exit'             → Exit monitoring\n`);
   }
 
   /**
@@ -149,50 +193,151 @@ class TerminalHealthDashboard {
   }
 
   /**
-   * Start interactive monitoring with user input
+   * Start auto-refresh timer (every 60 seconds)
    */
-  async startInteractiveMonitoring() {
+  startAutoRefresh(onRefresh) {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+    }
+    
+    this.autoRefreshInterval = setInterval(() => {
+      if (this.isMonitoring && onRefresh) {
+        onRefresh();
+      }
+    }, this.autoRefreshDelay);
+  }
+
+  /**
+   * Stop auto-refresh timer
+   */
+  stopAutoRefresh() {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+      this.autoRefreshInterval = null;
+    }
+  }
+
+  /**
+   * Start interactive monitoring with user input and auto-refresh
+   */
+  async startInteractiveMonitoring(callbacks = {}) {
     this.initializeInput();
     this.isMonitoring = true;
 
+    const {
+      onRelinkMaster,
+      onRelinkDevice,
+      onSwitchTo6Digit,
+      onShowDeviceDetails,
+      onListDevices,
+    } = callbacks;
+
     console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🤖 LINDA BOT - INTERACTIVE HEALTH MONITOR STARTED`);
+    console.log(`🤖 LINDA BOT - INTERACTIVE DEVICE MANAGER STARTED`);
     console.log(`${'═'.repeat(60)}`);
-    console.log(`Available Commands:`);
-    console.log(`  health   - Display detailed health dashboard`);
-    console.log(`  relink   - Re-link an inactive WhatsApp account`);
-    console.log(`  status   - Quick account status`);
-    console.log(`  quit     - Exit monitoring mode`);
+    console.log(`Type a command or press Enter to refresh. Type 'help' for commands.`);
     console.log(`${'═'.repeat(60)}\n`);
 
+    // Start auto-refresh
+    this.startAutoRefresh(() => {
+      console.clear();
+      this.displayHealthDashboard();
+      if (this.isMonitoring) {
+        this.rl.prompt();
+      }
+    });
+
     this.rl.on('line', async (input) => {
-      const command = input.trim().toLowerCase();
+      const input_lower = input.trim().toLowerCase();
+      const parts = input_lower.split(/\s+/);
+      const command = parts[0];
 
       switch (command) {
         case 'health':
+        case 'status':
+          console.clear();
           this.displayHealthDashboard();
           break;
+
         case 'relink':
-          await this.promptForReLink();
+          if (parts[1] === 'master') {
+            console.log(`\n⏳ Re-linking master account...`);
+            if (onRelinkMaster) {
+              await onRelinkMaster(this.masterPhoneNumber);
+            }
+          } else if (parts[1]) {
+            const phoneNumber = parts[1];
+            console.log(`\n⏳ Re-linking device ${phoneNumber}...`);
+            if (onRelinkDevice) {
+              await onRelinkDevice(phoneNumber);
+            }
+          } else {
+            console.log(`\n⚠️  Usage: 'relink master' or 'relink <phone>'\n`);
+          }
           break;
-        case 'status':
-          this.displayQuickStatus();
+
+        case 'code':
+          if (parts[1]) {
+            const phoneNumber = parts[1];
+            console.log(`\n⏳ Switching to 6-digit auth for ${phoneNumber}...`);
+            if (onSwitchTo6Digit) {
+              await onSwitchTo6Digit(phoneNumber);
+            }
+          } else {
+            console.log(`\n⚠️  Usage: 'code <phone>'\n`);
+          }
           break;
+
+        case 'device':
+          if (parts[1]) {
+            const phoneNumber = parts[1];
+            this.displayDeviceDetails(phoneNumber);
+          } else {
+            console.log(`\n⚠️  Usage: 'device <phone>'\n`);
+          }
+          break;
+
+        case 'list':
+          if (onListDevices) {
+            onListDevices();
+          } else {
+            this.listAllDevices();
+          }
+          break;
+
+        case 'help':
+          console.log(`\n📚 Available Commands:`);
+          console.log(`  status / health         → Display full dashboard`);
+          console.log(`  relink master           → Re-link master WhatsApp account`);
+          console.log(`  relink <phone>          → Re-link specific device`);
+          console.log(`  code <phone>            → Switch to 6-digit authentication`);
+          console.log(`  device <phone>          → Show detailed device information`);
+          console.log(`  list                    → List all devices`);
+          console.log(`  help                    → Show this help message`);
+          console.log(`  quit / exit             → Exit monitoring\n`);
+          break;
+
         case 'quit':
         case 'exit':
-          console.log(`\nExiting interactive monitoring...\n`);
+          console.log(`\n👋 Exiting device manager...\n`);
           this.isMonitoring = false;
+          this.stopAutoRefresh();
           if (this.rl) {
             this.rl.close();
             this.rl = null;
           }
           return;
+
         case '':
-          // Empty input - just show prompt
+          // Empty input - refresh display
+          console.clear();
+          this.displayHealthDashboard();
           break;
+
         default:
-          console.log(`Unknown command: ${command}`);
-          console.log(`Type 'health', 'relink', 'status', or 'quit'\n`);
+          if (input.trim()) {
+            console.log(`\n❓ Unknown command: '${command}'. Type 'help' for available commands.\n`);
+          }
       }
 
       if (this.isMonitoring) {
@@ -202,8 +347,11 @@ class TerminalHealthDashboard {
 
     this.rl.on('close', () => {
       this.isMonitoring = false;
+      this.stopAutoRefresh();
     });
 
+    // Initial display
+    this.displayHealthDashboard();
     this.rl.prompt();
   }
 
@@ -216,17 +364,91 @@ class TerminalHealthDashboard {
     console.log(`\n${'─'.repeat(60)}`);
     console.log(`📊 QUICK STATUS`);
     console.log(`${'─'.repeat(60)}`);
-    console.log(`WhatsApp Accounts: ${report.whatsappAccounts.active} active, ${report.whatsappAccounts.inactive} inactive, ${report.whatsappAccounts.warning} warning`);
-    console.log(`Google Accounts: ${report.googleAccounts.connected} of ${report.googleAccounts.total} connected`);
+
+    if (this.deviceManager) {
+      const count = this.deviceManager.getDeviceCount();
+      console.log(`Devices: ${count.linked}/${count.total} linked | Status: ${count.unlinked} unlinked, ${count.linking} linking`);
+    }
+
+    console.log(`WhatsApp: ${report.whatsappAccounts.active} active, ${report.whatsappAccounts.inactive} inactive, ${report.whatsappAccounts.warning} warning`);
+    console.log(`Google: ${report.googleAccounts.connected} of ${report.googleAccounts.total} connected`);
     console.log(`System Uptime: ${report.systemStatus.uptime}`);
-    console.log(`Last Health Check: ${report.systemStatus.lastCheck}`);
     console.log(`${'─'.repeat(60)}\n`);
+  }
+
+  /**
+   * Display device details
+   */
+  displayDeviceDetails(phoneNumber) {
+    if (!this.deviceManager) {
+      console.log(`\n❌ Device manager not available\n`);
+      return;
+    }
+
+    const device = this.deviceManager.getDevice(phoneNumber);
+    if (!device) {
+      console.log(`\n❌ Device not found: ${phoneNumber}\n`);
+      return;
+    }
+
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`📱 DEVICE DETAILS: ${device.name}`);
+    console.log(`${'═'.repeat(60)}`);
+    console.log(`Phone Number:     ${device.phoneNumber}`);
+    console.log(`Device ID:        ${device.deviceId}`);
+    console.log(`Role:             ${device.role}`);
+    console.log(`Status:           ${device.status}`);
+    console.log(`Online:           ${device.isOnline ? '✅ Yes' : '❌ No'}`);
+    console.log(`\nAuthentication:`);
+    console.log(`  Method:         ${device.authMethod || 'Not set'}`);
+    console.log(`  Linked At:      ${device.linkedAt || 'Never'}`);
+    console.log(`  Link Attempts:  ${device.linkAttempts}/${device.maxLinkAttempts}`);
+    console.log(`\nActivity:`);
+    console.log(`  Uptime:         ${Math.floor(device.uptime / 3600000)}h ${Math.floor((device.uptime % 3600000) / 60000)}m`);
+    console.log(`  Last Heartbeat: ${device.lastHeartbeat || 'N/A'}`);
+    console.log(`  Last Activity:  ${device.lastActivity || 'N/A'}`);
+    console.log(`  Heartbeat Count:${device.heartbeatCount}`);
+    console.log(`\nNetwork:`);
+    console.log(`  IP Address:     ${device.ipAddress || 'N/A'}`);
+    console.log(`\nStatus:`);
+    console.log(`  Last Error:     ${device.lastError || 'None'}`);
+    console.log(`  Recovery Mode:  ${device.recoveryMode ? '🟡 Yes' : '🟢 No'}`);
+    console.log(`${'═'.repeat(60)}\n`);
+  }
+
+  /**
+   * List all devices
+   */
+  listAllDevices() {
+    if (!this.deviceManager) {
+      console.log(`\n❌ Device manager not available\n`);
+      return;
+    }
+
+    const devices = this.deviceManager.getAllDevices();
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`📱 ALL DEVICES (${devices.length} total)`);
+    console.log(`${'═'.repeat(60)}`);
+
+    devices.forEach((device, idx) => {
+      const statusSymbol = {
+        linked: '✅',
+        unlinked: '❌',
+        linking: '⏳',
+        error: '⚠️',
+      }[device.status] || '❓';
+
+      console.log(`${idx + 1}. ${statusSymbol} ${device.phoneNumber} - ${device.name} [${device.role}]`);
+    });
+
+    console.log(`${'═'.repeat(60)}\n`);
   }
 
   /**
    * Close the dashboard
    */
   close() {
+    this.stopAutoRefresh();
     if (this.rl) {
       this.rl.close();
       this.rl = null;

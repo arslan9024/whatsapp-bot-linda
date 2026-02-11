@@ -74,6 +74,15 @@ class SessionStateManager {
         recoveryAttempts: state.recoveryAttempts || 0,
         lastAuthenticated: state.lastAuthenticated || null,
         lastError: state.lastError || null,
+        // NEW: Device metadata
+        deviceMetadata: state.deviceMetadata || {
+          linkedAt: null,
+          lastHeartbeat: null,
+          authMethod: null,
+          ipAddress: null,
+          uptime: 0,
+          heartbeatCount: 0,
+        },
       };
 
       this.accountStates.set(accountId, accountState);
@@ -84,6 +93,69 @@ class SessionStateManager {
       return true;
     } catch (error) {
       console.error(`❌ Failed to save account state for ${accountId}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Update device metadata for an account
+   */
+  async updateDeviceMetadata(accountId, metadata) {
+    try {
+      const state = this.getAccountState(accountId);
+      if (!state) {
+        return false;
+      }
+
+      if (!state.deviceMetadata) {
+        state.deviceMetadata = {};
+      }
+
+      Object.assign(state.deviceMetadata, metadata);
+      await this.saveAccountState(accountId, state);
+
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to update device metadata for ${accountId}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get device metadata for account
+   */
+  getDeviceMetadata(accountId) {
+    const state = this.getAccountState(accountId);
+    return state?.deviceMetadata || null;
+  }
+
+  /**
+   * Record device link event
+   */
+  async recordDeviceLinkEvent(accountId, result = "success") {
+    try {
+      const state = this.getAccountState(accountId);
+      if (!state) return false;
+
+      if (result === "success") {
+        state.deviceLinked = true;
+        state.isActive = true;
+        state.lastKnownState = "authenticated";
+        state.lastAuthenticated = new Date().toISOString();
+        
+        if (!state.deviceMetadata) {
+          state.deviceMetadata = {};
+        }
+        state.deviceMetadata.linkedAt = new Date().toISOString();
+      } else if (result === "unlinked") {
+        state.deviceLinked = false;
+        state.isActive = false;
+      }
+
+      await this.saveAccountState(accountId, state);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to record device link event: ${error.message}`);
       return false;
     }
   }

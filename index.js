@@ -13,6 +13,7 @@ import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.
 import { DeviceRecoveryManager } from "./code/utils/DeviceRecoveryManager.js";
 import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
 import SessionKeepAliveManager from "./code/utils/SessionKeepAliveManager.js";
+import DeviceLinkedManager from "./code/utils/DeviceLinkedManager.js";  // NEW: Device tracking manager
 
 // DATABASE & ANALYTICS (Phase 2)
 import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
@@ -44,6 +45,7 @@ const MAX_INIT_ATTEMPTS = 3;
 let bootstrapManager = null;
 let recoveryManager = null;
 let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
+let deviceLinkedManager = null;  // NEW: Device linking tracker
 
 // Feature handlers
 let contactHandler = null;
@@ -67,57 +69,65 @@ function logBot(msg, type = "info") {
 }
 
 /**
- * Setup terminal input listener for interactive health dashboard
+ * Setup terminal input listener for interactive health dashboard & device management
  * Allows users to:
- * - View WhatsApp and Google account status
- * - Re-link inactive accounts
- * - Monitor system health in real-time
+ * - View WhatsApp device status in real-time
+ * - Re-link master or specific accounts
+ * - Monitor system health
+ * - Switch to 6-digit authentication
  */
 function setupTerminalInputListener() {
   try {
-    // Use readline for simple command input
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    // Listen for user commands via input stream
-    let commandBuffer = '';
-    
-    process.stdin.on('data', async (data) => {
-      const input = data.toString().trim().toLowerCase();
-      
-      if (!input) return;
-      
-      switch (input) {
-        case 'dashboard':
-        case 'health':
-          terminalHealthDashboard.displayHealthDashboard();
-          break;
+    // Setup interactive monitoring with device manager callbacks
+    const callbacks = {
+      onRelinkMaster: async (masterPhone) => {
+        if (!masterPhone) {
+          logBot("Master phone not configured", "error");
+          return;
+        }
         
-        case 'relink':
-          await terminalHealthDashboard.promptForReLink();
-          break;
+        logBot(`Re-linking master account: ${masterPhone}`, "info");
+        if (deviceLinkedManager) {
+          deviceLinkedManager.resetDeviceStatus(masterPhone);
+        }
         
-        case 'status':
-          terminalHealthDashboard.displayQuickStatus();
-          break;
-        
-        case 'quit':
-        case 'exit':
-          logBot("Shutdown signal received", "warn");
-          process.emit('SIGINT');
-          break;
-        
-        default:
-          if (input !== 'ctrl+d' && input !== '') {
-            logBot(`Unknown command: ${input}. Try: 'health' | 'relink' | 'status' | 'quit'`, "info");
+        // Trigger re-linking by recreating client
+        const client = accountClients.get(masterPhone);
+        if (client) {
+          try {
+            // Reset session and trigger new QR
+            deviceLinkedManager.startLinkingAttempt(masterPhone);
+            setupNewLinkingFlow(client, masterPhone, 'master');
+            client.initialize();
+          } catch (error) {
+            logBot(`Failed to reset client: ${error.message}`, "error");
           }
-      }
-    });
+        }
+      },
+      
+      onRelinkDevice: async (phoneNumber) => {
+        logBot(`Re-linking device: ${phoneNumber}`, "info");
+        if (deviceLinkedManager) {
+          deviceLinkedManager.resetDeviceStatus(phoneNumber);
+        }
+      },
+      
+      onSwitchTo6Digit: async (phoneNumber) => {
+        logBot(`6-digit auth requested for: ${phoneNumber}`, "info");
+        logBot("6-digit code feature coming soon", "warn");
+      },
+      
+      onShowDeviceDetails: (phoneNumber) => {
+        terminalHealthDashboard.displayDeviceDetails(phoneNumber);
+      },
+      
+      onListDevices: () => {
+        terminalHealthDashboard.listAllDevices();
+      },
+    };
 
-    // Also enable Ctrl+H for quick health check
-    process.stdin.setRawMode?.(false);
+    // Start interactive monitoring
+    terminalHealthDashboard.startInteractiveMonitoring(callbacks);
 
   } catch (error) {
     logBot(`Terminal input setup warning: ${error.message}`, "warn");
@@ -159,6 +169,16 @@ async function initializeBot() {
       keepAliveManager.startStatusMonitoring();
       logBot("✅ SessionKeepAliveManager initialized", "success");
       global.keepAliveManager = keepAliveManager;
+    }
+
+    // ============================================
+    // STEP 1B: Initialize Device Linked Manager (NEW)
+    // ============================================
+    if (!deviceLinkedManager) {
+      deviceLinkedManager = new DeviceLinkedManager(logBot);
+      terminalHealthDashboard.setDeviceManager(deviceLinkedManager);
+      logBot("✅ DeviceLinkedManager initialized", "success");
+      global.deviceLinkedManager = deviceLinkedManager;
     }
 
     // ============================================
@@ -217,6 +237,15 @@ async function initializeBot() {
         }
 
         logBot(`✅ Client created for ${config.displayName}`, "success");
+
+        // NEW: Add device to tracking system
+        if (deviceLinkedManager) {
+          deviceLinkedManager.addDevice(config.phoneNumber, {
+            name: config.displayName,
+            role: config.role || 'secondary',
+          });
+          terminalHealthDashboard.setMasterPhoneNumber(orderedAccounts[0]?.phoneNumber);
+        }
 
         // Check for device recovery (Phase 3)
         logBot(`Checking for linked devices (${config.phoneNumber})...`, "info");
@@ -356,6 +385,16 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
       sessionPath: `sessions/session-${phoneNumber}`,
       lastKnownState: "authenticated"
     });
+    
+    // NEW: Mark device as linked in device manager
+    if (deviceLinkedManager) {
+      deviceLinkedManager.markDeviceLinked(phoneNumber, {
+        linkedAt: new Date().toISOString(),
+        authMethod: 'restore',
+        ipAddress: null,
+      });
+      sessionStateManager.recordDeviceLinkEvent(phoneNumber, 'success');
+    }
   });
 
   client.once("ready", async () => {
@@ -398,6 +437,11 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
 
   client.on("disconnected", (reason) => {
     logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
+    
+    // NEW: Mark device as unlinked in device manager
+    if (deviceLinkedManager) {
+      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reason || 'disconnected');
+    }
   });
 
   client.on("error", (error) => {
@@ -428,6 +472,12 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
   client.on("qr", async (qr) => {
     if (!qrShown) {
       qrShown = true;
+      
+      // NEW: Mark device as linking in device manager
+      if (deviceLinkedManager) {
+        deviceLinkedManager.startLinkingAttempt(phoneNumber);
+      }
+      
       try {
         await QRCodeDisplay.display(qr, {
           method: 'auto',
@@ -445,6 +495,15 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
     authComplete = true;
     logBot(`✅ Device linked (${phoneNumber})`, "success");
     
+    // NEW: Mark device as linked in device manager
+    if (deviceLinkedManager) {
+      deviceLinkedManager.markDeviceLinked(phoneNumber, {
+        linkedAt: new Date().toISOString(),
+        authMethod: 'qr',
+        ipAddress: null,
+      });
+    }
+    
     sessionStateManager.saveAccountState(phoneNumber, {
       phoneNumber: phoneNumber,
       displayName: "WhatsApp Account",
@@ -453,6 +512,8 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
       sessionPath: `sessions/session-${botId}`,
       lastKnownState: "authenticated"
     });
+    
+    sessionStateManager.recordDeviceLinkEvent(phoneNumber, 'success');
   });
 
   client.once("ready", async () => {
@@ -480,6 +541,11 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
 
   client.on("disconnected", (reason) => {
     logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
+    
+    // NEW: Mark device as unlinked in device manager
+    if (deviceLinkedManager) {
+      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reason || 'disconnected');
+    }
   });
 
   client.on("error", (error) => {
