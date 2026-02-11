@@ -1,30 +1,5 @@
 {
-  "timestamp": "2026-02-09T06:18:41.036Z",
+  "timestamp": "2026-02-10T08:23:40.048Z",
   "version": "1.0",
-  "accounts": {
-    "account-+971505760056": {
-      "phoneNumber": "+971505760056",
-      "displayName": "Test Account",
-      "deviceLinked": true,
-      "isActive": true,
-      "sessionPath": "sessions/session-+971505760056",
-      "lastKnownState": "authenticated",
-      "lastPing": "2026-02-08T22:02:22.799Z",
-      "recoveryAttempts": 0,
-      "lastAuthenticated": "2026-02-08T22:02:22.799Z",
-      "lastError": null
-    },
-    "test-phone-12345": {
-      "phoneNumber": "test-phone-12345",
-      "displayName": "Test Account",
-      "deviceLinked": true,
-      "isActive": false,
-      "sessionPath": "sessions/test",
-      "lastKnownState": "authenticated",
-      "lastPing": "2026-02-09T06:18:41.033Z",
-      "recoveryAttempts": 0,
-      "lastAuthenticated": null,
-      "lastError": null
-    }
-  }
+  "accounts": {}
 }

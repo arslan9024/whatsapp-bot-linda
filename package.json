@@ -6,17 +6,37 @@
     "type": "module",
     "scripts": {
         "start": "node index.js",
-        "dev": "nodemon index.js",
+        "dev": "nodemon --watch index.js --watch code/ --ignore sessions/ --ignore outputs/ --ignore logs/ --exec node --no-warnings index.js",
+        "dev:24-7": "nodemon --exec node --expose-gc index.js --ignore sessions/ --ignore outputs/ --ignore logs/ --delay 3000 --max-restarts 999 --exit-delay 60000 --signal SIGTERM",
+        "dev:watch": "nodemon --watch index.js --watch code/WhatsAppBot --watch code/utils --watch code/Services --exec node --no-warnings index.js",
         "clean-sessions": "node tools/cleanSessions.js",
         "fresh-start": "node tools/freshStart.js",
         "list-sessions": "node tools/listSessions.js",
         "send-hello": "node tools/sendHelloMessage.js",
+        "status": "node tools/showStatus.js",
         "test": "echo \"Error: no test specified\" && exit 1",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write ."
     },
-    "author": "Arslan Malik",
+    "nodemonConfig": {
+        "ignore": [
+            "sessions/*",
+            "outputs/*",
+            "logs/*",
+            "node_modules/*",
+            "*.log",
+            ".session-cache/*"
+        ],
+        "watch": [
+            "index.js",
+            "code/"
+        ],
+        "ext": "js,json",
+        "delay": 1000,
+        "restartable": "rs"
+    },
+    "author": "Arslan Malik (24/7 Production Ready)",
     "license": "ISC",
     "dependencies": {
         "@google-cloud/local-auth": "^2.1.0",

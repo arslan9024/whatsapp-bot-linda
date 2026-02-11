@@ -5,53 +5,48 @@ import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from 
 import SessionManager from "./code/utils/SessionManager.js";
 import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
+import readline from 'readline';
 
-// PHASE 4: Multi-Account Orchestration (February 9, 2026)
-// Bootstrap and recovery managers for multi-account WhatsApp bot system
+// PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
+// Multi-account orchestration, device recovery, health monitoring, keep-alive system
 import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.js";
-import DeviceRecoveryManager from "./code/utils/DeviceRecoveryManager.js";
-
-// PHASE 5: Account Health Monitoring (February 9, 2026)
-// Health checks and auto-recovery for all WhatsApp accounts
+import { DeviceRecoveryManager } from "./code/utils/DeviceRecoveryManager.js";
 import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
+import SessionKeepAliveManager from "./code/utils/SessionKeepAliveManager.js";
 
-// Initialize Conversation Analyzer (Session 18 - February 7, 2026)
-// This sets up message type logging and global statistics functions
+// DATABASE & ANALYTICS (Phase 2)
+import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
+import { OperationalAnalytics } from "./code/Services/OperationalAnalytics.js";
+
+// CONVERSATION ANALYSIS (Session 18)
 import "./code/WhatsAppBot/AnalyzerGlobals.js";
 
-// DATABASE INTEGRATION (Session 16 - Phase 2)
-// Import organized sheet services for Akoya database integration
-import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
-import { quickValidateSheet } from "./code/utils/sheetValidation.js";
-import { OperationalAnalytics } from "./code/Services/OperationalAnalytics.js";
-import { OrganizedSheets } from "./code/DamacHills2List.js";
-
-// GOOGLE CONTACTS INTEGRATION (Phase B - February 2026)
-// Contact lookup and management for WhatsApp bot
+// GOOGLE CONTACTS (Phase B - Contact Lookup)
 import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
 
-// GORAHA CONTACT VERIFICATION SERVICE (Phase C - February 2026)
-// Verifies all Goraha contacts in Google and checks WhatsApp presence
+// GORAHA VERIFICATION (Phase C - Contact Verification)
 import GorahaContactVerificationService from "./code/WhatsAppBot/GorahaContactVerificationService.js";
+
+// TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
+import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
 
 import fs from "fs";
 import path from "path";
 
-// Global bot instances (single master + multi-account support)
+// Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
-let accountClients = new Map(); // Map: phoneNumber → client instance (Phase 4)
+let accountClients = new Map(); // Map: phoneNumber → client instance
 let isInitializing = false;
 let initAttempts = 0;
-const MAX_INIT_ATTEMPTS = 2;
+const MAX_INIT_ATTEMPTS = 3;
 
-// Phase 4 Managers
+// Phase 4-5 Managers (24/7 Operation)
 let bootstrapManager = null;
 let recoveryManager = null;
+let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
 
-// Global contact handler (Phase B)
+// Feature handlers
 let contactHandler = null;
-
-// Goraha contact verification service (Phase C)
 let gorahaVerificationService = null;
 
 // All initialized accounts for graceful shutdown
@@ -72,14 +67,72 @@ function logBot(msg, type = "info") {
 }
 
 /**
- * PHASE 4: Multi-Account Bot Initialization
- * Orchestrates SessionStateManager, AccountBootstrapManager, and DeviceRecoveryManager
- * Ensures seamless recovery across restarts
+ * Setup terminal input listener for interactive health dashboard
+ * Allows users to:
+ * - View WhatsApp and Google account status
+ * - Re-link inactive accounts
+ * - Monitor system health in real-time
+ */
+function setupTerminalInputListener() {
+  try {
+    // Use readline for simple command input
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    // Listen for user commands via input stream
+    let commandBuffer = '';
+    
+    process.stdin.on('data', async (data) => {
+      const input = data.toString().trim().toLowerCase();
+      
+      if (!input) return;
+      
+      switch (input) {
+        case 'dashboard':
+        case 'health':
+          terminalHealthDashboard.displayHealthDashboard();
+          break;
+        
+        case 'relink':
+          await terminalHealthDashboard.promptForReLink();
+          break;
+        
+        case 'status':
+          terminalHealthDashboard.displayQuickStatus();
+          break;
+        
+        case 'quit':
+        case 'exit':
+          logBot("Shutdown signal received", "warn");
+          process.emit('SIGINT');
+          break;
+        
+        default:
+          if (input !== 'ctrl+d' && input !== '') {
+            logBot(`Unknown command: ${input}. Try: 'health' | 'relink' | 'status' | 'quit'`, "info");
+          }
+      }
+    });
+
+    // Also enable Ctrl+H for quick health check
+    process.stdin.setRawMode?.(false);
+
+  } catch (error) {
+    logBot(`Terminal input setup warning: ${error.message}`, "warn");
+    // Continue without terminal input if setup fails
+  }
+}
+
+/**
+ * MINIMAL BOT INITIALIZATION
+ * Focus: WhatsApp Device Linking via QR Code
+ * Simplified: No complex managers, databases, or analytics
  */
 async function initializeBot() {
-  // Prevent multiple simultaneous initializations
   if (isInitializing) {
-    logBot("Initialization already in progress, will wait...", "warn");
+    logBot("Initialization already in progress...", "warn");
     return;
   }
 
@@ -87,70 +140,76 @@ async function initializeBot() {
   initAttempts++;
 
   try {
-    // STEP 1: Initialize Phase 4 Managers
-    if (initAttempts === 1) {
-      bootstrapManager = new AccountBootstrapManager();
-      recoveryManager = new DeviceRecoveryManager();
-      logBot("Phase 4 managers initialized (Bootstrap + Recovery)", "success");
-    }
-
-    // STEP 2: Load Session State (Phase 1)
-    if (initAttempts === 1) {
-      const initialized = await sessionStateManager.initialize();
-      if (!initialized) {
-        logBot("Failed to initialize SessionStateManager", "warn");
-      } else {
-        const healthReport = sessionStateManager.getHealthReport();
-        logBot(`Session state loaded: ${healthReport.activeAccounts}/${healthReport.totalAccounts} accounts`, "success");
-        if (healthReport.linkedDevices > 0) {
-          logBot(`Found ${healthReport.linkedDevices} linked device(s) ready for recovery`, "success");
-        }
-      }
-    }
-
-    // STEP 3: Load Multi-Account Configuration (Phase 2)
-    logBot("Loading multi-account configuration...", "info");
-    await bootstrapManager.loadBotsConfig();
-    const accountConfigs = bootstrapManager.getAccountConfigs();
-    const orderedAccounts = bootstrapManager.getOrderedAccounts();
-    
-    logBot(`Found ${accountConfigs.length} configured account(s)`, "info");
-    orderedAccounts.forEach((config, idx) => {
-      logBot(`  [${idx + 1}] ${config.displayName} (${config.phoneNumber}) - ${config.role}`, "info");
-    });
-
-    // STEP 4: Display Banner (first initialization only)
+    // BANNER (first attempt only)
     if (initAttempts === 1) {
       console.log("\n╔═══════════════════════════════════════════════════════════════╗");
-      console.log("║       🤖 LINDA - Multi-Account WhatsApp Bot Service         ║");
-      console.log("║              Phase 4: Multi-Account Bootstrap               ║");
+      console.log("║       🤖 LINDA - 24/7 WhatsApp Bot Service                  ║");
+      console.log("║            PRODUCTION MODE ENABLED                          ║");
+      console.log("║        Sessions: Persistent | Features: All Enabled         ║");
       console.log("╚═══════════════════════════════════════════════════════════════╝\n");
     }
 
     logBot(`Initialization Attempt: ${initAttempts}/${MAX_INIT_ATTEMPTS}`, "info");
-    logBot("Starting sequential account initialization...", "info");
 
-    // STEP 5: Sequential Account Initialization
+    // ============================================
+    // STEP 1: Initialize Keep-Alive Manager
+    // ============================================
+    if (!keepAliveManager) {
+      keepAliveManager = new SessionKeepAliveManager(accountClients, logBot);
+      keepAliveManager.startStatusMonitoring();
+      logBot("✅ SessionKeepAliveManager initialized", "success");
+      global.keepAliveManager = keepAliveManager;
+    }
+
+    // ============================================
+    // STEP 2: Initialize Phase 4 Bootstrap Manager
+    // ============================================
+    if (!bootstrapManager) {
+      bootstrapManager = new AccountBootstrapManager();
+      recoveryManager = new DeviceRecoveryManager();
+      logBot("✅ Phase 4 managers initialized (Bootstrap + Recovery)", "success");
+      global.bootstrapManager = bootstrapManager;
+      global.recoveryManager = recoveryManager;
+    }
+
+    // ============================================
+    // STEP 3: Load & Process Bot Configuration
+    // ============================================
+    logBot("Loading bot configuration...", "info");
+    await bootstrapManager.loadBotsConfig();
+    const accountConfigs = bootstrapManager.getAccountConfigs();
+    const orderedAccounts = bootstrapManager.getOrderedAccounts();
+
+    logBot(`Found ${accountConfigs.length} configured account(s)`, "info");
+    orderedAccounts.forEach((config, idx) => {
+      const statusBadge = config.enabled ? "✅" : "⏭️";
+      logBot(`  [${idx + 1}] ${statusBadge} ${config.displayName} (${config.phoneNumber})`, "info");
+    });
+
+    // ============================================
+    // STEP 4: Sequential Multi-Account Initialization
+    // ============================================
+    logBot("\n🔄 Starting sequential account initialization...", "info");
+    const sequentialDelay = parseInt(process.env.ACCOUNT_SEQUENTIAL_DELAY) || 5000;
+
     for (const config of orderedAccounts) {
       if (!config.enabled) {
         logBot(`⏭️  Skipping disabled account: ${config.displayName}`, "warn");
         continue;
       }
 
-      logBot(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, "info");
-      logBot(`Initializing: ${config.displayName} (${config.phoneNumber})`, "info");
-      
+      logBot(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, "info");
+      logBot(`[Account ${orderedAccounts.indexOf(config) + 1}/${orderedAccounts.filter(c => c.enabled).length}] Initializing: ${config.displayName}...`, "info");
+
       try {
         // Create WhatsApp client
-        const client = await CreatingNewWhatsAppClient(config.phoneNumber);
+        logBot(`Creating WhatsApp client for: ${config.displayName}`, "info");
+        const client = await CreatingNewWhatsAppClient(config.id);
         if (!client) {
           throw new Error("Failed to create WhatsApp client");
         }
 
         accountClients.set(config.phoneNumber, client);
-        allInitializedAccounts.push(client);
-        
-        // Set Lion0 to first/primary account for backwards compatibility
         if (!Lion0) {
           Lion0 = client;
           global.Lion0 = Lion0;
@@ -159,25 +218,27 @@ async function initializeBot() {
 
         logBot(`✅ Client created for ${config.displayName}`, "success");
 
-        // STEP 6: Check for Device Recovery (Phase 3)
+        // Check for device recovery (Phase 3)
         logBot(`Checking for linked devices (${config.phoneNumber})...`, "info");
         const wasLinked = await recoveryManager.wasDevicePreviouslyLinked(config.phoneNumber);
         const savedState = sessionStateManager.getAccountState(config.phoneNumber);
 
         if (wasLinked && savedState?.deviceLinked) {
-          logBot(`Found previous device session - attempting recovery`, "success");
+          logBot(`Found previous device session - attempting restore...`, "success");
           setupRestoreFlow(client, config.phoneNumber, config);
-        } else if (savedState?.deviceLinked) {
-          logBot(`Device linked but session needs verification`, "warn");
-          setupNewLinkingFlow(client, config.phoneNumber);
         } else {
-          logBot(`No previous session - new device linking required`, "info");
+          logBot(`New device linking required - showing QR code...`, "info");
           createDeviceStatusFile(config.phoneNumber);
-          setupNewLinkingFlow(client, config.phoneNumber);
+          setupNewLinkingFlow(client, config.phoneNumber, config.id);
         }
 
-        // Record initialization
         await bootstrapManager.recordInitialization(config.id, true);
+        
+        // Delay before next account to prevent race conditions
+        if (config !== orderedAccounts[orderedAccounts.length - 1]) {
+          logBot(`Waiting ${sequentialDelay}ms before next account...`, "info");
+          await new Promise(resolve => setTimeout(resolve, sequentialDelay));
+        }
 
       } catch (error) {
         logBot(`Failed to initialize ${config.displayName}: ${error.message}`, "error");
@@ -186,30 +247,38 @@ async function initializeBot() {
       }
     }
 
-    logBot(`\nInitialization sequence complete`, "success");
-
-    // STEP 7: Initialize Database (Phase 2 continuation)
+    // ============================================
+    // STEP 5: Initialize Database & Analytics
+    // ============================================
     await initializeDatabase();
 
-    // STEP 8: Initialize Health Monitoring (Phase 5)
+    // ============================================
+    // STEP 6: Initialize Health Monitoring (Phase 5)
+    // ============================================
     logBot("Starting account health monitoring...", "info");
     accountHealthMonitor.startHealthChecks();
     logBot("✅ Account health monitoring active (5-minute intervals)", "success");
-    
-    // Make health monitor globally available
     global.healthMonitor = accountHealthMonitor;
 
     logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
-    logBot("║              🟢 PHASE 5 INITIALIZATION COMPLETE              ║", "success");
-    logBot("║        Session, Bootstrap, Recovery & Health Monitoring      ║", "success");
+    logBot("║           🚀 INITIALIZATION COMPLETE - 24/7 ACTIVE            ║", "success");
+    logBot("║        All enabled accounts initialized with keep-alive       ║", "success");
     logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
+
+    // ============================================
+    // STEP 7: Setup Interactive Terminal Dashboard
+    // ============================================
+    setupTerminalInputListener();
+    logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
+    logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit'", "info");
+
+    isInitializing = false;
 
   } catch (error) {
     logBot(`Initialization Error: ${error.message}`, "error");
-    
-    // Check if this is a browser lock error
+
     if (error.message.includes("browser is already running") && initAttempts < MAX_INIT_ATTEMPTS) {
-      logBot("Browser is locked from previous session - cleaning up...", "warn");
+      logBot("Browser lock detected - cleaning up and retrying...", "warn");
       await killBrowserProcesses();
       await sleep(2000);
       isInitializing = false;
@@ -226,49 +295,45 @@ async function initializeBot() {
 }
 
 /**
- * Initialize database and analytics (from original flow)
+ * Initialize database and analytics (Phase 2)
  */
 async function initializeDatabase() {
   logBot("Initializing database and analytics...", "info");
 
   try {
-    // DATABASE INITIALIZATION (Session 16 - Akoya Organized Sheet)
-    let contextIntegration = null;
-    let operationalAnalytics = null;
-    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID || (await import("./code/DamacHills2List.js")).OrganizedSheets?.Akoya;
+    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID;
 
     if (AKOYA_SHEET_ID) {
-      const { quickValidateSheet } = await import("./code/utils/sheetValidation.js");
-      const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
-      
-      if (sheetValid) {
-        const { AIContextIntegration } = await import("./code/Services/AIContextIntegration.js");
-        contextIntegration = new AIContextIntegration();
-        try {
-          await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
-          logBot("Database context loaded into memory", "success");
-          global.databaseContext = contextIntegration;
-        } catch (error) {
-          logBot(`Context initialization failed: ${error.message}`, "warn");
-          contextIntegration = null;
-        }
+      try {
+        const { quickValidateSheet } = await import("./code/utils/sheetValidation.js");
+        const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
+        
+        if (sheetValid) {
+          const contextIntegration = new AIContextIntegration();
+          try {
+            await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
+            logBot("Database context loaded into memory", "success");
+            global.databaseContext = contextIntegration;
+          } catch (error) {
+            logBot(`Context initialization failed: ${error.message}`, "warn");
+          }
 
-        // Step 3: Initialize analytics
-        try {
-          const { OperationalAnalytics } = await import("./code/Services/OperationalAnalytics.js");
-          operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
-          global.analytics = operationalAnalytics;
-          logBot("Analytics service initialized", "success");
-        } catch (error) {
-          logBot(`Analytics initialization failed: ${error.message}`, "warn");
-          operationalAnalytics = null;
+          try {
+            const operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
+            global.analytics = operationalAnalytics;
+            logBot("Analytics service initialized", "success");
+          } catch (error) {
+            logBot(`Analytics initialization failed: ${error.message}`, "warn");
+          }
+        } else {
+          logBot("Sheet validation failed - using legacy mode", "warn");
         }
-      } else {
-        logBot("Sheet validation failed - using LEGACY MODE", "warn");
+      } catch (error) {
+        logBot(`Database initialization error: ${error.message}`, "warn");
       }
     }
   } catch (error) {
-    logBot(`Database initialization error: ${error.message}`, "warn");
+    logBot(`Database error: ${error.message}`, "warn");
   }
 }
 
@@ -306,10 +371,12 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
     // PHASE 5: Register account for health monitoring
     accountHealthMonitor.registerAccount(phoneNumber, client);
     
+    // NEW: Start keep-alive heartbeats for 24/7 operation
+    keepAliveManager.startKeepAlive(phoneNumber, client);
+    
     // Initialize contact lookup handler (Phase B)
     try {
       if (!contactHandler) {
-        const { default: ContactLookupHandler } = await import("./code/WhatsAppBot/ContactLookupHandler.js");
         contactHandler = new ContactLookupHandler();
         await contactHandler.initialize();
         logBot("✅ Contact lookup handler ready", "success");
@@ -352,7 +419,7 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
 /**
  * Setup new device linking flow (Phase 4 multi-account version)
  */
-function setupNewLinkingFlow(client, phoneNumber) {
+function setupNewLinkingFlow(client, phoneNumber, botId) {
   logBot(`Setting up device linking for ${phoneNumber}...`, "info");
 
   let qrShown = false;
@@ -383,7 +450,7 @@ function setupNewLinkingFlow(client, phoneNumber) {
       displayName: "WhatsApp Account",
       deviceLinked: true,
       isActive: false,
-      sessionPath: `sessions/session-${phoneNumber}`,
+      sessionPath: `sessions/session-${botId}`,
       lastKnownState: "authenticated"
     });
   });
@@ -397,6 +464,9 @@ function setupNewLinkingFlow(client, phoneNumber) {
     
     // PHASE 5: Register account for health monitoring
     accountHealthMonitor.registerAccount(phoneNumber, client);
+    
+    // NEW: Start keep-alive heartbeats for 24/7 operation
+    keepAliveManager.startKeepAlive(phoneNumber, client);
     
     setupMessageListeners(client, phoneNumber);
     isInitializing = false;
@@ -428,7 +498,19 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
     const timestamp = new Date().toLocaleTimeString();
     const from = msg.from.includes("@g.us") ? `Group: ${msg.from}` : `User: ${msg.from}`;
     
+    // Update last activity for keep-alive tracking
+    keepAliveManager.updateLastActivity(phoneNumber);
+    
     logBot(`📨 [${timestamp}] (${phoneNumber}) ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? "..." : ""}`, "info");
+
+    try {
+      // Phase 3: Conversation type analysis (if enabled)
+      if (typeof logMessageTypeCompact === 'function') {
+        logMessageTypeCompact(msg);
+      }
+    } catch (error) {
+      // Silent fail on analyzer
+    }
 
     // Phase B: Contact lookup integration
     try {
@@ -446,6 +528,11 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
     if (msg.body === "!ping") {
       msg.reply("pong");
       logBot("📤 Ping reply sent", "success");
+    }
+
+    // Status command (new)
+    if (msg.body === "!status") {
+      displayStatus();
     }
 
     // Phase C: Goraha contact verification command
@@ -520,12 +607,14 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
 process.on("SIGINT", async () => {
   console.log("\n");
   logBot("Received shutdown signal", "warn");
-  logBot("Initiating graceful shutdown (Phase 4 + Phase 5)...", "info");
+  logBot("Initiating graceful shutdown...", "info");
   
   try {
-    // 0. Stop health monitoring (Phase 5)
-    logBot("Stopping health monitoring...", "info");
-    accountHealthMonitor.stopHealthChecks();
+    // 0. Stop health monitoring (Phase 5) - only if available
+    if (typeof accountHealthMonitor !== 'undefined') {
+      logBot("Stopping health monitoring...", "info");
+      accountHealthMonitor.stopHealthChecks();
+    }
     
     // 1. Save all account states
     logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, "info");

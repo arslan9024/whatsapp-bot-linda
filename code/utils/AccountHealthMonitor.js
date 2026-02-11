@@ -15,6 +15,8 @@
 
 import sessionStateManager from "../utils/SessionStateManager.js";
 import DeviceRecoveryManager from "../utils/DeviceRecoveryManager.js";
+import fs from 'fs';
+import path from 'path';
 
 class AccountHealthMonitor {
   constructor() {
@@ -432,15 +434,196 @@ class AccountHealthMonitor {
   }
 
   /**
-   * Print health check summary
+   * Print health check summary with WhatsApp and Google accounts
    */
   _printHealthSummary(results) {
     console.log(`${'─'.repeat(60)}`);
-    console.log(`Summary: ${results.healthy}/${results.totalAccounts} healthy, ${results.warning} warning, ${results.unhealthy} unhealthy`);
+    console.log(`📱 WHATSAPP ACCOUNTS - Summary: ${results.healthy}/${results.totalAccounts} healthy, ${results.warning} warning, ${results.unhealthy} unhealthy`);
     if (results.recovered > 0) {
-      console.log(`Recoveries: ${results.recovered} account(s) recovered`);
+      console.log(`🔄 Recoveries: ${results.recovered} account(s) recovered`);
     }
+    
+    // Show Google accounts status
+    this._printGoogleAccountsStatus();
+    
     console.log(`${'═'.repeat(60)}\n`);
+  }
+
+  /**
+   * Print Google accounts connection status
+   */
+  _printGoogleAccountsStatus() {
+    try {
+      // Attempt to read Google accounts registry
+      const registryPath = path.join(process.cwd(), 'code/GoogleAPI/accounts.json');
+      
+      if (fs.existsSync(registryPath)) {
+        const registryContent = fs.readFileSync(registryPath, 'utf-8');
+        const registry = JSON.parse(registryContent);
+        
+        console.log(`\n🔗 GOOGLE ACCOUNTS STATUS:`);
+        console.log(`${'─'.repeat(60)}`);
+        
+        if (registry.accounts && Array.isArray(registry.accounts)) {
+          registry.accounts.forEach((account, index) => {
+            const status = account.enabled !== false ? "✅ Connected" : "⚠️  Disabled";
+            const accountName = account.displayName || account.name || `Account ${index + 1}`;
+            const services = account.scopes ? account.scopes.length : 0;
+            console.log(`  ${accountName.padEnd(30)} ${status.padEnd(15)} (${services} services)`);
+          });
+        } else {
+          console.log(`  No Google accounts configured`);
+        }
+      } else {
+        console.log(`\n🔗 GOOGLE ACCOUNTS - No registry found`);
+      }
+    } catch (error) {
+      // Silently fail - Google accounts info is optional
+      console.log(`\n🔗 GOOGLE ACCOUNTS - Info unavailable`);
+    }
+  }
+
+  /**
+   * Prompt user to re-link an inactive WhatsApp account
+   */
+  async promptReLinkAccount(phoneNumber) {
+    try {
+      const accountData = this.accounts.get(phoneNumber);
+      
+      if (!accountData) {
+        console.error(`❌ Account not found: ${phoneNumber}`);
+        return false;
+      }
+
+      console.log(`\n${'═'.repeat(60)}`);
+      console.log(`🔗 RE-LINKING REQUIRED: ${phoneNumber}`);
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`\nAccount ${phoneNumber} is inactive.`);
+      console.log(`A new QR code will be generated to re-link the device.\n`);
+
+      // Destroy current client and reset state
+      try {
+        if (accountData.client && typeof accountData.client.destroy === 'function') {
+          await accountData.client.destroy();
+        }
+      } catch (e) {
+        // Ignore destroy errors
+      }
+
+      // Update status
+      accountData.status = "relinking";
+      accountData.consecutiveFailures = 0;
+      
+      // Save state
+      await sessionStateManager.saveAccountState(phoneNumber, {
+        phoneNumber,
+        displayName: `${phoneNumber} (Relinking)`,
+        deviceLinked: false,
+        isActive: false,
+        sessionPath: `sessions/session-${phoneNumber}`,
+        lastKnownState: "relinking",
+        requiresQRCode: true
+      });
+
+      console.log(`✅ Account reset. New QR code will be displayed on next bot restart.`);
+      console.log(`\nTo complete re-linking:`);
+      console.log(`1. Restart the bot: npm run dev:24-7`);
+      console.log(`2. Scan the new QR code with your WhatsApp device`);
+      console.log(`3. Device will be linked and session restored\n`);
+      console.log(`${'═'.repeat(60)}\n`);
+
+      return true;
+    } catch (error) {
+      console.error(`❌ Re-linking prompt failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Generate detailed health JSON report
+   */
+  generateDetailedHealthReport() {
+    const report = {
+      timestamp: new Date().toISOString(),
+      whatsappAccounts: {
+        total: this.accounts.size,
+        active: 0,
+        inactive: 0,
+        warning: 0,
+        details: []
+      },
+      googleAccounts: {
+        total: 0,
+        connected: 0,
+        details: []
+      },
+      systemStatus: {
+        uptime: this._calculateSystemUptime(),
+        lastCheck: this.metrics.lastCheckTime?.toISOString(),
+        totalChecks: this.metrics.totalChecks,
+        recoverySuccess: `${this.metrics.totalRecoveries > 0 ? ((this.metrics.totalRecoveries / (this.metrics.totalRecoveries + this.metrics.totalFailures)) * 100).toFixed(1) : 0}%`
+      }
+    };
+
+    // Add WhatsApp account details
+    for (const [phoneNumber, accountData] of this.accounts.entries()) {
+      const accountReport = {
+        phoneNumber,
+        status: accountData.status,
+        uptime: accountData.metrics.uptime,
+        lastActivity: accountData.lastActivity?.toISOString(),
+        responseTime: accountData.metrics.responseTime,
+        recoveryAttempts: accountData.recoveryAttempts,
+        createdAt: accountData.createdAt?.toISOString()
+      };
+      
+      report.whatsappAccounts.details.push(accountReport);
+
+      if (accountData.status === "healthy") report.whatsappAccounts.active++;
+      else if (accountData.status === "unhealthy") report.whatsappAccounts.inactive++;
+      else report.whatsappAccounts.warning++;
+    }
+
+    // Try to add Google accounts info
+    try {
+      const registryPath = path.join(process.cwd(), 'code/GoogleAPI/accounts.json');
+      
+      if (fs.existsSync(registryPath)) {
+        const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+        
+        if (registry.accounts && Array.isArray(registry.accounts)) {
+          report.googleAccounts.total = registry.accounts.length;
+          report.googleAccounts.connected = registry.accounts.filter(a => a.enabled !== false).length;
+          
+          registry.accounts.forEach(account => {
+            report.googleAccounts.details.push({
+              name: account.displayName || account.name,
+              enabled: account.enabled !== false,
+              services: account.scopes?.length || 0
+            });
+          });
+        }
+      }
+    } catch (e) {
+      // Google accounts info is optional
+    }
+
+    return report;
+  }
+
+  /**
+   * Calculate system uptime percentage
+   */
+  _calculateSystemUptime() {
+    if (this.accounts.size === 0) return "0%";
+    
+    let totalUptime = 0;
+    for (const [, accountData] of this.accounts.entries()) {
+      totalUptime += parseFloat(accountData.metrics.uptime) || 0;
+    }
+    
+    const avgUptime = (totalUptime / this.accounts.size).toFixed(1);
+    return `${avgUptime}%`;
   }
 }
 

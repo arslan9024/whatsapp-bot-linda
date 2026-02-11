@@ -401,8 +401,6 @@ class AccountBootstrapManager {
   }
 }
 
-// Create singleton instance
-const bootstrapManager = new AccountBootstrapManager();
-
-export default bootstrapManager;
+// Export the class so index.js can instantiate it
+export default AccountBootstrapManager;
 export { AccountBootstrapManager };
