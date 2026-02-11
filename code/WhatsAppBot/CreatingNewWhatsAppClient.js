@@ -103,9 +103,9 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       const msg = error.message || String(error);
       
       // Log non-fatal protocol errors but don't crash
-      if (msg.includes('Target') || msg.includes('Session closed') || msg.includes('Protocol')) {
-        console.warn(`⚠️  Protocol error (${ClientID}, non-critical): ${msg}`);
-        return; // Don't crash on protocol errors
+      if (msg.includes('Target') || msg.includes('Session') || msg.includes('Protocol') || msg.includes('Requesting')) {
+        // Suppress these - they're handled by global error handlers
+        return;
       }
       
       // Log other errors
@@ -114,8 +114,18 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
     
     // Add disconnect handler for recovery
     RegisteredAgentWAClient.on('disconnected', (reason) => {
-      console.warn(`📊 Client disconnected (${ClientID}): ${reason || 'unknown'}`);
-      // Allows graceful handling of disconnections
+      // Suppress disconnect logs unless critical
+      if (reason && !reason.includes('LOGOUT') && !reason.includes('RESTART')) {
+        console.warn(`📊 Client disconnected (${ClientID}): ${reason}`);
+      }
+    });
+    
+    // Suppress unnecessary warnings from whatsapp-web.js
+    RegisteredAgentWAClient.on('warn', (msg) => {
+      // Filter out common non-critical warnings
+      if (!msg.includes('Requesting')) {
+        console.warn(`⚠️  Client warning: ${msg}`);
+      }
     });
 
     return RegisteredAgentWAClient;

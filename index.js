@@ -82,19 +82,32 @@ function logBot(msg, type = "info") {
  * Global Error Handlers for Graceful Recovery
  * Prevents Puppeteer protocol errors from crashing the bot
  */
+
+// Define patterns for non-critical protocol errors that should not crash the bot
+const NON_CRITICAL_ERROR_PATTERNS = [
+  'Target closed',
+  'Session closed',
+  'Target.setAutoAttach',
+  'Requesting main frame',
+  'DevTools',
+  'Protocol error',
+  'browser is already running',
+  'CHROME_EXECUTABLE_PATH'
+];
+
+function isNonCriticalError(errorMsg) {
+  return NON_CRITICAL_ERROR_PATTERNS.some(pattern => 
+    errorMsg.toLowerCase().includes(pattern.toLowerCase())
+  );
+}
+
 process.on('unhandledRejection', (reason, promise) => {
   const errorMsg = reason?.message || String(reason);
   
-  // Filter and handle non-critical Puppeteer/Protocol errors
-  const isCritical = !errorMsg.includes('Target closed') && 
-                     !errorMsg.includes('Session closed') &&
-                     !errorMsg.includes('Target.setAutoAttach') &&
-                     !errorMsg.includes('Requesting main frame') &&
-                     !errorMsg.includes('DevTools');
-  
-  if (!isCritical) {
-    // Non-critical protocol error - log as warning but continue
-    logBot(`⚠️  Protocol Error (non-critical): ${errorMsg}`, "warn");
+  // Handle non-critical Puppeteer/Protocol errors silently
+  if (isNonCriticalError(errorMsg)) {
+    // Log once with warning prefix, don't crash
+    logBot(`⚠️  Protocol Warning: ${errorMsg}`, "warn");
     return; // Don't crash - just log and continue
   }
   
@@ -106,11 +119,10 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (error) => {
   const errorMsg = error?.message || String(error);
   
-  // Filter critical exceptions
-  if (errorMsg.includes('Target') || errorMsg.includes('Protocol')) {
-    logBot(`⚠️  Browser Protocol Exception (recovering): ${errorMsg}`, "warn");
-    // Continue running - don't exit
-    return;
+  // Handle non-critical protocol exceptions
+  if (isNonCriticalError(errorMsg)) {
+    logBot(`⚠️  Browser Protocol Exception: ${errorMsg}`, "warn");
+    return; // Continue running - don't exit
   }
   
   // Critical exception - log it
