@@ -2,6 +2,7 @@ import pkg from "whatsapp-web.js";
 import { createRequire } from 'module';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
 const execAsync = promisify(exec);
 const { LocalAuth, Client } = pkg;
 
@@ -46,24 +47,50 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
   console.log(`🔧 Creating WhatsApp client for: ${ClientID}${retryCount > 0 ? ` (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})` : ''}`);
 
   try {
+    // Configure Puppeteer to use system Chrome or Chromium
+    const puppeteerArgs = {
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--single-process",
+        "--disable-dev-shm-usage",
+        "--disable-web-resources",
+        "--disable-extensions",
+        "--disable-plugins",
+        "--disable-sync"
+      ]
+    };
+
+    // Try to use system Chrome if available
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      puppeteerArgs.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    } else if (process.platform === 'win32') {
+      // Try common Chrome installation paths on Windows
+      const possibleChromePaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        process.env.CHROME_BIN
+      ].filter(Boolean);
+      
+      for (const chromePath of possibleChromePaths) {
+        if (chromePath && fs.existsSync(chromePath)) {
+          puppeteerArgs.executablePath = chromePath;
+          console.log(`🌐 Using Chrome from: ${chromePath}`);
+          break;
+        }
+      }
+    }
+
     const RegisteredAgentWAClient = new Client({
       authStrategy: new LocalAuth({
         clientId: `${ClientID}`,
         dataPath: "sessions"
       }),
       restartOnAuthFail: true,
-      // Local development - headless mode for VSCode terminal only
-      headless: true,
-      seleniumOpts: {
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-gpu",
-          "--single-process",
-          "--disable-dev-shm-usage"
-        ]
-      },
+      // Puppeteer configuration for proper browser handling
+      puppeteer: puppeteerArgs,
       webVersionCache: {
         type: "remote",
         remotePath:
@@ -71,7 +98,14 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       }
     });
 
-    console.log(`✅ WhatsApp client created successfully for: ${ClientID}`);
+    // Add error handlers to catch Puppeteer/Protocol errors during initialization
+    RegisteredAgentWAClient.on('error', (error) => {
+      // Only log non-fatal errors (some protocol errors are recoverable)
+      if (!error.message.includes('Session closed')) {
+        console.error(`⚠️  Client error (${ClientID}): ${error.message}`);
+      }
+    });
+
     return RegisteredAgentWAClient;
   } catch (error) {
     // Check if this is a browser lock error
