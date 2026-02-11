@@ -14,6 +14,7 @@ import { DeviceRecoveryManager } from "./code/utils/DeviceRecoveryManager.js";
 import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
 import SessionKeepAliveManager from "./code/utils/SessionKeepAliveManager.js";
 import DeviceLinkedManager from "./code/utils/DeviceLinkedManager.js";  // NEW: Device tracking manager
+import { AccountConfigManager } from "./code/utils/AccountConfigManager.js";  // NEW: Dynamic account management
 
 // DATABASE & ANALYTICS (Phase 2)
 import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
@@ -51,6 +52,7 @@ let bootstrapManager = null;
 let recoveryManager = null;
 let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
 let deviceLinkedManager = null;  // NEW: Device linking tracker
+let accountConfigManager = null;  // NEW: Dynamic account configuration manager
 let commandHandler = null;  // NEW: Linda AI Command Handler
 
 // Feature handlers
@@ -87,8 +89,23 @@ function setupTerminalInputListener() {
     // Setup interactive monitoring with device manager callbacks
     const callbacks = {
       onRelinkMaster: async (masterPhone) => {
+        // Fallback to AccountConfigManager if master phone not provided
+        if (!masterPhone && accountConfigManager) {
+          masterPhone = accountConfigManager.getMasterPhoneNumber();
+        }
+        
         if (!masterPhone) {
-          logBot("Master phone not configured", "error");
+          logBot("⚠️  Master phone not configured", "error");
+          logBot("   💡 Use command: !set-master <account-id> to set master account", "info");
+          if (accountConfigManager) {
+            const accounts = accountConfigManager.getAllAccounts();
+            if (accounts.length > 0) {
+              logBot("   Available accounts:", "info");
+              accounts.forEach(acc => {
+                logBot(`     • ${acc.id}: ${acc.displayName} (${acc.phoneNumber})`, "info");
+              });
+            }
+          }
           return;
         }
         
@@ -188,6 +205,43 @@ async function initializeBot() {
     }
 
     // ============================================
+    // STEP 1C: Initialize Account Config Manager (NEW - Dynamic Management)
+    // ============================================
+    if (!accountConfigManager) {
+      accountConfigManager = new AccountConfigManager(logBot);
+      logBot("✅ AccountConfigManager initialized", "success");
+      global.accountConfigManager = accountConfigManager;
+      
+      // Validate master account configuration
+      const masterPhone = accountConfigManager.getMasterPhoneNumber();
+      const masterAccount = accountConfigManager.getMasterAccount();
+      
+      if (!masterPhone || !masterAccount) {
+        logBot("⚠️  WARNING: Master account not properly configured!", "warn");
+        logBot(`   Current status: ${accountConfigManager.getAccountCount()} accounts loaded`, "info");
+        
+        const allAccounts = accountConfigManager.getAllAccounts();
+        if (allAccounts.length > 0) {
+          logBot("   Available accounts:", "info");
+          allAccounts.forEach((acc, idx) => {
+            logBot(`     [${idx + 1}] ${acc.displayName} (${acc.phoneNumber}) - Role: ${acc.role || 'secondary'}`, "info");
+          });
+          
+          logBot("\n   💡 HOW TO FIX:", "info");
+          logBot("   Use command: !set-master <account-id>", "info");
+          logBot("   Example: !set-master account-1", "info");
+        } else {
+          logBot("   No accounts configured yet!", "error");
+          logBot("\n   💡 HOW TO FIX:", "info");
+          logBot("   Use command: !add-account <phone> <name>", "info");
+          logBot("   Example: !add-account +971501234567 'My Main Account'", "info");
+        }
+      } else {
+        logBot(`✅ Master account configured: ${masterAccount.displayName} (${masterPhone})`, "success");
+      }
+    }
+
+    // ============================================
     // STEP 2: Initialize Phase 4 Bootstrap Manager
     // ============================================
     if (!bootstrapManager) {
@@ -208,8 +262,7 @@ async function initializeBot() {
 
     logBot(`Found ${accountConfigs.length} configured account(s)`, "info");
     orderedAccounts.forEach((config, idx) => {
-      const statusBadge = config.enabled ? "✅" : "⏭️";
-      logBot(`  [${idx + 1}] ${statusBadge} ${config.displayName} (${config.phoneNumber})`, "info");
+      logBot(`  [${idx + 1}] ✅ ${config.displayName} (${config.phoneNumber}) - role: ${config.role}`, "info");
     });
 
     // ============================================
@@ -219,13 +272,9 @@ async function initializeBot() {
     const sequentialDelay = parseInt(process.env.ACCOUNT_SEQUENTIAL_DELAY) || 5000;
 
     for (const config of orderedAccounts) {
-      if (!config.enabled) {
-        logBot(`⏭️  Skipping disabled account: ${config.displayName}`, "warn");
-        continue;
-      }
-
+      // All accounts in orderedAccounts should be enabled, but double-check
       logBot(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, "info");
-      logBot(`[Account ${orderedAccounts.indexOf(config) + 1}/${orderedAccounts.filter(c => c.enabled).length}] Initializing: ${config.displayName}...`, "info");
+      logBot(`[Account ${orderedAccounts.indexOf(config) + 1}/${orderedAccounts.length}] Initializing: ${config.displayName}...`, "info");
 
       try {
         // Create WhatsApp client
@@ -250,7 +299,9 @@ async function initializeBot() {
             name: config.displayName,
             role: config.role || 'secondary',
           });
-          terminalHealthDashboard.setMasterPhoneNumber(orderedAccounts[0]?.phoneNumber);
+          // Use AccountConfigManager for master phone (more reliable)
+          const masterPhone = accountConfigManager?.getMasterPhoneNumber() || orderedAccounts[0]?.phoneNumber;
+          terminalHealthDashboard.setMasterPhoneNumber(masterPhone);
         }
 
         // Check for device recovery (Phase 3)
@@ -258,11 +309,12 @@ async function initializeBot() {
         const wasLinked = await recoveryManager.wasDevicePreviouslyLinked(config.phoneNumber);
         const savedState = sessionStateManager.getAccountState(config.phoneNumber);
 
-        if (wasLinked && savedState?.deviceLinked) {
+        // SAFETY: Only attempt restore if BOTH conditions are true
+        if (wasLinked === true && savedState?.deviceLinked === true) {
           logBot(`Found previous device session - attempting restore...`, "success");
           setupRestoreFlow(client, config.phoneNumber, config);
         } else {
-          logBot(`New device linking required - showing QR code...`, "info");
+          logBot(`New device linking required (wasLinked: ${wasLinked}, savedState: ${savedState?.deviceLinked}) - showing QR code...`, "info");
           createDeviceStatusFile(config.phoneNumber);
           setupNewLinkingFlow(client, config.phoneNumber, config.id);
         }
@@ -397,6 +449,16 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
 
   client.once("authenticated", () => {
     logBot(`✅ Session authenticated (${phoneNumber})`, "success");
+    
+    // Update device status file
+    const now = new Date().toISOString();
+    updateDeviceStatus(phoneNumber, {
+      deviceLinked: true,
+      linkedAt: now,
+      lastConnected: now,
+      authMethod: 'restore',
+    });
+    
     sessionStateManager.saveAccountState(phoneNumber, {
       phoneNumber: phoneNumber,
       displayName: config?.displayName || "Unknown Account",
@@ -406,13 +468,14 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
       lastKnownState: "authenticated"
     });
     
-    // NEW: Mark device as linked in device manager
+    // Mark device as linked in device manager
     if (deviceLinkedManager) {
       deviceLinkedManager.markDeviceLinked(phoneNumber, {
-        linkedAt: new Date().toISOString(),
+        linkedAt: now,
         authMethod: 'restore',
         ipAddress: null,
       });
+      logBot(`📊 Device manager updated (restore) for ${phoneNumber}`, "success");
       sessionStateManager.recordDeviceLinkEvent(phoneNumber, 'success');
     }
   });
@@ -449,10 +512,17 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
     isInitializing = false;
   });
 
-  client.once("auth_failure", (msg) => {
+  client.once("auth_failure", async (msg) => {
     logBot(`Session restore failed for ${phoneNumber}: ${msg}`, "error");
-    logBot("Will need to re-authenticate with new QR code", "warn");
-    isInitializing = false;
+    logBot("Falling back to new QR code authentication...", "warn");
+    
+    // FALLBACK: Setup new QR code linking instead of failing
+    try {
+      setupNewLinkingFlow(client, phoneNumber, config?.id || phoneNumber);
+    } catch (error) {
+      logBot(`Fallback QR setup failed: ${error.message}`, "error");
+      isInitializing = false;
+    }
   });
 
   client.on("disconnected", (reason) => {
@@ -488,6 +558,7 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
 
   let qrShown = false;
   let authComplete = false;
+  let initializationStarted = false;
 
   client.on("qr", async (qr) => {
     if (!qrShown) {
@@ -515,13 +586,23 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
     authComplete = true;
     logBot(`✅ Device linked (${phoneNumber})`, "success");
     
-    // NEW: Mark device as linked in device manager
+    // Update device status file
+    const now = new Date().toISOString();
+    updateDeviceStatus(phoneNumber, {
+      deviceLinked: true,
+      linkedAt: now,
+      lastConnected: now,
+      authMethod: 'qr',
+    });
+    
+    // Mark device as linked in device manager
     if (deviceLinkedManager) {
       deviceLinkedManager.markDeviceLinked(phoneNumber, {
-        linkedAt: new Date().toISOString(),
+        linkedAt: now,
         authMethod: 'qr',
         ipAddress: null,
       });
+      logBot(`📊 Device manager updated for ${phoneNumber}`, "success");
     }
     
     sessionStateManager.saveAccountState(phoneNumber, {
@@ -572,8 +653,19 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
     logBot(`Error during linking (${phoneNumber}): ${error.message}`, "error");
   });
 
-  logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
-  client.initialize();
+  // CRITICAL: Always initialize client to trigger QR event
+  if (!initializationStarted) {
+    initializationStarted = true;
+    logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
+    try {
+      client.initialize();
+    } catch (error) {
+      logBot(`Failed to initialize client: ${error.message}`, "error");
+      if (!error.message.includes("browser is already running")) {
+        throw error;
+      }
+    }
+  }
 }
 
 /**
@@ -591,14 +683,20 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
 
     try {
       // ═════════════════════════════════════════════════════════════════════════════
-      // LINDA AI COMMAND SYSTEM - Check for commands first (! prefix)
+      // LINDA AI COMMAND SYSTEM - MASTER ACCOUNT ONLY
       // ═════════════════════════════════════════════════════════════════════════════
-      if (commandHandler && msg.body.startsWith('!')) {
+      // Only master account processes commands (has Linda's intelligence)
+      // Secondary accounts are communication channels only
+      const masterPhone = accountConfigManager?.getMasterPhoneNumber();
+      const isMasterAccount = phoneNumber === masterPhone;
+
+      if (isMasterAccount && commandHandler && msg.body.startsWith('!')) {
         const context = {
           deviceCount: deviceLinkedManager ? deviceLinkedManager.getLinkedDevices().length : 0,
           accountCount: accountClients.size,
           client: client,
-          phoneNumber: phoneNumber
+          phoneNumber: phoneNumber,
+          isMasterAccount: true
         };
 
         const cmdResult = await commandHandler.processMessage(msg, phoneNumber, context);
@@ -612,92 +710,101 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
           return;
         }
         // Otherwise, continue to conversation processing
-      }
-
-      // ═════════════════════════════════════════════════════════════════════════════
-      // CONVERSATION ANALYSIS & LEARNING
-      // ═════════════════════════════════════════════════════════════════════════════
-      
-      try {
-        // Phase 3: Conversation type analysis (if enabled)
-        if (typeof logMessageTypeCompact === 'function') {
-          logMessageTypeCompact(msg);
-        }
-      } catch (error) {
-        // Silent fail on analyzer
-      }
-
-      // Phase B: Contact lookup integration
-      try {
-        if (contactHandler && !msg.from.includes("@g.us")) {
-          const contact = await contactHandler.getContact(msg.from);
-          if (contact) {
-            logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, "success");
-          }
-        }
-      } catch (error) {
-        logBot(`⚠️ Contact lookup error: ${error.message}`, "warn");
-      }
-
-      // Phase C: Goraha contact verification command (backward compatible)
-      if (msg.body === "!verify-goraha") {
-        logBot("📌 Goraha verification requested", "info");
+      } else if (!isMasterAccount && msg.body.startsWith('!')) {
+        // Secondary account received command - forward to master or inform user
+        logBot(`📩 Command on secondary account: ${msg.body.substring(0, 30)}`, "info");
         
+        if (masterPhone) {
+          await msg.reply(`📢 Commands are processed by the master account.\n\nYou can still send messages to the master account for help!`);
+        }
+        return;
+      }
+
+      // ═════════════════════════════════════════════════════════════════════════════
+      // CONVERSATION ANALYSIS & LEARNING - MASTER ACCOUNT ONLY
+      // ═════════════════════════════════════════════════════════════════════════════
+      if (isMasterAccount) {
         try {
-          // Initialize service if needed
-          if (!gorahaVerificationService) {
-            gorahaVerificationService = new GorahaContactVerificationService(client);
-            await gorahaVerificationService.initialize();
-            logBot("✅ GorahaContactVerificationService initialized", "success");
-            global.gorahaVerificationService = gorahaVerificationService;
+          // Phase 3: Conversation type analysis (if enabled)
+          if (typeof logMessageTypeCompact === 'function') {
+            logMessageTypeCompact(msg);
           }
-
-          // Send start message
-          await msg.reply("🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI'll send results when complete.");
-          logBot("Starting Goraha verification for all contacts...", "info");
-
-          // Run verification
-          const report = await gorahaVerificationService.verifyAllContacts({
-            autoFetch: true,
-            checkWhatsApp: true,
-            saveResults: true
-          });
-
-          // Print report
-          gorahaVerificationService.printReport(report);
-
-          // Send summary to user
-          const summary = report.summary;
-          let resultMessage = `✅ GORAHA VERIFICATION COMPLETE\n\n`;
-          resultMessage += `📊 Summary:\n`;
-          resultMessage += `• Contacts Checked: ${summary.totalContacts}\n`;
-          resultMessage += `• Valid Numbers: ${summary.validPhoneNumbers}\n`;
-          resultMessage += `• With WhatsApp: ${summary.withWhatsApp}\n`;
-          resultMessage += `• WITHOUT WhatsApp: ${summary.withoutWhatsApp}\n`;
-          resultMessage += `• Coverage: ${summary.percentageWithWhatsApp}\n`;
-
-          if (summary.withoutWhatsApp > 0) {
-            resultMessage += `\n⚠️ ${summary.withoutWhatsApp} number(s) need attention\n`;
-            
-            const numbersList = gorahaVerificationService.getNumbersSansWhatsApp();
-            if (numbersList.length > 0 && numbersList.length <= 10) {
-              resultMessage += `\nNumbers without WhatsApp:\n`;
-              numbersList.forEach((item, idx) => {
-                resultMessage += `${idx + 1}. ${item.name}: ${item.number}\n`;
-              });
-            } else if (numbersList.length > 10) {
-              resultMessage += `\nToo many to list (${numbersList.length} total). Check logs.\n`;
-            }
-          } else {
-            resultMessage += `\n✅ All contacts have WhatsApp accounts!`;
-          }
-
-          await msg.reply(resultMessage);
-          logBot("Verification results sent to user", "success");
-
         } catch (error) {
-          logBot(`❌ Verification error: ${error.message}`, "error");
-          await msg.reply(`❌ Verification failed: ${error.message}`);
+          // Silent fail on analyzer
+        }
+
+        // Phase B: Contact lookup integration
+        try {
+          if (contactHandler && !msg.from.includes("@g.us")) {
+            const contact = await contactHandler.getContact(msg.from);
+            if (contact) {
+              logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, "success");
+            }
+          }
+        } catch (error) {
+          logBot(`⚠️ Contact lookup error: ${error.message}`, "warn");
+        }
+
+        // Phase C: Goraha contact verification command (backward compatible)
+        if (msg.body === "!verify-goraha") {
+          logBot("📌 Goraha verification requested", "info");
+          
+          try {
+            // Initialize service if needed
+            if (!gorahaVerificationService) {
+              gorahaVerificationService = new GorahaContactVerificationService(client);
+              await gorahaVerificationService.initialize();
+              logBot("✅ GorahaContactVerificationService initialized", "success");
+              global.gorahaVerificationService = gorahaVerificationService;
+            }
+
+            // Send start message
+            await msg.reply("🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI'll send results when complete.");
+            logBot("Starting Goraha verification for all contacts...", "info");
+
+            // Run verification
+            const report = await gorahaVerificationService.verifyAllContacts({
+              autoFetch: true,
+              checkWhatsApp: true,
+              saveResults: true
+            });
+
+            // Print report
+            gorahaVerificationService.printReport(report);
+
+            // Send summary to user
+            const summary = report.summary;
+            let resultMessage = `✅ GORAHA VERIFICATION COMPLETE\n\n`;
+            resultMessage += `📊 Summary:\n`;
+            resultMessage += `• Contacts Checked: ${summary.totalContacts}\n`;
+            resultMessage += `• Valid Numbers: ${summary.validPhoneNumbers}\n`;
+            resultMessage += `• With WhatsApp: ${summary.withWhatsApp}\n`;
+            resultMessage += `• WITHOUT WhatsApp: ${summary.withoutWhatsApp}\n`;
+            resultMessage += `• Coverage: ${summary.percentageWithWhatsApp}\n`;
+
+            if (summary.withoutWhatsApp > 0) {
+              resultMessage += `\n⚠️ ${summary.withoutWhatsApp} number(s) need attention\n`;
+              
+              const numbersList = gorahaVerificationService.getNumbersSansWhatsApp();
+              if (numbersList.length > 0 && numbersList.length <= 10) {
+                resultMessage += `\nNumbers without WhatsApp:\n`;
+                numbersList.forEach((item, idx) => {
+                  resultMessage += `${idx + 1}. ${item.name}: ${item.number}\n`;
+                });
+              } else if (numbersList.length > 10) {
+                resultMessage += `\nToo many to list (${numbersList.length} total). Check logs.\n`;
+              }
+            } else {
+              resultMessage += `\n✅ All contacts have WhatsApp accounts!`;
+            }
+
+            await msg.reply(resultMessage);
+            logBot("Verification results sent to user", "success");
+
+          } catch (error) {
+            logBot(`❌ Verification error: ${error.message}`, "error");
+            await msg.reply(`❌ Verification failed: ${error.message}`);
+          }
         }
       }
 

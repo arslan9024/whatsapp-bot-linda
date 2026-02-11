@@ -68,6 +68,14 @@ export class LindaCommandHandler {
     // Sheets Commands
     this.registerHandler('list-sheets', this.handleListSheets.bind(this));
     this.registerHandler('sheet-info', this.handleSheetInfo.bind(this));
+
+    // Account Management Commands (NEW - February 11, 2026)
+    this.registerHandler('add-account', this.handleAddAccount.bind(this));
+    this.registerHandler('list-accounts', this.handleListAccounts.bind(this));
+    this.registerHandler('remove-account', this.handleRemoveAccount.bind(this));
+    this.registerHandler('set-master', this.handleSetMaster.bind(this));
+    this.registerHandler('enable-account', this.handleEnableAccount.bind(this));
+    this.registerHandler('disable-account', this.handleDisableAccount.bind(this));
   }
 
   /**
@@ -83,18 +91,22 @@ export class LindaCommandHandler {
   async processMessage(msg, phoneNumber, context = {}) {
     try {
       const messageBody = msg.body.trim();
+      const isMasterAccount = context.isMasterAccount || false;
+      const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
 
       // Check if message is a command (starts with !)
       if (!messageBody.startsWith('!')) {
-        // Not a command - log as conversation for learning
-        await this.learner.logConversation({
-          phoneNumber,
-          message: messageBody,
-          isFromUser: !msg.fromMe,
-          timestamp: new Date(),
-          chatId: msg.from,
-          messageId: msg.id
-        });
+        // Not a command - log as conversation for learning (master account only)
+        if (isMasterAccount) {
+          await this.learner.logConversation({
+            phoneNumber,
+            message: messageBody,
+            isFromUser: !msg.fromMe,
+            timestamp: new Date(),
+            chatId: msg.from,
+            messageId: msg.id
+          });
+        }
         return { isCommand: false, processed: false };
       }
 
@@ -212,15 +224,20 @@ export class LindaCommandHandler {
     // This is a simple placeholder that most commands will override
 
     // Some commands require no args
-    if (command === 'help' || command === 'status' || command === 'health') {
+    if (command === 'help' || command === 'status' || command === 'health' || command === 'list-accounts') {
       return { valid: true };
     }
 
     // Some commands require at least 1 arg
-    if (['find-contact', 'device-status', 'sheet-info', 'learn'].includes(command)) {
+    if (['find-contact', 'device-status', 'sheet-info', 'learn', 'remove-account', 'set-master', 'enable-account', 'disable-account'].includes(command)) {
       if (args.length === 0) {
         return { valid: false, error: `\`${command}\` requires arguments.` };
       }
+    }
+
+    // add-account requires at least 2 args (phone and name)
+    if (command === 'add-account' && args.length < 2) {
+      return { valid: false, error: `\`add-account\` requires phone number and account name.` };
     }
 
     return { valid: true };
@@ -313,8 +330,14 @@ export class LindaCommandHandler {
 
   async handleStatus({ msg, context }) {
     const stats = this.getUsageStats();
+    const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
+    const isMaster = context.phoneNumber === masterPhone;
+    const accountInfo = global.accountConfigManager?.getAccount(context.phoneNumber) || {};
+    
     let statusText = `\n📊 **LINDA STATUS**\n\n`;
     statusText += `✅ Status: Online\n`;
+    statusText += `📱 Account: ${accountInfo.displayName || context.phoneNumber}\n`;
+    statusText += `${isMaster ? '👑' : '📱'} Role: ${isMaster ? 'Master (Intelligence Hub)' : 'Secondary (Communication)'}\n`;
     statusText += `⏱️  Uptime: ${stats.uptimeFormatted}\n`;
     statusText += `📈 Total Commands: ${stats.totalCommands}\n`;
     statusText += `✅ Successful: ${stats.successCount}\n`;
@@ -325,10 +348,15 @@ export class LindaCommandHandler {
     await msg.reply(statusText);
   }
 
-  async handleHelp({ msg, args }) {
+  async handleHelp({ msg, args, context }) {
+    const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
+    const isMaster = context?.phoneNumber === masterPhone;
+    
     if (args.length === 0) {
       // General help
       let helpText = `\n📚 **LINDA COMMAND HELP**\n\n`;
+      helpText += `${isMaster ? '👑 MASTER ACCOUNT' : '📱 SECONDARY ACCOUNT'}\n`;
+      helpText += `${isMaster ? 'You have full command access' : 'Send commands to master account for processing'}\n\n`;
       helpText += `Type \`!help <command>\` for details.\n\n`;
 
       for (const category of this.registry.getCategories()) {
@@ -578,6 +606,229 @@ export class LindaCommandHandler {
     const sheetName = args.join(' ');
     await msg.reply(`📄 Sheet Info: ${sheetName}\n\n(Sheet info coming soon)`);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACCOUNT MANAGEMENT COMMANDS (NEW - February 11, 2026)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !add-account <phone> <name>
+   * Add a new WhatsApp account
+   */
+  async handleAddAccount({ msg, args, context }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    if (args.length < 2) {
+      await msg.reply(
+        `Usage: \`!add-account <phone> <name>\`\n\n` +
+        `Example: \`!add-account +971501234567 'My Main Account'\``
+      );
+      return;
+    }
+
+    const phone = args[0];
+    const name = args.slice(1).join(' ').replace(/['"]/g, '');
+
+    const result = await accountConfigManager.addAccount({
+      phone,
+      displayName: name,
+      accountId: `account-${Date.now()}`,
+      role: 'secondary'
+    });
+
+    if (result.success) {
+      const account = result.account;
+      await msg.reply(
+        `✅ **Account Added Successfully**\n\n` +
+        `📱 Name: ${account.displayName}\n` +
+        `☎️  Phone: ${account.phoneNumber}\n` +
+        `🆔 ID: ${account.id}\n` +
+        `⚙️  Status: ${account.status}\n\n` +
+        `💡 Next: Scan QR code to link this account`
+      );
+    } else {
+      await msg.reply(`❌ Error: ${result.error}`);
+    }
+  }
+
+  /**
+   * !list-accounts
+   * List all configured accounts
+   */
+  async handleListAccounts({ msg }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    const accounts = accountConfigManager.getAllAccounts();
+    const masterAccount = accountConfigManager.getMasterAccount();
+
+    if (accounts.length === 0) {
+      await msg.reply(
+        `📱 **No Accounts Configured**\n\n` +
+        `Use: \`!add-account <phone> <name>\`\n` +
+        `Example: \`!add-account +971501234567 'My Account'\``
+      );
+      return;
+    }
+
+    let text = `\n📱 **CONFIGURED ACCOUNTS** (${accounts.length})\n\n`;
+    text += `Master Account: ${masterAccount?.displayName || 'Not Set'}\n\n`;
+
+    accounts.forEach((account, idx) => {
+      const roleIcon = account.role === 'primary' ? '👑' : '📱';
+      const statusIcon = account.status === 'active' ? '✅' : '⏳';
+      const enabledIcon = account.enabled ? '🟢' : '🔴';
+
+      text += `${idx + 1}. ${roleIcon} ${account.displayName}\n`;
+      text += `   ID: \`${account.id}\`\n`;
+      text += `   Phone: ${account.phoneNumber}\n`;
+      text += `   Status: ${statusIcon} ${account.status || 'pending'}\n`;
+      text += `   Enabled: ${enabledIcon} ${account.enabled ? 'Yes' : 'No'}\n\n`;
+    });
+
+    text += `💡 Commands:\n`;
+    text += `• Remove: \`!remove-account <id>\`\n`;
+    text += `• Master: \`!set-master <id>\`\n`;
+    text += `• Enable: \`!enable-account <id>\`\n`;
+    text += `• Disable: \`!disable-account <id>\``;
+
+    await msg.reply(text);
+  }
+
+  /**
+   * !remove-account <account-id>
+   * Remove an account
+   */
+  async handleRemoveAccount({ msg, args }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    if (args.length === 0) {
+      await msg.reply(`Usage: \`!remove-account <account-id>\``);
+      return;
+    }
+
+    const accountId = args[0];
+    const result = await accountConfigManager.removeAccount(accountId);
+
+    if (result.success) {
+      await msg.reply(
+        `✅ ${result.message}\n\n` +
+        `📝 Note: Device session still exists on WhatsApp\n` +
+        `Use WhatsApp Settings > Linked Devices to revoke access`
+      );
+    } else {
+      await msg.reply(`❌ Error: ${result.error}`);
+    }
+  }
+
+  /**
+   * !set-master <account-id>
+   * Set account as master (primary)
+   */
+  async handleSetMaster({ msg, args }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    if (args.length === 0) {
+      await msg.reply(`Usage: \`!set-master <account-id>\``);
+      return;
+    }
+
+    const accountId = args[0];
+    const result = await accountConfigManager.setMasterAccount(accountId);
+
+    if (result.success) {
+      // Update terminal dashboard
+      const masterAccount = accountConfigManager.getMasterAccount();
+      const terminalDashboard = global.terminalHealthDashboard;
+      if (terminalDashboard && masterAccount) {
+        terminalDashboard.setMasterPhoneNumber(masterAccount.phoneNumber);
+      }
+
+      await msg.reply(
+        `✅ **Master Account Updated**\n\n` +
+        `${result.message}\n\n` +
+        `👑 This account is now the primary account for Linda`
+      );
+    } else {
+      await msg.reply(`❌ Error: ${result.error}`);
+    }
+  }
+
+  /**
+   * !enable-account <account-id>
+   * Enable an account
+   */
+  async handleEnableAccount({ msg, args }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    if (args.length === 0) {
+      await msg.reply(`Usage: \`!enable-account <account-id>\``);
+      return;
+    }
+
+    const accountId = args[0];
+    const result = await accountConfigManager.enableAccount(accountId);
+
+    if (result.success) {
+      await msg.reply(
+        `✅ ${result.message}\n\n` +
+        `🟢 Account is now enabled\n` +
+        `⚬ Restart Linda to activate this account`
+      );
+    } else {
+      await msg.reply(`❌ Error: ${result.error}`);
+    }
+  }
+
+  /**
+   * !disable-account <account-id>
+   * Disable an account
+   */
+  async handleDisableAccount({ msg, args }) {
+    const accountConfigManager = global.accountConfigManager;
+    if (!accountConfigManager) {
+      await msg.reply(`❌ Account manager not initialized`);
+      return;
+    }
+
+    if (args.length === 0) {
+      await msg.reply(`Usage: \`!disable-account <account-id>\``);
+      return;
+    }
+
+    const accountId = args[0];
+    const result = await accountConfigManager.disableAccount(accountId);
+
+    if (result.success) {
+      await msg.reply(
+        `✅ ${result.message}\n\n` +
+        `🔴 Account is now disabled\n` +
+        `⚬ Will not be initialized on next restart`
+      );
+    } else {
+      await msg.reply(`❌ Error: ${result.error}`);
+    }
+  }
 }
 
 export default LindaCommandHandler;
+

@@ -428,6 +428,92 @@ export class LindaCommandRegistry {
     });
 
     // ════════════════════════════════════════════════════════════════════════
+    // CATEGORY 4.5: ACCOUNT MANAGEMENT (NEW - February 11, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    
+    this.registerCommand({
+      name: 'add-account',
+      category: 'accounts',
+      description: 'Add a new WhatsApp account',
+      usage: '!add-account <phone> <name>',
+      examples: [
+        '!add-account +971501234567 "My Main Account"',
+        '!add-account +971559876543 Main Office'
+      ],
+      requiresAuth: false,
+      handler: 'AddAccountHandler',
+      helpText: 'Adds a new WhatsApp account to Linda. Requires phone number and display name.'
+    });
+
+    this.registerCommand({
+      name: 'list-accounts',
+      category: 'accounts',
+      description: 'List all configured WhatsApp accounts',
+      usage: '!list-accounts',
+      examples: [
+        '!list-accounts',
+        '!accounts'
+      ],
+      requiresAuth: false,
+      handler: 'ListAccountsHandler',
+      helpText: 'Shows all configured accounts, their status, and master account.'
+    });
+
+    this.registerCommand({
+      name: 'remove-account',
+      category: 'accounts',
+      description: 'Remove a WhatsApp account',
+      usage: '!remove-account <account-id>',
+      examples: [
+        '!remove-account account-1234567890',
+        '!remove-account old-device'
+      ],
+      requiresAuth: true,
+      handler: 'RemoveAccountHandler',
+      helpText: 'Removes an account from Linda. Requires authentication.'
+    });
+
+    this.registerCommand({
+      name: 'set-master',
+      category: 'accounts',
+      description: 'Set primary WhatsApp account',
+      usage: '!set-master <account-id>',
+      examples: [
+        '!set-master account-1234567890',
+        '!set-master main-office'
+      ],
+      requiresAuth: true,
+      handler: 'SetMasterHandler',
+      helpText: 'Sets the primary account for Linda operations. Requires authentication.'
+    });
+
+    this.registerCommand({
+      name: 'enable-account',
+      category: 'accounts',
+      description: 'Enable a WhatsApp account',
+      usage: '!enable-account <account-id>',
+      examples: [
+        '!enable-account account-1234567890'
+      ],
+      requiresAuth: true,
+      handler: 'EnableAccountHandler',
+      helpText: 'Enables an account. Will be initialized on next restart.'
+    });
+
+    this.registerCommand({
+      name: 'disable-account',
+      category: 'accounts',
+      description: 'Disable a WhatsApp account',
+      usage: '!disable-account <account-id>',
+      examples: [
+        '!disable-account account-1234567890'
+      ],
+      requiresAuth: true,
+      handler: 'DisableAccountHandler',
+      helpText: 'Disables an account. Will not be initialized on next restart.'
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
     // CATEGORY 5: LEARNING & CONVERSATION LOGGING
     // ════════════════════════════════════════════════════════════════════════
     
