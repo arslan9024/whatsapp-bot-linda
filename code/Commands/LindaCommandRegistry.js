@@ -590,6 +590,526 @@ export class LindaCommandRegistry {
       handler: 'PingHandler',
       helpText: 'Simple connectivity test. Linda responds with pong.'
     });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CATEGORY 6: PHASE 1 - MESSAGE ENHANCEMENT (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    this.registerCommand({
+      name: 'edit-msg',
+      category: 'messageman',
+      description: 'Edit a previously sent message',
+      usage: '!edit-msg <messageId> <newContent>',
+      examples: [
+        '!edit-msg abc123 Updated information here',
+        '!edit-msg 5678 Corrected spelling'
+      ],
+      requiresAuth: false,
+      handler: 'EditMessageHandler',
+      helpText: 'Edit your own message. Message ID found in message details.'
+    });
+
+    this.registerCommand({
+      name: 'delete-msg',
+      category: 'messageman',
+      description: 'Delete a message',
+      usage: '!delete-msg <messageId> [everyone]',
+      examples: [
+        '!delete-msg abc123',
+        '!delete-msg def456 everyone'
+      ],
+      requiresAuth: false,
+      handler: 'DeleteMessageHandler',
+      helpText: 'Delete your message. Optionally delete for everyone.'
+    });
+
+    this.registerCommand({
+      name: 'react',
+      category: 'messageman',
+      description: 'Add emoji reaction to message',
+      usage: '!react <messageId> <emoji>',
+      examples: [
+        '!react abc123 ❤️',
+        '!react def456 😂',
+        '!react xyz789 🔥'
+      ],
+      requiresAuth: false,
+      aliases: ['emoji', 'react-msg'],
+      handler: 'ReactToMessageHandler',
+      helpText: 'Emoji options: ❤️ 😂 😮 😢 🙏 🔥'
+    });
+
+    this.registerCommand({
+      name: 'get-reactions',
+      category: 'messageman',
+      description: 'View all reactions on a message',
+      usage: '!get-reactions <messageId>',
+      examples: [
+        '!get-reactions abc123',
+        '!get-reactions msg-xyz'
+      ],
+      requiresAuth: false,
+      aliases: ['view-reactions', 'reactions'],
+      handler: 'GetReactionsHandler',
+      helpText: 'Shows emoji count and details for all reactions.'
+    });
+
+    this.registerCommand({
+      name: 'forward-msg',
+      category: 'messageman',
+      description: 'Forward message to another chat',
+      usage: '!forward-msg <messageId> <chatId>',
+      examples: [
+        '!forward-msg abc123 971501234567',
+        '!forward-msg def456 group-xyz'
+      ],
+      requiresAuth: false,
+      handler: 'ForwardMessageHandler',
+      helpText: 'Forward to another person or group.'
+    });
+
+    this.registerCommand({
+      name: 'pin-msg',
+      category: 'messageman',
+      description: 'Pin a message in chat',
+      usage: '!pin-msg <messageId>',
+      examples: [
+        '!pin-msg abc123',
+        '!pin-msg important-msg'
+      ],
+      requiresAuth: false,
+      handler: 'PinMessageHandler',
+      helpText: 'Pin message to top of chat.'
+    });
+
+    this.registerCommand({
+      name: 'unpin-msg',
+      category: 'messageman',
+      description: 'Unpin a message',
+      usage: '!unpin-msg <messageId>',
+      examples: [
+        '!unpin-msg abc123'
+      ],
+      requiresAuth: false,
+      handler: 'UnpinMessageHandler',
+      helpText: 'Remove pin from message.'
+    });
+
+    this.registerCommand({
+      name: 'star-msg',
+      category: 'messageman',
+      description: 'Star/bookmark a message',
+      usage: '!star-msg <messageId>',
+      examples: [
+        '!star-msg abc123',
+        '!save-msg important-msg'
+      ],
+      requiresAuth: false,
+      aliases: ['bookmark-msg', 'favorite-msg'],
+      handler: 'StarMessageHandler',
+      helpText: 'Save message to favorites for quick access.'
+    });
+
+    this.registerCommand({
+      name: 'reaction-stats',
+      category: 'messageman',
+      description: 'Get reaction statistics for chat',
+      usage: '!reaction-stats [period]',
+      examples: [
+        '!reaction-stats',
+        '!reaction-stats today',
+        '!reaction-stats week'
+      ],
+      requiresAuth: false,
+      aliases: ['emoji-stats', 'sentiment'],
+      handler: 'ReactionStatsHandler',
+      helpText: 'Show emoji breakdown and sentiment trends.'
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CATEGORY 7: PHASE 1 - GROUP MANAGEMENT (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    this.registerCommand({
+      name: 'create-group',
+      category: 'groups',
+      description: 'Create a new WhatsApp group',
+      usage: '!create-group <name> <phone1> <phone2>...',
+      examples: [
+        '!create-group "Team Meeting" 971501234567 971509876543',
+        '!create-group "Project Alpha" +971501234567 +971509876543'
+      ],
+      requiresAuth: true,
+      handler: 'CreateGroupHandler',
+      helpText: 'Creates group with specified members. Minimum 1 member required.'
+    });
+
+    this.registerCommand({
+      name: 'add-group',
+      category: 'groups',
+      description: 'Add members to existing group',
+      usage: '!add-group <groupId> <phone1> <phone2> ...',
+      examples: [
+        '!add-group group-123 971501234567 971509876543',
+        '!add-group teams +971501234567'
+      ],
+      requiresAuth: true,
+      aliases: ['invite-group'],
+      handler: 'AddGroupMembersHandler',
+      helpText: 'Add one or more members to group.'
+    });
+
+    this.registerCommand({
+      name: 'remove-group',
+      category: 'groups',
+      description: 'Remove members from group',
+      usage: '!remove-group <groupId> <phone>',
+      examples: [
+        '!remove-group group-123 971501234567',
+        '!kick-group teams +971509876543'
+      ],
+      requiresAuth: true,
+      aliases: ['kick-group'],
+      handler: 'RemoveGroupMembersHandler',
+      helpText: 'Remove member(s) from group.'
+    });
+
+    this.registerCommand({
+      name: 'promote-admin',
+      category: 'groups',
+      description: 'Promote member to group admin',
+      usage: '!promote-admin <groupId> <phone>',
+      examples: [
+        '!promote-admin group-123 971501234567',
+        '!make-admin teams +971509876543'
+      ],
+      requiresAuth: true,
+      handler: 'PromoteAdminHandler',
+      helpText: 'Give admin privileges to group member.'
+    });
+
+    this.registerCommand({
+      name: 'demote-admin',
+      category: 'groups',
+      description: 'Demote group admin',
+      usage: '!demote-admin <groupId> <phone>',
+      examples: [
+        '!demote-admin group-123 971501234567',
+        '!remove-admin teams +971509876543'
+      ],
+      requiresAuth: true,
+      handler: 'DemoteAdminHandler',
+      helpText: 'Remove admin privileges from member.'
+    });
+
+    this.registerCommand({
+      name: 'group-info',
+      category: 'groups',
+      description: 'Get group information',
+      usage: '!group-info <groupId>',
+      examples: [
+        '!group-info group-123',
+        '!group-info teams'
+      ],
+      requiresAuth: false,
+      aliases: ['group-details', 'ginfo'],
+      handler: 'GroupInfoHandler',
+      helpText: 'Shows members, admins, description, creation date.'
+    });
+
+    this.registerCommand({
+      name: 'group-invite',
+      category: 'groups',
+      description: 'Get/share group invite link',
+      usage: '!group-invite <groupId>',
+      examples: [
+        '!group-invite group-123',
+        '!group-invite teams'
+      ],
+      requiresAuth: false,
+      handler: 'GroupInviteHandler',
+      helpText: 'Generate shareable invite link for group.'
+    });
+
+    this.registerCommand({
+      name: 'group-members',
+      category: 'groups',
+      description: 'List all group members',
+      usage: '!group-members <groupId>',
+      examples: [
+        '!group-members group-123',
+        '!members teams'
+      ],
+      requiresAuth: false,
+      aliases: ['members'],
+      handler: 'GroupMembersHandler',
+      helpText: 'Shows all members with admin status.'
+    });
+
+    this.registerCommand({
+      name: 'approval-requests',
+      category: 'groups',
+      description: 'View pending group membership requests',
+      usage: '!approval-requests <groupId>',
+      examples: [
+        '!approval-requests group-123',
+        '!pending-requests teams'
+      ],
+      requiresAuth: true,
+      aliases: ['pending-requests'],
+      handler: 'MembershipRequestsHandler',
+      helpText: 'Show users waiting to join group.'
+    });
+
+    this.registerCommand({
+      name: 'approve-request',
+      category: 'groups',
+      description: 'Approve membership request',
+      usage: '!approve-request <groupId> <userId>',
+      examples: [
+        '!approve-request group-123 user-xyz',
+        '!approve teams +971501234567'
+      ],
+      requiresAuth: true,
+      handler: 'ApproveRequestHandler',
+      helpText: 'Allow user to join group.'
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CATEGORY 8: PHASE 1 - CHAT ORGANIZATION (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    this.registerCommand({
+      name: 'pin-chat',
+      category: 'chatorg',
+      description: 'Pin chat to top of list',
+      usage: '!pin-chat <chatId>',
+      examples: [
+        '!pin-chat 971501234567',
+        '!pin contact-name'
+      ],
+      requiresAuth: false,
+      handler: 'PinChatHandler',
+      helpText: 'Pin conversation to show at top.'
+    });
+
+    this.registerCommand({
+      name: 'unpin-chat',
+      category: 'chatorg',
+      description: 'Unpin chat',
+      usage: '!unpin-chat <chatId>',
+      examples: [
+        '!unpin-chat 971501234567'
+      ],
+      requiresAuth: false,
+      handler: 'UnpinChatHandler',
+      helpText: 'Remove pin from conversation.'
+    });
+
+    this.registerCommand({
+      name: 'archive-chat',
+      category: 'chatorg',
+      description: 'Archive conversation',
+      usage: '!archive-chat <chatId>',
+      examples: [
+        '!archive-chat 971501234567',
+        '!archive contact'
+      ],
+      requiresAuth: false,
+      handler: 'ArchiveChatHandler',
+      helpText: 'Move chat to archived section.'
+    });
+
+    this.registerCommand({
+      name: 'unarchive-chat',
+      category: 'chatorg',
+      description: 'Unarchive conversation',
+      usage: '!unarchive-chat <chatId>',
+      examples: [
+        '!unarchive-chat 971501234567'
+      ],
+      requiresAuth: false,
+      handler: 'UnarchiveChatHandler',
+      helpText: 'Restore archived conversation.'
+    });
+
+    this.registerCommand({
+      name: 'mute-chat',
+      category: 'chatorg',
+      description: 'Mute chat notifications',
+      usage: '!mute-chat <chatId> [duration]',
+      examples: [
+        '!mute-chat 971501234567',
+        '!mute-chat contact 3600'
+      ],
+      requiresAuth: false,
+      handler: 'MuteChatHandler',
+      helpText: 'Silence notifications. Duration in seconds (0=indefinite).'
+    });
+
+    this.registerCommand({
+      name: 'unmute-chat',
+      category: 'chatorg',
+      description: 'Unmute chat',
+      usage: '!unmute-chat <chatId>',
+      examples: [
+        '!unmute-chat 971501234567'
+      ],
+      requiresAuth: false,
+      handler: 'UnmuteChatHandler',
+      helpText: 'Restore notifications.'
+    });
+
+    this.registerCommand({
+      name: 'label-chat',
+      category: 'chatorg',
+      description: 'Add label to chat',
+      usage: '!label-chat <chatId> <label>',
+      examples: [
+        '!label-chat 971501234567 premium',
+        '!tag-chat contact vip'
+      ],
+      requiresAuth: false,
+      aliases: ['tag-chat'],
+      handler: 'LabelChatHandler',
+      helpText: 'Organize chats with custom labels.'
+    });
+
+    this.registerCommand({
+      name: 'list-starred',
+      category: 'chatorg',
+      description: 'Show all starred messages',
+      usage: '!list-starred',
+      examples: [
+        '!list-starred',
+        '!favorites'
+      ],
+      requiresAuth: false,
+      aliases: ['favorites', 'bookmarks'],
+      handler: 'ListStarredHandler',
+      helpText: 'Display all bookmarked messages across chats.'
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CATEGORY 9: PHASE 1 - ADVANCED CONTACTS (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    this.registerCommand({
+      name: 'block',
+      category: 'contacts',
+      description: 'Block a contact',
+      usage: '!block <phone>',
+      examples: [
+        '!block 971501234567',
+        '!block spam-number'
+      ],
+      requiresAuth: false,
+      handler: 'BlockContactHandler',
+      helpText: 'Prevent contact from contacting you.'
+    });
+
+    this.registerCommand({
+      name: 'unblock',
+      category: 'contacts',
+      description: 'Unblock a contact',
+      usage: '!unblock <phone>',
+      examples: [
+        '!unblock 971501234567'
+      ],
+      requiresAuth: false,
+      handler: 'UnblockContactHandler',
+      helpText: 'Restore blocked contact.'
+    });
+
+    this.registerCommand({
+      name: 'blocked-list',
+      category: 'contacts',
+      description: 'Show all blocked contacts',
+      usage: '!blocked-list',
+      examples: [
+        '!blocked-list',
+        '!blocks'
+      ],
+      requiresAuth: false,
+      aliases: ['blocks'],
+      handler: 'BlockedListHandler',
+      helpText: 'View all blocked users.'
+    });
+
+    this.registerCommand({
+      name: 'contact-status',
+      category: 'contacts',
+      description: 'Get contact\'s status/bio',
+      usage: '!contact-status <phone>',
+      examples: [
+        '!contact-status 971501234567',
+        '!about @contact-name'
+      ],
+      requiresAuth: false,
+      aliases: ['contact-about'],
+      handler: 'ContactStatusHandler',
+      helpText: 'Show user\'s WhatsApp status/bio.'
+    });
+
+    this.registerCommand({
+      name: 'contact-info',
+      category: 'contacts',
+      description: 'Get detailed contact information',
+      usage: '!contact-info <phone>',
+      examples: [
+        '!contact-info 971501234567',
+        '!info @contact-name'
+      ],
+      requiresAuth: false,
+      aliases: ['info'],
+      handler: 'ContactInfoHandler',
+      helpText: 'Show profile pic, status, devices, account type.'
+    });
+
+    this.registerCommand({
+      name: 'common-groups',
+      category: 'contacts',
+      description: 'Find common groups with contact',
+      usage: '!common-groups <phone>',
+      examples: [
+        '!common-groups 971501234567',
+        '!shared-groups @contact'
+      ],
+      requiresAuth: false,
+      aliases: ['shared-groups'],
+      handler: 'CommonGroupsHandler',
+      helpText: 'Show groups you both are members of.'
+    });
+
+    this.registerCommand({
+      name: 'verify-whatsapp',
+      category: 'contacts',
+      description: 'Check if number is on WhatsApp',
+      usage: '!verify-whatsapp <phone>',
+      examples: [
+        '!verify-whatsapp 971501234567',
+        '!on-wa +971501234567'
+      ],
+      requiresAuth: false,
+      aliases: ['on-wa'],
+      handler: 'VerifyWhatsAppHandler',
+      helpText: 'Validate if number has WhatsApp account.'
+    });
+
+    this.registerCommand({
+      name: 'profile-picture',
+      category: 'contacts',
+      description: 'Get contact\'s profile picture',
+      usage: '!profile-picture <phone>',
+      examples: [
+        '!profile-picture 971501234567',
+        '!pic @contact-name'
+      ],
+      requiresAuth: false,
+      aliases: ['pic', 'avatar'],
+      handler: 'ProfilePictureHandler',
+      helpText: 'Download and show contact profile picture.'
+    });
   }
 
   /**

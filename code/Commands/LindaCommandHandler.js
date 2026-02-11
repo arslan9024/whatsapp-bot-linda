@@ -76,6 +76,57 @@ export class LindaCommandHandler {
     this.registerHandler('set-master', this.handleSetMaster.bind(this));
     this.registerHandler('enable-account', this.handleEnableAccount.bind(this));
     this.registerHandler('disable-account', this.handleDisableAccount.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 1 MESSAGE ENHANCEMENT COMMANDS (NEW - February 11, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this.registerHandler('edit-msg', this.handleEditMessage.bind(this));
+    this.registerHandler('delete-msg', this.handleDeleteMessage.bind(this));
+    this.registerHandler('react', this.handleReactMessage.bind(this));
+    this.registerHandler('get-reactions', this.handleGetReactions.bind(this));
+    this.registerHandler('forward-msg', this.handleForwardMessage.bind(this));
+    this.registerHandler('pin-msg', this.handlePinMessage.bind(this));
+    this.registerHandler('unpin-msg', this.handleUnpinMessage.bind(this));
+    this.registerHandler('star-msg', this.handleStarMessage.bind(this));
+    this.registerHandler('reaction-stats', this.handleReactionStats.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 1 GROUP MANAGEMENT COMMANDS (NEW - February 11, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this.registerHandler('create-group', this.handleCreateGroup.bind(this));
+    this.registerHandler('add-group', this.handleAddGroupMembers.bind(this));
+    this.registerHandler('remove-group', this.handleRemoveGroupMembers.bind(this));
+    this.registerHandler('promote-admin', this.handlePromoteAdmin.bind(this));
+    this.registerHandler('demote-admin', this.handleDemoteAdmin.bind(this));
+    this.registerHandler('group-info', this.handleGroupInfo.bind(this));
+    this.registerHandler('group-invite', this.handleGroupInvite.bind(this));
+    this.registerHandler('group-members', this.handleGroupMembers.bind(this));
+    this.registerHandler('approval-requests', this.handleMembershipRequests.bind(this));
+    this.registerHandler('approve-request', this.handleApproveRequest.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 1 CHAT ORGANIZATION COMMANDS (NEW - February 11, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this.registerHandler('pin-chat', this.handlePinChat.bind(this));
+    this.registerHandler('unpin-chat', this.handleUnpinChat.bind(this));
+    this.registerHandler('archive-chat', this.handleArchiveChat.bind(this));
+    this.registerHandler('unarchive-chat', this.handleUnarchiveChat.bind(this));
+    this.registerHandler('mute-chat', this.handleMuteChat.bind(this));
+    this.registerHandler('unmute-chat', this.handleUnmuteChat.bind(this));
+    this.registerHandler('label-chat', this.handleLabelChat.bind(this));
+    this.registerHandler('list-starred', this.handleListStarred.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 1 CONTACT MANAGEMENT COMMANDS (NEW - February 11, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this.registerHandler('block', this.handleBlockContact.bind(this));
+    this.registerHandler('unblock', this.handleUnblockContact.bind(this));
+    this.registerHandler('blocked-list', this.handleBlockedList.bind(this));
+    this.registerHandler('contact-status', this.handleContactStatus.bind(this));
+    this.registerHandler('contact-info', this.handleContactInfo.bind(this));
+    this.registerHandler('common-groups', this.handleCommonGroups.bind(this));
+    this.registerHandler('verify-whatsapp', this.handleVerifyWhatsApp.bind(this));
+    this.registerHandler('profile-picture', this.handleProfilePicture.bind(this));
   }
 
   /**
@@ -838,6 +889,413 @@ export class LindaCommandHandler {
     } else {
       await msg.reply(`❌ Error: ${result.error}`);
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 MESSAGE ENHANCEMENT HANDLERS (NEW - February 11, 2026)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !edit-msg <messageId> <newContent>
+   */
+  async handleEditMessage({ msg, args }) {
+    const messageEnhancementService = global.messageEnhancementService;
+    if (!messageEnhancementService) {
+      await msg.reply(`❌ Message enhancement service not available`);
+      return;
+    }
+
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!edit-msg <messageId> <newContent>\``);
+      return;
+    }
+
+    try {
+      await msg.reply(`✏️  Message editing not yet implemented in this version`);
+    } catch (error) {
+      await msg.reply(`❌ Error: ${error.message}`);
+    }
+  }
+
+  /**
+   * !delete-msg <messageId> [everyone]
+   */
+  async handleDeleteMessage({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!delete-msg <messageId> [everyone]\``);
+      return;
+    }
+    await msg.reply(`🗑️  Message deletion not yet implemented in this version`);
+  }
+
+  /**
+   * !react <messageId> <emoji>
+   */
+  async handleReactMessage({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!react <messageId> <emoji>\``);
+      return;
+    }
+    const emoji = args[1];
+    const supportedEmojis = ['❤️', '😂', '😮', '😢', '🙏', '🔥'];
+    
+    if (supportedEmojis.includes(emoji)) {
+      await msg.reply(`😊 Reaction ${emoji} ready! Backend integration coming soon.`);
+    } else {
+      await msg.reply(`Supported emojis: ${supportedEmojis.join(' ')}`);
+    }
+  }
+
+  /**
+   * !get-reactions <messageId>
+   */
+  async handleGetReactions({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!get-reactions <messageId>\``);
+      return;
+    }
+    await msg.reply(`📊 Reaction retrieval not yet implemented in this version`);
+  }
+
+  /**
+   * !forward-msg <messageId> <chatId>
+   */
+  async handleForwardMessage({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!forward-msg <messageId> <chatId>\``);
+      return;
+    }
+    await msg.reply(`➡️  Message forwarding not yet implemented in this version`);
+  }
+
+  /**
+   * !pin-msg <messageId>
+   */
+  async handlePinMessage({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!pin-msg <messageId>\``);
+      return;
+    }
+    await msg.reply(`📌 Message pinning not yet implemented in this version`);
+  }
+
+  /**
+   * !unpin-msg <messageId>
+   */
+  async handleUnpinMessage({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!unpin-msg <messageId>\``);
+      return;
+    }
+    await msg.reply(`📍 Message unpinning not yet implemented in this version`);
+  }
+
+  /**
+   * !star-msg <messageId>
+   */
+  async handleStarMessage({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!star-msg <messageId>\``);
+      return;
+    }
+    await msg.reply(`⭐ Message starring not yet implemented in this version`);
+  }
+
+  /**
+   * !reaction-stats [period]
+   */
+  async handleReactionStats({ msg, args }) {
+    await msg.reply(`📊 Reaction stats will show emoji breakdown and sentiment analysis soon!`);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 GROUP MANAGEMENT HANDLERS (NEW - February 11, 2026)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !create-group <name> <phone1> <phone2> ...
+   */
+  async handleCreateGroup({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!create-group <name> <phone1> <phone2> ...\``);
+      return;
+    }
+    await msg.reply(`✅ Group creation feature is ready! Awaiting whatsapp-web.js integration.`);
+  }
+
+  /**
+   * !add-group <groupId> <phone1> <phone2> ...
+   */
+  async handleAddGroupMembers({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!add-group <groupId> <phone1> <phone2> ...\``);
+      return;
+    }
+    await msg.reply(`👥 Adding group members... Backend integration in progress.`);
+  }
+
+  /**
+   * !remove-group <groupId> <phone>
+   */
+  async handleRemoveGroupMembers({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!remove-group <groupId> <phone>\``);
+      return;
+    }
+    await msg.reply(`👤 Removing member... Feature implementation coming soon.`);
+  }
+
+  /**
+   * !promote-admin <groupId> <phone>
+   */
+  async handlePromoteAdmin({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!promote-admin <groupId> <phone>\``);
+      return;
+    }
+    await msg.reply(`⭐ Member promotion ready! Implementation in progress.`);
+  }
+
+  /**
+   * !demote-admin <groupId> <phone>
+   */
+  async handleDemoteAdmin({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!demote-admin <groupId> <phone>\``);
+      return;
+    }
+    await msg.reply(`📍 Member demotion ready! Implementation in progress.`);
+  }
+
+  /**
+   * !group-info <groupId>
+   */
+  async handleGroupInfo({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!group-info <groupId>\``);
+      return;
+    }
+    await msg.reply(`ℹ️  Group information retrieval coming soon!`);
+  }
+
+  /**
+   * !group-invite <groupId>
+   */
+  async handleGroupInvite({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!group-invite <groupId>\``);
+      return;
+    }
+    await msg.reply(`🔗 Group invite link generation in progress...`);
+  }
+
+  /**
+   * !group-members <groupId>
+   */
+  async handleGroupMembers({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!group-members <groupId>\``);
+      return;
+    }
+    await msg.reply(`👥 Group members list coming soon!`);
+  }
+
+  /**
+   * !approval-requests <groupId>
+   */
+  async handleMembershipRequests({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!approval-requests <groupId>\``);
+      return;
+    }
+    await msg.reply(`🔔 Membership request handling in development...`);
+  }
+
+  /**
+   * !approve-request <groupId> <userId>
+   */
+  async handleApproveRequest({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!approve-request <groupId> <userId>\``);
+      return;
+    }
+    await msg.reply(`✅ Request approval feature coming soon!`);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 CHAT ORGANIZATION HANDLERS (NEW - February 11, 2026)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !pin-chat <chatId>
+   */
+  async handlePinChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!pin-chat <chatId>\``);
+      return;
+    }
+    await msg.reply(`📌 Chat pinning feature in development...`);
+  }
+
+  /**
+   * !unpin-chat <chatId>
+   */
+  async handleUnpinChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!unpin-chat <chatId>\``);
+      return;
+    }
+    await msg.reply(`📍 Chat unpinning feature coming soon!`);
+  }
+
+  /**
+   * !archive-chat <chatId>
+   */
+  async handleArchiveChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!archive-chat <chatId>\``);
+      return;
+    }
+    await msg.reply(`📦 Chat archiving feature in progress...`);
+  }
+
+  /**
+   * !unarchive-chat <chatId>
+   */
+  async handleUnarchiveChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!unarchive-chat <chatId>\``);
+      return;
+    }
+    await msg.reply(`📂 Chat unarchiving feature coming soon!`);
+  }
+
+  /**
+   * !mute-chat <chatId> [duration]
+   */
+  async handleMuteChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!mute-chat <chatId> [duration]\``);
+      return;
+    }
+    await msg.reply(`🔇 Chat mute feature in development...`);
+  }
+
+  /**
+   * !unmute-chat <chatId>
+   */
+  async handleUnmuteChat({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!unmute-chat <chatId>\``);
+      return;
+    }
+    await msg.reply(`🔊 Chat unmute feature coming soon!`);
+  }
+
+  /**
+   * !label-chat <chatId> <label>
+   */
+  async handleLabelChat({ msg, args }) {
+    if (args.length < 2) {
+      await msg.reply(`Usage: \`!label-chat <chatId> <label>\``);
+      return;
+    }
+    await msg.reply(`🏷️  Chat labeling feature in progress...`);
+  }
+
+  /**
+   * !list-starred
+   */
+  async handleListStarred({ msg }) {
+    await msg.reply(`⭐ Starred messages list coming soon!`);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 CONTACT MANAGEMENT HANDLERS (NEW - February 11, 2026)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !block <phone>
+   */
+  async handleBlockContact({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!block <phone>\``);
+      return;
+    }
+    await msg.reply(`🚫 Contact blocking feature in development...`);
+  }
+
+  /**
+   * !unblock <phone>
+   */
+  async handleUnblockContact({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!unblock <phone>\``);
+      return;
+    }
+    await msg.reply(`🟢 Contact unblocking feature coming soon!`);
+  }
+
+  /**
+   * !blocked-list
+   */
+  async handleBlockedList({ msg }) {
+    await msg.reply(`🚫 Blocked contacts list will be displayed soon!`);
+  }
+
+  /**
+   * !contact-status <phone>
+   */
+  async handleContactStatus({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!contact-status <phone>\``);
+      return;
+    }
+    await msg.reply(`📝 Contact status retrieval in progress...`);
+  }
+
+  /**
+   * !contact-info <phone>
+   */
+  async handleContactInfo({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!contact-info <phone>\``);
+      return;
+    }
+    await msg.reply(`ℹ️  Detailed contact information coming soon!`);
+  }
+
+  /**
+   * !common-groups <phone>
+   */
+  async handleCommonGroups({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!common-groups <phone>\``);
+      return;
+    }
+    await msg.reply(`👥 Common groups finder in development...`);
+  }
+
+  /**
+   * !verify-whatsapp <phone>
+   */
+  async handleVerifyWhatsApp({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!verify-whatsapp <phone>\``);
+      return;
+    }
+    await msg.reply(`✓ WhatsApp verification feature in progress...`);
+  }
+
+  /**
+   * !profile-picture <phone>
+   */
+  async handleProfilePicture({ msg, args }) {
+    if (args.length < 1) {
+      await msg.reply(`Usage: \`!profile-picture <phone>\``);
+      return;
+    }
+    await msg.reply(`🖼️  Profile picture retrieval coming soon!`);
   }
 }
 

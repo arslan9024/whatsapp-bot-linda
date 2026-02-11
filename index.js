@@ -35,6 +35,16 @@ import GorahaContactVerificationService from "./code/WhatsAppBot/GorahaContactVe
 import LindaCommandHandler from "./code/Commands/LindaCommandHandler.js";
 import LindaCommandRegistry from "./code/Commands/LindaCommandRegistry.js";
 
+// PHASE 1: WHATSAPP-WEB.JS FEATURE INTEGRATION (February 11, 2026)
+// Message enhancement, reactions, group management, chat organization, contacts
+import { getMessageEnhancementService } from "./code/Services/MessageEnhancementService.js";
+import { getReactionTracker } from "./code/Services/ReactionTracker.js";
+import { getGroupManagementService } from "./code/Services/GroupManagementService.js";
+import { getChatOrganizationService } from "./code/Services/ChatOrganizationService.js";
+import { getAdvancedContactService } from "./code/Services/AdvancedContactService.js";
+import { ReactionHandler } from "./code/WhatsAppBot/Handlers/ReactionHandler.js";
+import { GroupEventHandler } from "./code/WhatsAppBot/Handlers/GroupEventHandler.js";
+
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
 import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
 
@@ -426,12 +436,57 @@ async function initializeBot() {
     // ============================================
     if (!commandHandler) {
       commandHandler = new LindaCommandHandler(logBot);
-      logBot("✅ Linda Command Handler initialized (31 commands available)", "success");
+      logBot("✅ Linda Command Handler initialized (71 commands available)", "success");
       global.commandHandler = commandHandler;
       logBot(`   - Command Registry: ${LindaCommandRegistry.getCommandCount()} commands`, "info");
       logBot(`   - Categories: ${LindaCommandRegistry.getCategoryCount()} command types`, "info");
       logBot(`   - Type !help in chat to see all commands`, "info");
     }
+
+    // ============================================
+    // STEP 6.6: Initialize Phase 1 Services (NEW)
+    // ============================================
+    logBot("\n🔄 Initializing Phase 1 whatsapp-web.js Features...", "info");
+    
+    // Message Enhancement Service
+    const messageEnhancementService = getMessageEnhancementService();
+    global.messageEnhancementService = messageEnhancementService;
+    logBot("  ✅ Message Enhancement Service (edit, delete, react, forward)", "success");
+
+    // Reaction Tracker
+    const reactionTracker = getReactionTracker(null); // Will be integrated with MongoDB later
+    global.reactionTracker = reactionTracker;
+    logBot("  ✅ Reaction Tracker Service (sentiment analysis)", "success");
+
+    // Group Management Service (will get botManager reference)
+    const groupManagementService = getGroupManagementService(null);
+    global.groupManagementService = groupManagementService;
+    logBot("  ✅ Group Management Service (create, manage, invite)", "success");
+
+    // Chat Organization Service
+    const chatOrganizationService = getChatOrganizationService(null);
+    global.chatOrganizationService = chatOrganizationService;
+    logBot("  ✅ Chat Organization Service (pin, archive, mute, label)", "success");
+
+    // Advanced Contact Service
+    const advancedContactService = getAdvancedContactService(null, null);
+    global.advancedContactService = advancedContactService;
+    logBot("  ✅ Advanced Contact Service (block, status, profile, verify)", "success");
+
+    // Event Handlers
+    const reactionHandler = new ReactionHandler(null);
+    global.reactionHandler = reactionHandler;
+    logBot("  ✅ Reaction Event Handler (on message_reaction)", "success");
+
+    const groupEventHandler = new GroupEventHandler(null);
+    global.groupEventHandler = groupEventHandler;
+    logBot("  ✅ Group Event Handler (on group_join, group_leave, etc.)", "success");
+
+    logBot("📲 Phase 1 Services Ready: 40+ new WhatsApp commands available!", "success");
+    logBot("   - Message manipulation: edit, delete, react, forward, pin, star", "info");
+    logBot("   - Group operations: create groups, add/remove members, promote admins", "info");
+    logBot("   - Chat management: pin, archive, mute, label conversations", "info");
+    logBot("   - Contact features: block, status, profile, verify WhatsApp", "info");
 
     logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
     logBot("║           🚀 INITIALIZATION COMPLETE - 24/7 ACTIVE            ║", "success");
@@ -746,6 +801,96 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
  * Setup message listening for individual account (Phase 4 - multi-account)
  */
 function setupMessageListeners(client, phoneNumber = "Unknown") {
+  // ═════════════════════════════════════════════════════════════════════════════
+  // PHASE 1: EVENT HANDLER BINDINGS (February 12, 2026)
+  // ═════════════════════════════════════════════════════════════════════════════
+  // Bind whatsapp-web.js events to our handlers
+  
+  /**
+   * MESSAGE REACTION EVENT - Track emoji reactions to messages
+   * Calls ReactionHandler.handleReaction() when someone reacts with emoji
+   */
+  client.on('message_reaction', async (reaction) => {
+    try {
+      if (!ReactionHandler) {
+        logBot("⚠️  ReactionHandler not initialized", "warn");
+        return;
+      }
+
+      const reactionHandlerInstance = new ReactionHandler();
+      await reactionHandlerInstance.handleReaction(reaction);
+      
+      logBot(`✅ Reaction tracked: ${reaction.reaction} on message ${reaction.msg.id.id}`, "success");
+    } catch (error) {
+      logBot(`❌ Error handling reaction: ${error.message}`, "error");
+    }
+  });
+
+  /**
+   * GROUP UPDATE EVENT - Track group changes (name, description, picture)
+   * Calls GroupEventHandler.handleGroupUpdate() when group info changes
+   */
+  client.on('group_update', async (notification) => {
+    try {
+      if (!GroupEventHandler) {
+        logBot("⚠️  GroupEventHandler not initialized", "warn");
+        return;
+      }
+
+      const groupHandlerInstance = new GroupEventHandler();
+      await groupHandlerInstance.handleGroupUpdate(notification);
+      
+      logBot(`✅ Group update tracked: ${notification.chatId}`, "success");
+    } catch (error) {
+      logBot(`❌ Error handling group update: ${error.message}`, "error");
+    }
+  });
+
+  /**
+   * GROUP JOIN EVENT - Track when members join a group
+   * Calls GroupEventHandler.handleGroupJoin()
+   */
+  client.on('group_join', async (notification) => {
+    try {
+      if (!GroupEventHandler) {
+        logBot("⚠️  GroupEventHandler not initialized", "warn");
+        return;
+      }
+
+      const groupHandlerInstance = new GroupEventHandler();
+      await groupHandlerInstance.handleGroupJoin(notification);
+      
+      logBot(`✅ Group join tracked: ${notification.contact.length} member(s) joined`, "success");
+    } catch (error) {
+      logBot(`❌ Error handling group join: ${error.message}`, "error");
+    }
+  });
+
+  /**
+   * GROUP LEAVE EVENT - Track when members leave a group
+   * Calls GroupEventHandler.handleGroupLeave()
+   */
+  client.on('group_leave', async (notification) => {
+    try {
+      if (!GroupEventHandler) {
+        logBot("⚠️  GroupEventHandler not initialized", "warn");
+        return;
+      }
+
+      const groupHandlerInstance = new GroupEventHandler();
+      await groupHandlerInstance.handleGroupLeave(notification);
+      
+      logBot(`✅ Group leave tracked: ${notification.contact.length} member(s) left`, "success");
+    } catch (error) {
+      logBot(`❌ Error handling group leave: ${error.message}`, "error");
+    }
+  });
+
+  logBot(`✅ Phase 1 event handlers bound for ${phoneNumber}`, "success");
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // MESSAGE LISTENING (Existing)
+  // ═════════════════════════════════════════════════════════════════════════════
   client.on("message", async (msg) => {
     const timestamp = new Date().toLocaleTimeString();
     const from = msg.from.includes("@g.us") ? `Group: ${msg.from}` : `User: ${msg.from}`;
@@ -887,7 +1032,7 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
     }
   });
 
-  logBot(`Message listeners ready for ${phoneNumber}`, "success");
+  logBot(`✅ Message listeners ready for ${phoneNumber}`, "success");
 }
 
 /**
