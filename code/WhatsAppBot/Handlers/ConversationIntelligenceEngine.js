@@ -23,6 +23,8 @@ class ConversationIntelligenceEngine {
   constructor(options = {}) {
     this.conversations = new Map();
     this.conversationPatterns = new Map();
+    this.conversationHistory = [];  // ← ADD: For test compatibility
+    this.contextWindow = options.contextWindow || 5;  // ← ADD: Context window size
     this.sentimentThresholds = options.sentimentThresholds || {
       positive: 0.5,
       negative: -0.5
@@ -156,9 +158,13 @@ class ConversationIntelligenceEngine {
 
   /**
    * Analyze sentiment of messages
+   * Handles both single message and array of messages
    */
   analyzeSentiment(messages) {
-    const sentiments = messages.map(msg => {
+    // Handle both single message and array of messages
+    const messageArray = Array.isArray(messages) ? messages : [messages];
+    
+    const sentiments = messageArray.map(msg => {
       const text = msg.text?.toLowerCase() || '';
       const words = text.split(/\s+/);
 
@@ -693,6 +699,38 @@ class ConversationIntelligenceEngine {
       topicsTracked: Object.keys(this.topicKewords).length,
       learningStats: this.getLearningStats()
     };
+  }
+
+  /**
+   * Check if engine is ready (async for compatibility)
+   */
+  async isReady() {
+    return new Promise(resolve => {
+      setTimeout(() => resolve(this.initialized), 10);
+    });
+  }
+
+  /**
+   * Get conversation topic for a contact
+   */
+  getConversationTopic(contactId) {
+    if (!contactId) return 'general';
+    
+    const conversation = this.conversations.get(contactId);
+    if (conversation && conversation.topic) {
+      return conversation.topic;
+    }
+    
+    return 'general';
+  }
+
+  /**
+   * Clear conversation history
+   */
+  clearHistory() {
+    this.conversationHistory = [];
+    this.conversations.clear();
+    return { success: true, cleared: true };
   }
 }
 
