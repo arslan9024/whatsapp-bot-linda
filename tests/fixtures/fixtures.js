@@ -109,7 +109,25 @@ const testFixtures = {
       phone: '+919876543210',
       displayName: 'Linda Secondary 2',
       type: 'secondary'
-    }
+    },
+
+    multiple: [
+      {
+        phone: '+14155552671',
+        displayName: 'Linda Master',
+        type: 'master'
+      },
+      {
+        phone: '+442071838750',
+        displayName: 'Linda Secondary 1',
+        type: 'secondary'
+      },
+      {
+        phone: '+919876543210',
+        displayName: 'Linda Secondary 2',
+        type: 'secondary'
+      }
+    ]
   },
 
   // Batches
