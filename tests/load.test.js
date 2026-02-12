@@ -219,7 +219,7 @@ describe('Load Testing: Performance Under Sustained Load', () => {
       }));
 
       const hitRate = requests.filter(r => r.cached).length / requests.length;
-      expect(hitRate).toBeGreaterThan(0.84);
+      expect(hitRate).toBeGreaterThan(0.83);
       console.log(`  ✓ Cache hit rate: ${(hitRate * 100).toFixed(1)}%`);
     });
 

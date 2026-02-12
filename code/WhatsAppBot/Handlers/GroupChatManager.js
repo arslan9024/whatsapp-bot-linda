@@ -397,6 +397,185 @@ class GroupChatManager {
   }
 
   /**
+   * Track a group for monitoring and analytics
+   */
+  trackGroup(groupChat) {
+    try {
+      const group = {
+        groupId: groupChat.id,
+        name: groupChat.name || 'Unnamed Group',
+        members: [],
+        messageCount: 0,
+        activity: [],
+        rules: [],
+        createdAt: new Date().toISOString()
+      };
+
+      this.groupRegistry.set(groupChat.id, group);
+      logger.info('Group tracked', { groupId: groupChat.id, groupName: group.name });
+
+      return { success: true, groupId: groupChat.id };
+    } catch (error) {
+      logger.error('Failed to track group', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Record activity in a group
+   */
+  recordActivity(groupId, contactId, action) {
+    try {
+      const group = this.groupRegistry.get(groupId);
+      if (!group) {
+        throw new Error(`Group not found: ${groupId}`);
+      }
+
+      group.activity.push({
+        contactId,
+        action,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.info('Activity recorded', { groupId, contactId, action });
+
+      return { success: true, groupId, activity: group.activity.length };
+    } catch (error) {
+      logger.error('Failed to record activity', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Add a rule to the group
+   */
+  addRule(rule) {
+    try {
+      if (!rule || !rule.pattern) {
+        throw new Error('Rule must have a pattern');
+      }
+
+      // Store rule with a unique ID
+      const ruleId = `rule_${Date.now()}`;
+      rule.id = ruleId;
+
+      // Add to all groups that are tracking rules (or create a global rules array)
+      if (!this.rules) {
+        this.rules = [];
+      }
+      this.rules.push(rule);
+
+      logger.info('Rule added', { ruleId, pattern: rule.pattern.toString() });
+
+      return { success: true, ruleId, rule };
+    } catch (error) {
+      logger.error('Failed to add rule', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if message violates group rules
+   */
+  checkMessage(message, groupId) {
+    try {
+      if (!message || !message.body) {
+        return { violated: false, violations: [] };
+      }
+
+      const violations = [];
+      const rules = this.rules || [];
+
+      for (const rule of rules) {
+        if (rule.pattern && rule.pattern.test(message.body)) {
+          violations.push({
+            ruleId: rule.id,
+            action: rule.action,
+            severity: rule.severity,
+            message: `Message matches pattern: ${rule.pattern.toString()}`
+          });
+        }
+      }
+
+      return {
+        violated: violations.length > 0,
+        violations,
+        messageBody: message.body,
+        groupId
+      };
+    } catch (error) {
+      logger.error('Failed to check message', { error: error.message });
+      return { violated: false, violations: [], error: error.message };
+    }
+  }
+
+  /**
+   * Get user participation in group
+   */
+  getUserParticipation(groupId, userId) {
+    try {
+      const group = this.groupRegistry.get(groupId);
+      if (!group) {
+        return null;
+      }
+
+      const activities = group.activity.filter(a => a.contactId === userId) || [];
+      
+      return {
+        userId,
+        groupId,
+        participationCount: activities.length,
+        activities,
+        lastActivity: activities.length > 0 ? activities[activities.length - 1].timestamp : null
+      };
+    } catch (error) {
+      logger.error('Failed to get user participation', { error: error.message });
+      return null;
+    }
+  }
+
+  /**
+   * Get activity log for a group
+   */
+  getActivityLog(groupId) {
+    try {
+      const group = this.groupRegistry.get(groupId);
+      if (!group) {
+        return [];
+      }
+
+      return group.activity || [];
+    } catch (error) {
+      logger.error('Failed to get activity log', { error: error.message });
+      return [];
+    }
+  }
+
+  /**
+   * Get activity summary for a group
+   */
+  getActivitySummary(groupId) {
+    try {
+      const group = this.groupRegistry.get(groupId);
+      if (!group) {
+        return { totalMessages: 0, totalActivity: 0, lastActivity: null };
+      }
+
+      const activity = group.activity || [];
+      return {
+        groupId,
+        totalMessages: group.messageCount || 0,
+        totalActivity: activity.length,
+        lastActivity: activity.length > 0 ? activity[activity.length - 1].timestamp : null,
+        members: group.members ? group.members.length : 0
+      };
+    } catch (error) {
+      logger.error('Failed to get activity summary', { error: error.message });
+      return { totalMessages: 0, totalActivity: 0, lastActivity: null };
+    }
+  }
+
+  /**
    * Get group statistics
    */
   getGroupStats() {

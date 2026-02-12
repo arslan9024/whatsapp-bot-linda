@@ -57,6 +57,10 @@ class WhatsAppMultiAccountManager extends EventEmitter {
    */
   async addAccount(accountConfig) {
     try {
+      if (!accountConfig || !accountConfig.phone) {
+        throw new Error('Account config with phone is required');
+      }
+
       const accountId = accountConfig.id || this.generateAccountId();
 
       // Validate phone number
@@ -92,7 +96,7 @@ class WhatsAppMultiAccountManager extends EventEmitter {
       };
 
       // Check if this should be the master account
-      if (accounts.size === 0 || accountConfig.type === 'master') {
+      if (this.accounts.size === 0 || accountConfig.type === 'master') {
         if (this.masterAccount) {
           // Demote current master to secondary
           const oldMaster = this.accounts.get(this.masterAccount);

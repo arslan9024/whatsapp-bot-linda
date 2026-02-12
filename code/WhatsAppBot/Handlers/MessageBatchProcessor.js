@@ -252,6 +252,53 @@ class MessageBatchProcessor extends EventEmitter {
   }
 
   /**
+   * High-level batch processing (convenience method for integration tests)
+   * Creates, adds messages, and processes a batch
+   */
+  async processBatchMessages(messages, options = {}, botContext = null) {
+    try {
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return { success: false, processed: 0, errors: ['No messages provided'] };
+      }
+
+      // Create batch
+      const batchResult = this.createBatch({
+        name: options.batchName || `batch_${Date.now()}`,
+        priority: options.priority || 'normal'
+      });
+
+      const batchId = batchResult.batchId;
+
+      // Add messages to batch
+      this.addMessagesToBatch(batchId, messages);
+
+      // Process batch with a simple message handler
+      const messageHandler = async (message) => {
+        return { status: 'sent', messageId: message.id };
+      };
+
+      const processResult = await this.processBatch(batchId, messageHandler);
+
+      return {
+        success: true,
+        batchId,
+        processed: messages.length,
+        progress: processResult.progress,
+        duration: processResult.duration,
+        errors: []
+      };
+    } catch (error) {
+      logger.error('Failed to process batch messages', { error: error.message });
+      return {
+        success: false,
+        processed: 0,
+        errors: [error.message]
+      };
+    }
+  }
+
+
+  /**
    * Send message with retry logic
    */
   async sendMessageWithRetry(message, messageHandler, attempt = 0) {

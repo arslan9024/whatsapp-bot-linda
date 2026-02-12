@@ -53,7 +53,9 @@ module.exports = {
   globals: {
     testEnvironment: 'node'
   },
-  maxWorkers: '50%',
+  maxWorkers: 2,
+  maxThreads: 2,
+  workerIdleMemoryLimit: '512M',
   setupFiles: [],
   resetMocks: true,
   restoreMocks: true,

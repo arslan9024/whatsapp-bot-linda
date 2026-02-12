@@ -72,6 +72,23 @@ class CommandExecutor {
    * Register a command
    */
   registerCommand(commandName, handler) {
+    // Handle both (name, handler) and (configObject) signatures
+    if (typeof commandName === 'object' && commandName.name) {
+      const config = commandName;
+      this.commands.set(config.name.toLowerCase(), {
+        name: config.name,
+        handler: config.handler,
+        registeredAt: new Date().toISOString()
+      });
+      logger.info('Command registered', { commandName: config.name });
+      return;
+    }
+
+    // Standard (name, handler) signature
+    if (typeof commandName !== 'string') {
+      throw new Error('Command name must be a string');
+    }
+
     this.commands.set(commandName.toLowerCase(), {
       name: commandName,
       handler,
@@ -528,6 +545,47 @@ class CommandExecutor {
    */
   generateCommandId() {
     return `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Suggest a command based on intent
+   */
+  async suggestCommand(intent) {
+    try {
+      const suggestions = [];
+
+      // Map intents to commands
+      const intentMap = {
+        'greeting': ['help', 'status'],
+        'help': ['help', 'status'],
+        'inquiry': ['help', 'status'],
+        'command': ['execute', 'help'],
+        'feedback': ['feedback', 'help'],
+        'unknown': ['help']
+      };
+
+      const commandSuggestions = intentMap[intent] || ['help'];
+      
+      for (const cmdName of commandSuggestions) {
+        const command = this.commands.get(cmdName);
+        if (command) {
+          suggestions.push({
+            command: cmdName,
+            name: command.name,
+            confidence: 0.85
+          });
+        }
+      }
+
+      return {
+        intent,
+        suggestions,
+        primary: suggestions[0] || null
+      };
+    } catch (error) {
+      logger.error('Failed to suggest command', { error: error.message });
+      return { intent, suggestions: [], error: error.message };
+    }
   }
 
   /**

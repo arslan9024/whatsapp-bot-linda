@@ -48,6 +48,57 @@ class ConversationIntelligenceEngine {
   }
 
   /**
+   * Process a single message and extract intelligence
+   */
+  async processMessage(message, botContext) {
+    try {
+      if (!message || !message.body) {
+        return {
+          success: true,
+          isEmpty: true,
+          messageId: message?.id,
+          timestamp: new Date().toISOString(),
+          contactId: botContext?.contact?.id
+        };
+      }
+
+      const tokens = message.body.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      const sentiment = this.analyzeSentiment([message]);
+      const topics = this.extractTopics([message]);
+      const intents = this.recognizeIntents([message]);
+
+      return {
+        success: true,
+        isEmpty: false,
+        messageId: message.id,
+        timestamp: new Date().toISOString(),
+        contactId: botContext?.contact?.id,
+        analysis: {
+          sentiment: sentiment.overall,
+          sentimentScore: sentiment.score,
+          topics,
+          intents,
+          wordCount: tokens.length
+        },
+        tokens,
+        body: message.body,
+        metadata: {
+          from: botContext?.contact?.id,
+          timestamp: new Date().toISOString(),
+          messageId: message.id
+        }
+      };
+    } catch (error) {
+      logger.error('Error processing message', { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        messageId: message?.id
+      };
+    }
+  }
+
+  /**
    * Initialize topic keywords
    */
   initializeTopicKeywords() {
@@ -322,6 +373,164 @@ class ConversationIntelligenceEngine {
   }
 
   /**
+   * Add message to conversation history
+   */
+  async addToHistory(message, botContext) {
+    try {
+      const conversationId = botContext?.contact?.id || 'unknown';
+      const conversation = this.conversations.get(conversationId) || {
+        messages: [],
+        createdAt: new Date().toISOString()
+      };
+
+      conversation.messages.push({
+        ...message,
+        timestamp: new Date().toISOString(),
+        from: botContext?.contact?.id
+      });
+
+      this.conversations.set(conversationId, conversation);
+      logger.info('Added message to history', { conversationId });
+
+      return { success: true, conversationId };
+    } catch (error) {
+      logger.error('Failed to add to history', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Detect urgency level in message
+   */
+  async detectUrgency(message) {
+    try {
+      if (!message || !message.body) {
+        return { urgency: 'normal', score: 0 };
+      }
+
+      const text = message.body.toLowerCase();
+      const urgencyKeywords = {
+        critical: ['urgent', 'emergency', 'critical', 'asap', 'immediately', 'now', 'crisis'],
+        high: ['important', 'soon', 'quickly', 'hurry', 'rush', 'serious'],
+        normal: ['regular', 'standard', 'whenever', 'no rush']
+      };
+
+      let urgency = 'normal';
+      let score = 0;
+
+      for (const word of urgencyKeywords.critical) {
+        if (text.includes(word)) {
+          urgency = 'critical';
+          score = 0.9;
+          break;
+        }
+      }
+
+      if (urgency === 'normal') {
+        for (const word of urgencyKeywords.high) {
+          if (text.includes(word)) {
+            urgency = 'high';
+            score = 0.6;
+            break;
+          }
+        }
+      }
+
+      return { urgency, score, text };
+    } catch (error) {
+      logger.error('Failed to detect urgency', { error: error.message });
+      return { urgency: 'normal', score: 0, error: error.message };
+    }
+  }
+
+  /**
+   * Extract entities from message (names, numbers, emails, etc.)
+   */
+  async extractEntities(message) {
+    try {
+      if (!message || !message.body) {
+        return { entities: [], names: [], emails: [], phones: [] };
+      }
+
+      const text = message.body;
+      const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
+      const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
+      const nameRegex = /\b[A-Z][a-z]+\s[A-Z][a-z]+\b/g;
+
+      const emails = text.match(emailRegex) || [];
+      const phones = text.match(phoneRegex) || [];
+      const names = text.match(nameRegex) || [];
+
+      const entities = [
+        ...names.map(n => ({ type: 'person', value: n })),
+        ...emails.map(e => ({ type: 'email', value: e })),
+        ...phones.map(p => ({ type: 'phone', value: p }))
+      ];
+
+      return {
+        entities,
+        names,
+        emails,
+        phones,
+        entityCount: entities.length
+      };
+    } catch (error) {
+      logger.error('Failed to extract entities', { error: error.message });
+      return { entities: [], names: [], emails: [], phones: [], error: error.message };
+    }
+  }
+
+  /**
+   * Detect intent of message (simplified version)
+   */
+  async detectIntent(message) {
+    try {
+      if (!message || !message.body) {
+        return { intent: 'unknown', confidence: 0 };
+      }
+
+      const text = message.body.toLowerCase();
+      const intents = this.recognizeIntents([message]);
+
+      if (intents.detected && intents.detected.length > 0) {
+        return {
+          intent: intents.detected[0],
+          intents: intents.detected,
+          confidence: 0.8,
+          text
+        };
+      }
+
+      return { intent: 'unknown', confidence: 0, text };
+    } catch (error) {
+      logger.error('Failed to detect intent', { error: error.message });
+      return { intent: 'unknown', confidence: 0, error: error.message };
+    }
+  }
+
+  /**
+   * Analyze sentiment of a message synchronously and return result
+   */
+  async getSentimentAnalysis(message) {
+    try {
+      if (!message || !message.body) {
+        return { sentiment: 'neutral', score: 0 };
+      }
+
+      const result = this.analyzeSentiment([message]);
+      return {
+        sentiment: result.overall,
+        score: parseFloat(result.score),
+        details: result.details?.[0],
+        category: result.overall
+      };
+    } catch (error) {
+      logger.error('Failed to analyze sentiment', { error: error.message });
+      return { sentiment: 'neutral', score: 0, error: error.message };
+    }
+  }
+
+  /**
    * Learn from conversation feedback
    */
   learnFromFeedback(conversationId, feedback) {
@@ -399,6 +608,61 @@ class ConversationIntelligenceEngine {
     }
 
     return 'neutral';
+  }
+
+  /**
+   * Get conversation history
+   */
+  getConversationHistory(conversationId = null) {
+    try {
+      if (conversationId) {
+        const conversation = this.conversations.get(conversationId);
+        return conversation ? conversation.messages || [] : [];
+      }
+      
+      // Return all conversation messages
+      const allMessages = [];
+      for (const conversation of this.conversations.values()) {
+        if (conversation.messages) {
+          allMessages.push(...conversation.messages);
+        }
+      }
+      return allMessages;
+    } catch (error) {
+      logger.error('Failed to get conversation history', { error: error.message });
+      return [];
+    }
+  }
+
+  /**
+   * Get user profile/information from conversation history
+   */
+  getUserProfile(userId) {
+    try {
+      const conversation = this.conversations.get(userId);
+      if (!conversation) {
+        return {
+          userId,
+          conversationCount: 0,
+          messageCount: 0,
+          preferences: {},
+          lastInteraction: null
+        };
+      }
+
+      const messages = conversation.messages || [];
+      return {
+        userId,
+        conversationCount: 1,
+        messageCount: messages.length,
+        preferences: conversation.preferences || {},
+        lastInteraction: messages.length > 0 ? messages[messages.length - 1].timestamp : null,
+        createdAt: conversation.createdAt
+      };
+    } catch (error) {
+      logger.error('Failed to get user profile', { error: error.message });
+      return { userId, conversationCount: 0, messageCount: 0, preferences: {}, lastInteraction: null };
+    }
   }
 
   /**

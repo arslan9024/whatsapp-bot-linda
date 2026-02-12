@@ -166,6 +166,10 @@ class AdvancedMediaHandler {
    */
   async downloadMedia(media, mediaId) {
     try {
+      if (!media) {
+        return { success: false, error: 'Media object is required' };
+      }
+
       const filename = media.filename || `media_${mediaId}`;
       const fileExtension = this.getFileExtension(media.mimetype);
       const finalFilename = `${mediaId}_${filename}${fileExtension}`;
@@ -178,10 +182,15 @@ class AdvancedMediaHandler {
       // For now, return the path where it would be stored
       logger.info('Media download initiated', { mediaId, path: downloadPath });
 
-      return downloadPath;
+      return {
+        success: true,
+        path: downloadPath,
+        filename: finalFilename,
+        mediaId
+      };
     } catch (error) {
       logger.error('Failed to download media', { error: error.message });
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
@@ -265,8 +274,8 @@ class AdvancedMediaHandler {
   /**
    * Get media type category
    */
-  getMediaType(mimeType) {
-    if (mimeType.startsWith('image/')) return 'image';
+  getMediaType(mimeType) {    if (!mimeType) return 'document';
+    if (typeof mimeType !== 'string') return 'document';    if (mimeType.startsWith('image/')) return 'image';
     if (mimeType.startsWith('video/')) return 'video';
     if (mimeType.startsWith('audio/')) return 'audio';
     return 'document';
