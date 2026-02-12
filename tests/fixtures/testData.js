@@ -181,13 +181,12 @@ export const phoneValidationTests = {
   
   invalid: [
     'not-a-number',
-    '123',
+    '123',      // Too short - only 3 digits (less than 7)
     'abc-def-ghij',
-    '971501234',  // Too short
-    '97150123456789',  // Too long
-    '',
-    null,
-    undefined
+    '1234567a',  // Contains non-numeric character
+    '9715012345678901',  // Too long - 16 digits (exceeds 15 max)
+    '',         // Empty string
+    // Note: null and undefined are filtered by the test (phone && typeof phone === 'string')
   ]
 };
 

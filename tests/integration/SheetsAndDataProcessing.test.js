@@ -467,7 +467,7 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
       for (let i = 0; i < batches; i++) {
         const batchData = Array.from({ length: recordsPerBatch }, (_, idx) => [
           `User ${i}-${idx}`,
-          `971${50 + (idx % 10)}${String(1000000 + idx).slice(-6)}`
+          `971501${String(1000000 + idx).slice(-6)}`  // 971501 + 6 digits = 12 chars total
         ]);
         
         const extracted = await dataService.extractPhoneNumbers(batchData);

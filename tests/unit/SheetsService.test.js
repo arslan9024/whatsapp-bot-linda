@@ -191,7 +191,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ READ OPERATIONS TESTS ============
   describe('Read Operations (getValues)', () => {
     it('should get values from valid spreadsheet and range', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: mockSheetData.simple
       });
 
@@ -205,7 +205,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle empty sheet data', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: mockSheetData.empty
       });
 
@@ -220,7 +220,7 @@ describe('SheetsService Unit Tests', () => {
 
     it('should use default range if not provided', async () => {
       const range = 'Sheet1';
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: mockSheetData.simple
       });
 
@@ -241,7 +241,7 @@ describe('SheetsService Unit Tests', () => {
         ])
       );
 
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: largeData
       });
 
@@ -254,7 +254,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle merged cells gracefully', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: mockSheetData.withMergedCells
       });
 
@@ -271,7 +271,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ GETITEM OPERATIONS TESTS ============
   describe('Read Operations (getCell, getColumn, getRow)', () => {
     it('should get single cell value', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: {
           range: 'Sheet1!B2',
           values: [['john@example.com']]
@@ -287,7 +287,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should get entire column', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: {
           range: 'Sheet1!B:B',
           values: [['Email'], ['john@example.com'], ['jane@example.com']]
@@ -303,7 +303,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should get entire row', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: {
           range: 'Sheet1!2:2',
           values: [['John Doe', 'john@example.com', '971501234567']]
@@ -319,7 +319,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle non-existent cell gracefully', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: { range: 'Sheet1!Z100' }
       });
 
@@ -335,7 +335,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ WRITE OPERATIONS TESTS ============
   describe('Write Operations (appendRow, appendRows)', () => {
     it('should append single row', async () => {
-      mockSheetsAPI.spreadsheets.values.append = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.append = jest.fn().mockResolvedValue({
         data: {
           ...mockAPIResponses.successAppend.data,
           updates: {
@@ -355,7 +355,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should append multiple rows', async () => {
-      mockSheetsAPI.spreadsheets.values.append = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.append = jest.fn().mockResolvedValue({
         data: {
           ...mockAPIResponses.successAppend.data,
           updates: {
@@ -377,7 +377,7 @@ describe('SheetsService Unit Tests', () => {
     it('should format append values correctly', async () => {
       const values = [['Test', 'test@example.com', '971501234567']];
       
-      mockSheetsAPI.spreadsheets.values.append = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.append = jest.fn().mockResolvedValue({
         data: mockAPIResponses.successAppend.data
       });
 
@@ -398,7 +398,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ UPDATE OPERATIONS TESTS ============
   describe('Write Operations (updateCell, updateRange)', () => {
     it('should update single cell', async () => {
-      mockSheetsAPI.spreadsheets.values.update = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.update = jest.fn().mockResolvedValue({
         data: mockAPIResponses.successUpdate.data
       });
 
@@ -413,7 +413,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should update multiple cells in range', async () => {
-      mockSheetsAPI.spreadsheets.values.update = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.update = jest.fn().mockResolvedValue({
         data: {
           ...mockAPIResponses.successUpdate.data,
           updatedRows: 3,
@@ -436,7 +436,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should clear range by updating with empty values', async () => {
-      mockSheetsAPI.spreadsheets.values.update = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.update = jest.fn().mockResolvedValue({
         data: mockAPIResponses.successUpdate.data
       });
 
@@ -453,7 +453,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ BATCH OPERATIONS TESTS ============
   describe('Batch Operations', () => {
     it('should batch update multiple ranges', async () => {
-      mockSheetsAPI.spreadsheets.values.batchUpdate = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.batchUpdate = jest.fn().mockResolvedValue({
         data: {
           responses: [
             { ...mockAPIResponses.successUpdate.data },
@@ -473,7 +473,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle batch append for multiple rows', async () => {
-      mockSheetsAPI.spreadsheets.values.append = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.append = jest.fn().mockResolvedValue({
         data: {
           ...mockAPIResponses.successAppend.data,
           updates: {
@@ -496,7 +496,7 @@ describe('SheetsService Unit Tests', () => {
   // ============ ERROR HANDLING TESTS ============
   describe('Error Handling', () => {
     it('should handle 401 unauthorized error', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockRejectedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockRejectedValue({
         status: 401,
         message: 'Unauthorized'
       });
@@ -510,7 +510,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle 404 not found error', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockRejectedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockRejectedValue({
         status: 404,
         message: 'Spreadsheet not found'
       });
@@ -524,7 +524,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle 400 invalid range error', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockRejectedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockRejectedValue({
         status: 400,
         message: 'The range is invalid'
       });
@@ -538,7 +538,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle 429 rate limit error', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockRejectedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockRejectedValue({
         status: 429,
         message: 'Rate limit exceeded'
       });
@@ -552,7 +552,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle network errors', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockRejectedValue(
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockRejectedValue(
         new Error('Network error')
       );
 
@@ -584,7 +584,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle special characters in data', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: {
           range: 'Sheet1!A1:C2',
           values: [
@@ -603,7 +603,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle emoji and unicode characters', async () => {
-      mockSheetsAPI.spreadsheets.values.append = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.append = jest.fn().mockResolvedValue({
         data: mockAPIResponses.successAppend.data
       });
 
@@ -617,7 +617,7 @@ describe('SheetsService Unit Tests', () => {
     });
 
     it('should handle null and undefined values', async () => {
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: {
           range: 'Sheet1!A1:C3',
           values: [
@@ -642,7 +642,7 @@ describe('SheetsService Unit Tests', () => {
     it('should handle large data retrieval within reasonable time', async () => {
       const startTime = Date.now();
       
-      mockSheetsAPI.spreadsheets.values.get = vi.fn().mockResolvedValue({
+      mockSheetsAPI.spreadsheets.values.get = jest.fn().mockResolvedValue({
         data: createMockSheetData(
           Array.from({ length: 1000 }, (_, i) => [
             `User ${i}`,
