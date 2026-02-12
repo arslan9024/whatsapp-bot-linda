@@ -439,6 +439,16 @@ class MessageTemplateEngine {
 
     return mostUsed;
   }
+
+  /**
+   * Reset engine state for test isolation
+   */
+  reset() {
+    this.templates.clear();
+    this.templateHistory = [];
+    this.initialized = false;
+    logger.debug('MessageTemplateEngine state reset');
+  }
 }
 
 module.exports = MessageTemplateEngine;

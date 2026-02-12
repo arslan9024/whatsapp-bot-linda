@@ -621,6 +621,16 @@ class GroupChatManager {
       createdAt: g.createdAt
     }));
   }
+
+  /**
+   * Reset manager state for test isolation
+   */
+  reset() {
+    this.groupRegistry.clear();
+    this.memberRegistry.clear();
+    this.initialized = false;
+    logger.debug('GroupChatManager state reset');
+  }
 }
 
 module.exports = GroupChatManager;

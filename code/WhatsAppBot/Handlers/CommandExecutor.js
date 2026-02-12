@@ -612,6 +612,17 @@ class CommandExecutor {
       registeredCommands: Array.from(this.commands.keys())
     };
   }
+
+  /**
+   * Reset executor state for test isolation
+   */
+  reset() {
+    this.commands.clear();
+    this.commandHistory = [];
+    this.userContexts.clear();
+    this.initialized = false;
+    logger.debug('CommandExecutor state reset');
+  }
 }
 
 module.exports = CommandExecutor;

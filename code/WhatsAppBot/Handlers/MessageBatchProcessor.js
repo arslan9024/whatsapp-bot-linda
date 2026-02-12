@@ -513,6 +513,23 @@ class MessageBatchProcessor extends EventEmitter {
       metrics: this.getMetrics()
     };
   }
+
+  /**
+   * Reset processor state for test isolation
+   */
+  reset() {
+    this.batches.clear();
+    this.processingBatches.clear();
+    this.metrics = {
+      totalBatches: 0,
+      totalMessages: 0,
+      successfulMessages: 0,
+      failedMessages: 0,
+      retries: 0
+    };
+    this.initialized = false;
+    logger.debug('MessageBatchProcessor state reset');
+  }
 }
 
 module.exports = MessageBatchProcessor;

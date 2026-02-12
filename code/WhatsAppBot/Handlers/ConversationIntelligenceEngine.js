@@ -869,6 +869,17 @@ class ConversationIntelligenceEngine {
       timeSpanDays: 0
     };
   }
+
+  /**
+   * Reset engine state for test isolation
+   */
+  reset() {
+    this.conversations.clear();
+    this.conversationPatterns.clear();
+    this.conversationHistory = [];
+    this.initialized = false;
+    logger.debug('ConversationIntelligenceEngine state reset');
+  }
 }
 
 module.exports = ConversationIntelligenceEngine;

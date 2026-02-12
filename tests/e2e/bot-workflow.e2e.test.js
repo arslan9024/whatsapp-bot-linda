@@ -32,6 +32,13 @@ describe('End-to-End Bot Workflow Tests', () => {
       conversation: new ConversationIntelligenceEngine({ logger: mockLogger })
     };
 
+    // Reset all handlers to ensure clean state for test isolation
+    Object.values(handlers).forEach(handler => {
+      if (handler && typeof handler.reset === 'function') {
+        handler.reset();
+      }
+    });
+
     // Initialize bot state
     botState = {
       running: true,
@@ -39,6 +46,15 @@ describe('End-to-End Bot Workflow Tests', () => {
       messagesProcessed: 0,
       lastActivityTime: Date.now()
     };
+  });
+
+  afterEach(() => {
+    // Reset all handlers after each test to clean up state
+    Object.values(handlers).forEach(handler => {
+      if (handler && typeof handler.reset === 'function') {
+        handler.reset();
+      }
+    });
   });
 
   // ============ SCENARIO 1: CUSTOMER SERVICE FLOW ============

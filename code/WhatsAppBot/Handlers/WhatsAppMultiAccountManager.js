@@ -555,6 +555,19 @@ class WhatsAppMultiAccountManager extends EventEmitter {
     const averageHealth = healthScores.reduce((sum, score) => sum + score, 0) / accounts.length;
     return Math.round(averageHealth);
   }
+
+  /**
+   * Reset manager state for test isolation
+   */
+  reset() {
+    this.accounts.clear();
+    this.accountRouting.clear();
+    this.accountMetrics.clear();
+    this.masterAccount = null;
+    this.secondaryAccounts = [];
+    this.initialized = false;
+    logger.debug('WhatsAppMultiAccountManager state reset');
+  }
 }
 
 module.exports = WhatsAppMultiAccountManager;

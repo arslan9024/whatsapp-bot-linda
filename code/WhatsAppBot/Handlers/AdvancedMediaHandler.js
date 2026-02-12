@@ -347,6 +347,15 @@ class AdvancedMediaHandler {
     logger.info('Media cache cleared', { itemsCleared: count });
     return { success: true, itemsCleared: count };
   }
+
+  /**
+   * Reset handler state for test isolation
+   */
+  reset() {
+    this.mediaCache.clear();
+    this.initialized = false;
+    logger.debug('AdvancedMediaHandler state reset');
+  }
 }
 
 module.exports = AdvancedMediaHandler;
