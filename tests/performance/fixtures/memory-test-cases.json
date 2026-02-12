@@ -1,0 +1,87 @@
+{
+  "memoryThresholds": {
+    "baseline": {
+      "target": 50,
+      "unit": "MB",
+      "description": "Application baseline memory usage"
+    },
+    "peakAllowed": {
+      "target": 150,
+      "unit": "MB",
+      "description": "Maximum allowed peak memory during operations"
+    },
+    "growthPerThousandOps": {
+      "target": 10,
+      "unit": "MB",
+      "description": "Expected memory growth per 1000 operations"
+    },
+    "gcPauseTime": {
+      "target": 100,
+      "unit": "ms",
+      "description": "Target garbage collection pause duration"
+    },
+    "memoryRecovery": {
+      "target": 90,
+      "unit": "%",
+      "description": "Expected percentage of memory recovered after operations"
+    }
+  },
+  "leakDetectionScenarios": [
+    {
+      "name": "Event Listener Accumulation",
+      "operations": 100,
+      "expectedListeners": 0,
+      "tolerance": 5,
+      "description": "Verify event listeners are properly cleaned up"
+    },
+    {
+      "name": "Message Handler Cleanup",
+      "operations": 500,
+      "expectedHandlers": 0,
+      "tolerance": 10,
+      "description": "Verify message handlers don't accumulate"
+    },
+    {
+      "name": "Session Object Cleanup",
+      "operations": 200,
+      "expectedSessions": 0,
+      "tolerance": 5,
+      "description": "Verify session objects are garbage collected"
+    },
+    {
+      "name": "Connection Pool Cleanup",
+      "operations": 100,
+      "expectedConnections": 0,
+      "tolerance": 2,
+      "description": "Verify database connections are released"
+    }
+  ],
+  "profilingConfig": {
+    "sampleInterval": 100,
+    "heapSnapshots": true,
+    "trackAllocations": true,
+    "includeNatives": false,
+    "timelineEvents": true
+  },
+  "gcTestPatterns": [
+    {
+      "name": "Allocation Intensive",
+      "allocationsPerIteration": 1000,
+      "iterations": 10,
+      "expectGCTrigger": true
+    },
+    {
+      "name": "Sustained Load",
+      "allocationsPerIteration": 100,
+      "iterations": 100,
+      "expectGCTrigger": true
+    },
+    {
+      "name": "Cleanup Intensive",
+      "allocationsPerIteration": 500,
+      "iterations": 20,
+      "cleanupBetweenIterations": true,
+      "expectGCTrigger": true
+    }
+  ]
+}

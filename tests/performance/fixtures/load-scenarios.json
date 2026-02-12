@@ -1,0 +1,123 @@
+{
+  "scenarios": {
+    "light": {
+      "name": "Light Load",
+      "concurrentConnections": 10,
+      "messagesPerSecond": 5,
+      "duration": 10,
+      "expectedThroughput": 50
+    },
+    "medium": {
+      "name": "Medium Load",
+      "concurrentConnections": 50,
+      "messagesPerSecond": 25,
+      "duration": 10,
+      "expectedThroughput": 250
+    },
+    "heavy": {
+      "name": "Heavy Load",
+      "concurrentConnections": 100,
+      "messagesPerSecond": 100,
+      "duration": 10,
+      "expectedThroughput": 1000
+    },
+    "spike": {
+      "name": "Traffic Spike",
+      "concurrentConnections": 200,
+      "messagesPerSecond": 500,
+      "duration": 5,
+      "expectedThroughput": 2500
+    },
+    "concurrentMessages100ConcurrentMessages": {
+      "name": "100 Concurrent Messages",
+      "concurrency": 100,
+      "expectedDurationMs": 5000,
+      "expectedThroughput": 100
+    },
+    "1000CommandExecutions": {
+      "name": "1000 Command Executions",
+      "commandCount": 1000,
+      "concurrency": 10,
+      "expectedDurationMs": 5000
+    },
+    "500DatabaseWrites": {
+      "name": "500 Database Writes",
+      "writeCount": 500,
+      "concurrency": 50,
+      "expectedDurationMs": 10000,
+      "successThreshold": 490
+    },
+    "sessionManagementAtScale": {
+      "name": "50 Concurrent Sessions",
+      "sessionCount": 50,
+      "operationCount": 500,
+      "duration": 10000
+    },
+    "queueProcessing": {
+      "name": "Queue Processing",
+      "queueSize": 100,
+      "workers": 4,
+      "expectedThroughput": 50
+    }
+  },
+  "coursepatterns": {
+    "10concurrent": {
+      "name": "10 Concurrent Messages",
+      "count": 10,
+      "interval": 100,
+      "targetDuration": 2000
+    },
+    "50concurrent": {
+      "name": "50 Concurrent Messages",
+      "count": 50,
+      "interval": 50,
+      "targetDuration": 10000
+    },
+    "100concurrent": {
+      "name": "100 Concurrent Messages",
+      "count": 100,
+      "interval": 25,
+      "targetDuration": 30000
+    }
+  },
+  "multiAccountPatterns": {
+    "dualAccount": {
+      "accounts": 2,
+      "activeAccounts": 2,
+      "operationsPerAccount": 50,
+      "switchFrequency": "random"
+    },
+    "pentaAccount": {
+      "accounts": 5,
+      "activeAccounts": 5,
+      "operationsPerAccount": 20,
+      "switchFrequency": "sequential"
+    },
+    "decimalAccount": {
+      "accounts": 10,
+      "activeAccounts": 8,
+      "operationsPerAccount": 10,
+      "switchFrequency": "random"
+    }
+  },
+  "sessionPatterns": {
+    "rapidCreation": {
+      "name": "Rapid Session Creation",
+      "sessionCount": 100,
+      "creationRate": "immediate",
+      "targetDuration": 5000
+    },
+    "gradualCreation": {
+      "name": "Gradual Session Creation",
+      "sessionCount": 100,
+      "creationRate": 10,
+      "targetDuration": 10000
+    },
+    "sustainedSessions": {
+      "name": "Sustained Active Sessions",
+      "sessionCount": 50,
+      "duration": 60000,
+      "idleTimeout": 30000
+    }
+  }
+}

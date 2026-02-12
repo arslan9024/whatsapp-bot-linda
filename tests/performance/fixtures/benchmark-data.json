@@ -1,0 +1,116 @@
+{
+  "messages": {
+    "simple": {
+      "id": "msg-001",
+      "from": "1234567890@c.us",
+      "to": "9876543210@c.us",
+      "body": "Hello, this is a simple test message",
+      "timestamp": 1707739800000,
+      "type": "text",
+      "hasMedia": false
+    },
+    "withMedia": {
+      "id": "msg-002",
+      "from": "1234567890@c.us",
+      "to": "9876543210@c.us",
+      "body": "Check this image",
+      "timestamp": 1707739800000,
+      "type": "image",
+      "hasMedia": true,
+      "mediaSize": 2097152
+    },
+    "largePayload": {
+      "id": "msg-003",
+      "from": "1234567890@c.us",
+      "to": "9876543210@c.us",
+      "body": "This is a large payload message with 5MB of content simulated by repeating text patterns",
+      "timestamp": 1707739800000,
+      "type": "text",
+      "hasMedia": false,
+      "size": 5242880
+    }
+  },
+  "commands": [
+    {
+      "id": "cmd-001",
+      "command": "add_contact",
+      "params": {
+        "name": "John Doe",
+        "phone": "555-1234",
+        "email": "john@example.com"
+      }
+    },
+    {
+      "id": "cmd-002",
+      "command": "update_sheet",
+      "params": {
+        "sheetId": "sheet-123",
+        "range": "A1:Z100",
+        "values": [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+      }
+    },
+    {
+      "id": "cmd-003",
+      "command": "search_contact",
+      "params": {
+        "query": "John",
+        "limit": 10
+      }
+    }
+  ],
+  "accounts": {
+    "account1": {
+      "id": "acc-001",
+      "phone": "1234567890",
+      "name": "Main Account",
+      "status": "connected"
+    },
+    "account2": {
+      "id": "acc-002",
+      "phone": "9876543210",
+      "name": "Secondary Account",
+      "status": "connected"
+    },
+    "account3": {
+      "id": "acc-003",
+      "phone": "5555555555",
+      "name": "Tertiary Account",
+      "status": "connected"
+    }
+  },
+  "conversations": [
+    {
+      "id": "conv-001",
+      "contactId": "999-111-2222",
+      "lastMessage": "How are you?",
+      "timestamp": 1707739800000,
+      "messageCount": 25
+    },
+    {
+      "id": "conv-002",
+      "contactId": "888-222-3333",
+      "lastMessage": "See you later",
+      "timestamp": 1707739800000,
+      "messageCount": 42
+    }
+  ],
+  "databaseQueries": [
+    {
+      "id": "query-001",
+      "type": "find",
+      "collection": "messages",
+      "filter": { "from": "1234567890@c.us" },
+      "expectedResults": 150
+    },
+    {
+      "id": "query-002",
+      "type": "aggregate",
+      "collection": "conversations",
+      "pipeline": [
+        { "$match": { "status": "active" } },
+        { "$group": { "_id": "$contactId", "count": { "$sum": 1 } } }
+      ],
+      "expectedResults": 25
+    }
+  ]
+}

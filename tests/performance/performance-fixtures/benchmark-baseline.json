@@ -1,0 +1,175 @@
+{
+  "description": "Performance baseline benchmarks for Phase 4 M4",
+  "created": "2026-02-12",
+  "environment": {
+    "nodeVersion": "v18+",
+    "platform": "Windows",
+    "testDate": "2026-02-12"
+  },
+  "benchmarks": {
+    "messageProcessing": {
+      "name": "Message Processing Benchmark",
+      "operations": [
+        {
+          "id": "parse-simple-text",
+          "description": "Parse simple text message",
+          "expectedMs": 5,
+          "tolerancePercent": 20
+        },
+        {
+          "id": "parse-complex-json",
+          "description": "Parse complex JSON message",
+          "expectedMs": 15,
+          "tolerancePercent": 25
+        },
+        {
+          "id": "validate-message",
+          "description": "Validate message content",
+          "expectedMs": 10,
+          "tolerancePercent": 20
+        }
+      ]
+    },
+    "commandProcessing": {
+      "name": "Command Processing Benchmark",
+      "operations": [
+        {
+          "id": "parse-command",
+          "description": "Parse command from message",
+          "expectedMs": 5,
+          "tolerancePercent": 20
+        },
+        {
+          "id": "validate-command",
+          "description": "Validate command syntax",
+          "expectedMs": 10,
+          "tolerancePercent": 25
+        },
+        {
+          "id": "execute-simple",
+          "description": "Execute simple command",
+          "expectedMs": 50,
+          "tolerancePercent": 30
+        },
+        {
+          "id": "execute-complex",
+          "description": "Execute complex command",
+          "expectedMs": 150,
+          "tolerancePercent": 35
+        }
+      ]
+    },
+    "databaseOperations": {
+      "name": "Database Operations Benchmark",
+      "operations": [
+        {
+          "id": "single-read",
+          "description": "Single row read",
+          "expectedMs": 10,
+          "tolerancePercent": 30
+        },
+        {
+          "id": "single-write",
+          "description": "Single row write",
+          "expectedMs": 20,
+          "tolerancePercent": 30
+        },
+        {
+          "id": "batch-read",
+          "description": "Read 100 rows",
+          "expectedMs": 50,
+          "tolerancePercent": 35
+        },
+        {
+          "id": "batch-write",
+          "description": "Write 100 rows",
+          "expectedMs": 100,
+          "tolerancePercent": 35
+        }
+      ]
+    },
+    "concurrencyOperations": {
+      "name": "Concurrency Benchmark",
+      "operations": [
+        {
+          "id": "concurrent-5",
+          "description": "5 concurrent operations",
+          "expectedMs": 50,
+          "tolerancePercent": 30
+        },
+        {
+          "id": "concurrent-10",
+          "description": "10 concurrent operations",
+          "expectedMs": 80,
+          "tolerancePercent": 35
+        },
+        {
+          "id": "concurrent-50",
+          "description": "50 concurrent operations",
+          "expectedMs": 300,
+          "tolerancePercent": 40
+        }
+      ]
+    },
+    "memoryOperations": {
+      "name": "Memory Operations Benchmark",
+      "operations": [
+        {
+          "id": "allocate-1mb",
+          "description": "Allocate 1MB",
+          "expectedMs": 2,
+          "tolerancePercent": 50
+        },
+        {
+          "id": "allocate-10mb",
+          "description": "Allocate 10MB",
+          "expectedMs": 10,
+          "tolerancePercent": 50
+        },
+        {
+          "id": "gc-cycle",
+          "description": "Garbage collection cycle",
+          "expectedMs": 50,
+          "tolerancePercent": 60
+        }
+      ]
+    }
+  },
+  "throughputBenchmarks": {
+    "messagesPerSecond": {
+      "light": 100,
+      "moderate": 500,
+      "heavy": 1000,
+      "peak": 2000
+    },
+    "commandsPerSecond": {
+      "light": 50,
+      "moderate": 200,
+      "heavy": 500,
+      "peak": 1000
+    },
+    "operationsPerSecond": {
+      "light": 500,
+      "moderate": 2000,
+      "heavy": 5000,
+      "peak": 10000
+    }
+  },
+  "memoryBenchmarks": {
+    "baseline": {
+      "rssHeapMB": 25,
+      "heapUsedMB": 15,
+      "description": "Memory at application start"
+    },
+    "underLoad": {
+      "rssHeapMB": 75,
+      "heapUsedMB": 50,
+      "description": "Memory under moderate load"
+    },
+    "peak": {
+      "rssHeapMB": 150,
+      "heapUsedMB": 100,
+      "description": "Memory at peak stress test"
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "description": "Load testing scenarios for Phase 4 M4",
+  "created": "2026-02-12",
+  "scenarios": {
+    "100ConcurrentMessages": {
+      "name": "100 Concurrent Messages",
+      "messageCount": 100,
+      "concurrency": 100,
+      "messageType": "text",
+      "expectedDurationMs": 2000,
+      "description": "Simulate 100 concurrent text messages being processed"
+    },
+    "concurrentMessages100ConcurrentMessages": {
+      "name": "100 Concurrent Messages",
+      "messageCount": 100,
+      "concurrency": 100,
+      "messageType": "text",
+      "expectedDurationMs": 2000,
+      "description": "Simulate 100 concurrent text messages being processed"
+    },
+    "1000CommandExecutions": {
+      "name": "1000 Command Executions",
+      "commandCount": 1000,
+      "batchSize": 10,
+      "expectedDurationMs": 5000,
+      "description": "Execute 1000 commands in batches of 10"
+    },
+    "500DatabaseWrites": {
+      "name": "500 Database Writes",
+      "writeCount": 500,
+      "dataSize": "1KB",
+      "concurrency": 5,
+      "expectedDurationMs": 3000,
+      "successThreshold": 490,
+      "description": "Write 500 database entries concurrently"
+    },
+    "SessionManagementAtScale": {
+      "name": "Session Management at Scale",
+      "sessionCount": 50,
+      "operationCount": 500,
+      "expectedDurationMs": 4000,
+      "description": "Create and manage 50 concurrent sessions with 500 operations"
+    },
+    "sessionManagementAtScale": {
+      "name": "Session Management at Scale",
+      "sessionCount": 50,
+      "operationCount": 500,
+      "expectedDurationMs": 4000,
+      "description": "Create and manage 50 concurrent sessions with 500 operations"
+    },
+    "QueueProcessing": {
+      "name": "Queue Processing - 100 Items",
+      "queueSize": 100,
+      "itemSize": "500B",
+      "workerCount": 4,
+      "expectedDurationMs": 1500,
+      "description": "Process 100 items through default queue with 4 workers"
+    },
+    "queueProcessing": {
+      "name": "Queue Processing - 100 Items",
+      "queueSize": 100,
+      "itemSize": "500B",
+      "workers": 4,
+      "expectedDurationMs": 1500,
+      "description": "Process 100 items through default queue with 4 workers"
+    },
+    "MemorySpikeTest": {
+      "name": "Memory Spike - Rapid Allocation",
+      "allocationCount": 1000,
+      "allocationSize": "100KB",
+      "expectedPeakMB": 150,
+      "description": "Rapidly allocate 1000 x 100KB objects and release"
+    },
+    "DatabaseQueryBurst": {
+      "name": "Database Query Burst",
+      "queryCount": 200,
+      "complexityLevel": "medium",
+      "expectedDurationMs": 1500,
+      "description": "Execute 200 database queries in burst mode"
+    },
+    "ConcurrentFileOperations": {
+      "name": "Concurrent File Operations",
+      "fileCount": 50,
+      "operationType": "read-write",
+      "concurrency": 10,
+      "expectedDurationMs": 2000,
+      "description": "Perform read-write operations on 50 files concurrently"
+    }
+  },
+  "loadProfiles": {
+    "light": {
+      "description": "Light production load",
+      "messagesPerSecond": 10,
+      "commandsPerSecond": 5,
+      "databaseOpsPerSecond": 20
+    },
+    "moderate": {
+      "description": "Moderate production load",
+      "messagesPerSecond": 50,
+      "commandsPerSecond": 20,
+      "databaseOpsPerSecond": 100
+    },
+    "heavy": {
+      "description": "Heavy production load",
+      "messagesPerSecond": 100,
+      "commandsPerSecond": 50,
+      "databaseOpsPerSecond": 200
+    },
+    "peak": {
+      "description": "Peak production load (stress test)",
+      "messagesPerSecond": 200,
+      "commandsPerSecond": 100,
+      "databaseOpsPerSecond": 500
+    }
+  }
+}

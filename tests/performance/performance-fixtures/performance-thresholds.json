@@ -1,0 +1,70 @@
+{
+  "description": "Performance testing thresholds and SLAs for Phase 4 M4",
+  "created": "2026-02-12",
+  "thresholds": {
+    "messageParse": {
+      "maxTimeMs": 50,
+      "description": "Message parsing should complete within 50ms"
+    },
+    "commandResponse": {
+      "maxTimeMs": 200,
+      "description": "Command processing should complete within 200ms"
+    },
+    "databaseQuery": {
+      "maxTimeMs": 100,
+      "description": "Database queries should complete within 100ms"
+    },
+    "contactSync": {
+      "maxTimeMs": 500,
+      "description": "Contact sync operations should complete within 500ms"
+    },
+    "sheetOperation": {
+      "maxTimeMs": 1000,
+      "description": "Sheet operations should complete within 1000ms"
+    },
+    "concurrentMessageLimit": {
+      "maxCount": 100,
+      "description": "System should handle 100 concurrent messages",
+      "unit": "messages/batch"
+    },
+    "memoryPeakIncrease": {
+      "maxMB": 50,
+      "description": "Memory increase under load should not exceed 50MB"
+    },
+    "gcTimeRatio": {
+      "maxPercent": 5,
+      "description": "Garbage collection should not exceed 5% of total time"
+    },
+    "queueProcessing": {
+      "maxTimeMs": 500,
+      "itemCount": 100,
+      "description": "Processing 100 queued items should complete within 500ms"
+    },
+    "connectionPoolSize": {
+      "maxConnections": 10,
+      "description": "Connection pool should maintain max 10 concurrent connections"
+    },
+    "rateLimitEnforced": {
+      "required": true,
+      "description": "Rate limiting must be enforced"
+    }
+  },
+  "performanceCategories": {
+    "excellent": {
+      "responseTime": "0-30ms",
+      "throughput": "1000+ ops/sec"
+    },
+    "good": {
+      "responseTime": "30-100ms",
+      "throughput": "500-1000 ops/sec"
+    },
+    "acceptable": {
+      "responseTime": "100-200ms",
+      "throughput": "200-500 ops/sec"
+    },
+    "degraded": {
+      "responseTime": "200-500ms",
+      "throughput": "50-200 ops/sec"
+    }
+  }
+}
