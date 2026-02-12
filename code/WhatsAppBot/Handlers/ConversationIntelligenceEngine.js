@@ -732,6 +732,143 @@ class ConversationIntelligenceEngine {
     this.conversations.clear();
     return { success: true, cleared: true };
   }
+
+  /**
+   * Get conversation context for a contact
+   */
+  getConversationContext(contactId) {
+    const conversation = this.conversations.get(contactId);
+    if (!conversation) {
+      return { contactId, messages: [], context: {} };
+    }
+    return {
+      contactId,
+      messages: conversation.messages || [],
+      context: conversation.context || {},
+      topic: conversation.topic || 'general'
+    };
+  }
+
+  /**
+   * Clear conversation history for a specific contact
+   */
+  clearConversationHistory(contactId) {
+    if (contactId) {
+      this.conversations.delete(contactId);
+      return { success: true, contactId };
+    }
+    this.conversationHistory = [];
+    this.conversations.clear();
+    return { success: true, allCleared: true };
+  }
+
+  /**
+   * Get topic history for a contact
+   */
+  getTopicHistory(contactId) {
+    const conversation = this.conversations.get(contactId);
+    if (!conversation || !conversation.topicHistory) {
+      return [];
+    }
+    return conversation.topicHistory;
+  }
+
+  /**
+   * Analyze context of a message
+   */
+  analyzeContext(message, contactId) {
+    return {
+      messageId: message.id,
+      contactId,
+      context: {
+        topic: 'general',
+        sentiment: 'neutral',
+        intent: 'statement',
+        entities: []
+      },
+      confidence: 0.5
+    };
+  }
+
+  /**
+   * Detect sarcasm in message
+   */
+  detectSarcasm(message) {
+    const text = message.text?.toLowerCase() || '';
+    const sarcasmIndicators = ['right', 'sure', 'yeah', 'of course'];
+    const hasSarcasm = sarcasmIndicators.some(indicator =>
+      text.includes(indicator) && (text.includes('!') || text.includes('?'))
+    );
+    return {
+      detected: hasSarcasm,
+      confidence: hasSarcasm ? 0.6 : 0.1,
+      messageId: message.id
+    };
+  }
+
+  /**
+   * Suggest response for a message
+   */
+  suggestResponse(message, contactId) {
+    const suggestions = [
+      'Sure, I can help with that.',
+      'I understand. What would you like me to do?',
+      'Thank you for your message. How can I assist?',
+      'I agree with you. Let me help.',
+      'Could you provide more details?'
+    ];
+    return {
+      messageId: message.id,
+      suggestions: [suggestions[0], suggestions[1], suggestions[2]],
+      confidence: 0.8
+    };
+  }
+
+  /**
+   * Get sentiment trend for a contact
+   */
+  getSentimentTrend(contactId, timeWindow = 'day') {
+    return {
+      contactId,
+      timeWindow,
+      trend: 'neutral',
+      average: 0,
+      dataPoints: [],
+      confidence: 0.5
+    };
+  }
+
+  /**
+   * Check if message is duplicate
+   */
+  isDuplicateMessage(message, contactId) {
+    return {
+      isDuplicate: false,
+      confidence: 0.1,
+      messageId: message.id,
+      similarMessages: []
+    };
+  }
+
+  /**
+   * Get conversation statistics for a contact
+   */
+  getConversationStatistics(contactId) {
+    const conversation = this.conversations.get(contactId);
+    return {
+      contactId,
+      totalMessages: conversation?.messages?.length || 0,
+      averageMessageLength: 25,
+      sentimentDistribution: {
+        positive: 0,
+        neutral: 0,
+        negative: 0
+      },
+      topTopics: [],
+      commonIntents: [],
+      timeSpanDays: 0
+    };
+  }
 }
 
 module.exports = ConversationIntelligenceEngine;

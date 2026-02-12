@@ -47,18 +47,24 @@ const testFixtures = {
   // Templates
   templates: {
     simple: {
+      id: 'tpl_greeting_001',  // ← ADD: ID for Map lookup
       name: 'greeting',
-      content: 'Hello {{name}}!'
+      content: 'Hello {{name}}!',
+      variables: ['name']
     },
 
     withMultipleVars: {
+      id: 'tpl_order_001',  // ← ADD: ID for Map lookup
       name: 'order_confirmation',
-      content: 'Order #{{orderId}} confirmed for {{customerName}}. Total: {{amount}} {{currency}}'
+      content: 'Order #{{orderId}} confirmed for {{customerName}}. Total: {{amount}} {{currency}}',
+      variables: ['orderId', 'customerName', 'amount', 'currency']
     },
 
     withConditional: {
+      id: 'tpl_status_001',  // ← ADD: ID for Map lookup
       name: 'customer_status',
-      content: 'Hello {{name}}, {{#if isPremium}}welcome back premium customer{{/if}}'
+      content: 'Hello {{name}}, {{#if isPremium}}welcome back premium customer{{/if}}',
+      variables: ['name', 'isPremium']
     }
   },
 
@@ -133,28 +139,33 @@ const testFixtures = {
   // Batches
   batches: {
     small: {
+      id: 'batch_001',  // ← ADD: ID for Map lookup
       name: 'Small Batch',
       messages: [
-        { id: 'msg1', to: '+14155552671', text: 'Hello 1' },
-        { id: 'msg2', to: '+442071838750', text: 'Hello 2' }
+        { id: 'msg1', to: '+14155552671', text: 'Hello 1', templateId: 'tpl_greeting_001' },
+        { id: 'msg2', to: '+442071838750', text: 'Hello 2', templateId: 'tpl_greeting_001' }
       ]
     },
 
     medium: {
+      id: 'batch_002',  // ← ADD: ID for Map lookup
       name: 'Medium Batch',
       messages: Array.from({ length: 50 }, (_, i) => ({
         id: `msg_${i}`,
-        to: `+1${String(i).padStart(10, '0')}`,
-        text: `Message ${i}`
+        to: `+1415555${String(i + 2671).slice(-4)}`,
+        text: `Message ${i}`,
+        templateId: 'tpl_greeting_001'
       }))
     },
 
     large: {
+      id: 'batch_003',  // ← ADD: ID for Map lookup
       name: 'Large Batch',
       messages: Array.from({ length: 100 }, (_, i) => ({
         id: `msg_${i}`,
-        to: `+1${String(i).padStart(10, '0')}`,
-        text: `Message ${i}`
+        to: `+1415555${String((i + 2671) % 10000).slice(-4)}`,
+        text: `Message ${i}`,
+        templateId: 'tpl_greeting_001'
       }))
     }
   },
