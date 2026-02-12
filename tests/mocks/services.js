@@ -431,6 +431,151 @@ class MockEventEmitter {
   }
 }
 
+/**
+ * MockRedis - Simulates Redis cache for testing
+ * Implements: set, get, del, exists, incr, expire, flushAll, keys, ttl
+ */
+class MockRedis {
+  constructor() {
+    this.store = {};
+    this.expirations = {};
+    this.callCount = {};
+  }
+
+  set(key, value, options = {}) {
+    this.store[key] = JSON.stringify(value);
+    this.callCount.set = (this.callCount.set || 0) + 1;
+    
+    if (options.EX) {
+      const expiryTime = Date.now() + (options.EX * 1000);
+      this.expirations[key] = expiryTime;
+    }
+    
+    return 'OK';
+  }
+
+  get(key) {
+    this.callCount.get = (this.callCount.get || 0) + 1;
+    
+    // Check if key has expired
+    if (this.expirations[key] && Date.now() > this.expirations[key]) {
+      delete this.store[key];
+      delete this.expirations[key];
+      return null;
+    }
+    
+    if (!(key in this.store)) return null;
+    try {
+      return JSON.parse(this.store[key]);
+    } catch {
+      return this.store[key];
+    }
+  }
+
+  del(key) {
+    this.callCount.del = (this.callCount.del || 0) + 1;
+    if (key in this.store) {
+      delete this.store[key];
+      delete this.expirations[key];
+      return 1;
+    }
+    return 0;
+  }
+
+  exists(key) {
+    if (this.expirations[key] && Date.now() > this.expirations[key]) {
+      delete this.store[key];
+      delete this.expirations[key];
+      return 0;
+    }
+    return key in this.store ? 1 : 0;
+  }
+
+  incr(key) {
+    this.callCount.incr = (this.callCount.incr || 0) + 1;
+    const current = this.get(key) || 0;
+    const newValue = parseInt(current) + 1;
+    this.set(key, newValue);
+    return newValue;
+  }
+
+  expire(key, seconds) {
+    if (!(key in this.store)) return 0;
+    const expiryTime = Date.now() + (seconds * 1000);
+    this.expirations[key] = expiryTime;
+    return 1;
+  }
+
+  ttl(key) {
+    if (!(key in this.store)) return -2;
+    if (!this.expirations[key]) return -1;
+    
+    const remaining = Math.ceil((this.expirations[key] - Date.now()) / 1000);
+    return remaining > 0 ? remaining : -2;
+  }
+
+  keys(pattern = '*') {
+    const allKeys = Object.keys(this.store).filter(key => {
+      // Check expiration
+      if (this.expirations[key] && Date.now() > this.expirations[key]) {
+        delete this.store[key];
+        delete this.expirations[key];
+        return false;
+      }
+      return true;
+    });
+
+    if (pattern === '*') return allKeys;
+    
+    // Simple glob pattern matching
+    const regexPattern = pattern
+      .replace(/\./g, '\\.')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    const regex = new RegExp(`^${regexPattern}$`);
+    
+    return allKeys.filter(key => regex.test(key));
+  }
+
+  flushAll() {
+    this.store = {};
+    this.expirations = {};
+    return 'OK';
+  }
+
+  mget(...keys) {
+    return keys.map(key => this.get(key));
+  }
+
+  mset(...args) {
+    for (let i = 0; i < args.length; i += 2) {
+      this.set(args[i], args[i + 1]);
+    }
+    return 'OK';
+  }
+
+  getStats() {
+    return {
+      totalKeys: Object.keys(this.store).length,
+      callCounts: this.callCount,
+      hitRate: this.calculateHitRate(),
+    };
+  }
+
+  calculateHitRate() {
+    const gets = this.callCount.get || 0;
+    if (gets === 0) return 100;
+    const hits = gets - (this.callCount.misses || 0);
+    return Math.round((hits / gets) * 100);
+  }
+
+  reset() {
+    this.store = {};
+    this.expirations = {};
+    this.callCount = {};
+  }
+}
+
 module.exports = {
   MockWhatsAppClient,
   MockMongoDb,
@@ -438,6 +583,7 @@ module.exports = {
   MockLogger,
   MockFileService,
   MockEventEmitter,
+  MockRedis,
 
   /**
    * Create test services object
