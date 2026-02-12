@@ -14,7 +14,6 @@
  * Created: February 7, 2026
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mockPhoneRows,
   phoneValidationTests,
@@ -24,26 +23,27 @@ import {
 } from '../fixtures/testData.js';
 
 // Mock the logger and errorHandler
-vi.mock('../../../code/Integration/Google/utils/logger.js', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn()
-  }
-}));
+// (Note: These are commented out as they're not directly imported in this test)
+// jest.mock('../../../code/Integration/Google/utils/logger.js', () => ({
+//   logger: {
+//     info: jest.fn(),
+//     error: jest.fn(),
+//     warn: jest.fn(),
+//     debug: jest.fn()
+//   }
+// }));
 
-vi.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
-  errorHandler: {
-    handle: (error, context) => {
-      throw error;
-    }
-  }
-}));
+// jest.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
+//   errorHandler: {
+//     handle: (error, context) => {
+//       throw error;
+//     }
+//   }
+// }));
 
 // Mock file system
-vi.mock('fs', () => ({
-  readFileSync: vi.fn((path) => {
+jest.mock('fs', () => ({
+  readFileSync: jest.fn((path) => {
     if (path.includes('countryPhoneCodes.json')) {
       return JSON.stringify([
         { code: '44', country: 'United Kingdom', format: '+44' },
@@ -80,18 +80,18 @@ describe('DataProcessingService Unit Tests', () => {
       ]),
       
       // Methods to test
-      extractPhoneNumbers: vi.fn(),
-      validatePhoneNumber: vi.fn(),
-      processRow: vi.fn(),
-      deduplicatePhones: vi.fn(),
-      formatPhones: vi.fn(),
-      batchExtract: vi.fn(),
-      initialize: vi.fn().mockResolvedValue(true)
+      extractPhoneNumbers: jest.fn(),
+      validatePhoneNumber: jest.fn(),
+      processRow: jest.fn(),
+      deduplicatePhones: jest.fn(),
+      formatPhones: jest.fn(),
+      batchExtract: jest.fn(),
+      initialize: jest.fn().mockResolvedValue(true)
     };
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   // ============ INITIALIZATION TESTS ============
@@ -607,8 +607,8 @@ describe('DataProcessingService Unit Tests', () => {
     });
 
     it('should handle file read errors gracefully', () => {
-      vi.mock('fs', () => ({
-        readFileSync: vi.fn(() => {
+      jest.mock('fs', () => ({
+        readFileSync: jest.fn(() => {
           throw new Error('File not found');
         })
       }));

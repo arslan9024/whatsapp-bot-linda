@@ -22,7 +22,6 @@
  * ✅ All 26 functions → 2 services, 19+ methods
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mockSheetData,
   mockPhoneRows,
@@ -32,13 +31,13 @@ import {
   getMockSheetsAPI
 } from '../fixtures/testData.js';
 
-vi.mock('../../../code/Integration/Google/utils/logger.js', () => ({
-  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
-}));
+// jest.mock('../../../code/Integration/Google/utils/logger.js', () => ({
+//   logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
+// }));
 
-vi.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
-  errorHandler: { handle: (error, context) => { throw error; } }
-}));
+// jest.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
+//   errorHandler: { handle: (error, context) => { throw error; } }
+// }));
 
 describe('Legacy Migration Validation Tests', () => {
   let sheetsService;
@@ -50,21 +49,21 @@ describe('Legacy Migration Validation Tests', () => {
       sheetsAPI: getMockSheetsAPI(),
       cache: new Map(),
       
-      getValues: vi.fn(async (spreadsheetId, range = 'Sheet1') => ({
+      getValues: jest.fn(async (spreadsheetId, range = 'Sheet1') => ({
         range,
         values: mockSheetData.simple.values
       })),
       
-      getRow: vi.fn(async (spreadsheetId, range) => {
+      getRow: jest.fn(async (spreadsheetId, range) => {
         return ['John Doe', 'john@example.com', '971501234567'];
       }),
       
-      appendRow: vi.fn(async (spreadsheetId, range, values) => ({
+      appendRow: jest.fn(async (spreadsheetId, range, values) => ({
         updatedRows: 1,
         updatedColumns: values[0].length
       })),
       
-      appendRows: vi.fn(async (spreadsheetId, range, values) => ({
+      appendRows: jest.fn(async (spreadsheetId, range, values) => ({
         updatedRows: values.length,
         updatedColumns: values[0].length
       }))
@@ -72,7 +71,7 @@ describe('Legacy Migration Validation Tests', () => {
 
     // DataProcessingService replaces: phone extraction & validation functions
     dataService = {
-      extractPhoneNumbers: vi.fn(async (rows, options) => {
+      extractPhoneNumbers: jest.fn(async (rows, options) => {
         const phones = [];
         rows.forEach(row => {
           row.forEach(cell => {
@@ -84,15 +83,15 @@ describe('Legacy Migration Validation Tests', () => {
         return { phones, total: phones.length, statistics: { extracted: phones.length } };
       }),
       
-      validatePhoneNumber: vi.fn((phone) => {
+      validatePhoneNumber: jest.fn((phone) => {
         return /^(\+|00)?[0-9]{7,15}$/.test(phone);
       }),
       
-      deduplicatePhones: vi.fn((phones) => {
+      deduplicatePhones: jest.fn((phones) => {
         return [...new Set(phones)];
       }),
       
-      formatPhones: vi.fn((phones) => {
+      formatPhones: jest.fn((phones) => {
         return phones.map(p => ({
           original: p,
           formatted: p.replace(/\s/g, '')
@@ -102,7 +101,7 @@ describe('Legacy Migration Validation Tests', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   // ============ MIGRATION MAP VALIDATION ============

@@ -13,7 +13,7 @@
  * Created: February 7, 2026
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   mockSheetData,
   mockPhoneRows,
@@ -24,20 +24,20 @@ import {
   getMockSheetsAPI
 } from '../fixtures/testData.js';
 
-vi.mock('../../../code/Integration/Google/utils/logger.js', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn()
-  }
-}));
+// jest.mock('../../../code/Integration/Google/utils/logger.js', () => ({
+//   logger: {
+//     info: jest.fn(),
+//     error: jest.fn(),
+//     warn: jest.fn(),
+//     debug: jest.fn()
+//   }
+// }));
 
-vi.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
-  errorHandler: {
-    handle: (error, context) => { throw error; }
-  }
-}));
+// jest.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
+//   errorHandler: {
+//     handle: (error, context) => { throw error; }
+//   }
+// }));
 
 describe('Integration Tests: SheetsService + DataProcessingService', () => {
   let sheetsService;
@@ -57,14 +57,14 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
       cacheTTL: 3600000,
       cache: new Map(),
       
-      getValues: vi.fn(async (spreadsheetId, range) => {
+      getValues: jest.fn(async (spreadsheetId, range) => {
         return {
           range,
           values: mockSheetData.simple.values
         };
       }),
       
-      appendRow: vi.fn(async (spreadsheetId, range, values) => {
+      appendRow: jest.fn(async (spreadsheetId, range, values) => {
         return { updatedRows: 1, updatedCells: 3 };
       })
     };
@@ -74,7 +74,7 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
       countryPhoneCodes: new Map([['71', { code: '71', country: 'UAE' }]]),
       uaeMobileNetworkCodes: new Map([['50', { code: '50' }], ['55', { code: '55' }]]),
       
-      extractPhoneNumbers: vi.fn(async (rows) => {
+      extractPhoneNumbers: jest.fn(async (rows) => {
         const phones = [];
         rows.forEach(row => {
           row.forEach(cell => {
@@ -90,18 +90,18 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
         };
       }),
       
-      validatePhoneNumber: vi.fn((phone) => {
+      validatePhoneNumber: jest.fn((phone) => {
         return /^(\+|00)?[0-9]{7,15}$/.test(phone);
       }),
       
-      deduplicatePhones: vi.fn((phones) => {
+      deduplicatePhones: jest.fn((phones) => {
         return [...new Set(phones)];
       })
     };
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   // ============ END-TO-END WORKFLOW TESTS ============
@@ -192,7 +192,7 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
     });
 
     it('should handle large dataset workflow', async () => {
-      sheetsService.getValues = vi.fn().mockResolvedValue({
+      sheetsService.getValues = jest.fn().mockResolvedValue({
         range: 'Sheet1',
         values: [
           ['Name', 'Email', 'Phone'],
@@ -294,7 +294,7 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
   // ============ ERROR RECOVERY TESTS ============
   describe('Error Handling & Recovery', () => {
     it('should handle sheet read error and recover', async () => {
-      sheetsService.getValues = vi.fn().mockRejectedValueOnce({
+      sheetsService.getValues = jest.fn().mockRejectedValueOnce({
         status: 401,
         message: 'Unauthorized'
       }).mockResolvedValueOnce(mockSheetData.simple);
@@ -341,7 +341,7 @@ describe('Integration Tests: SheetsService + DataProcessingService', () => {
     });
 
     it('should handle write errors gracefully', async () => {
-      sheetsService.appendRow = vi.fn().mockRejectedValue({
+      sheetsService.appendRow = jest.fn().mockRejectedValue({
         status: 403,
         message: 'Permission denied'
       });

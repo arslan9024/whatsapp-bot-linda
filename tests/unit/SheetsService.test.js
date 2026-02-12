@@ -12,7 +12,6 @@
  * Created: February 7, 2026
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mockSheetData,
   mockSpreadsheetIds,
@@ -26,22 +25,23 @@ import {
 } from '../fixtures/testData.js';
 
 // Mock the modules
-vi.mock('../../../code/Integration/Google/utils/logger.js', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn()
-  }
-}));
+// (Note: These are commented out as they're not directly imported in this test)
+// jest.mock('../../../code/Integration/Google/utils/logger.js', () => ({
+//   logger: {
+//     info: jest.fn(),
+//     error: jest.fn(),
+//     warn: jest.fn(),
+//     debug: jest.fn()
+//   }
+// }));
 
-vi.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
-  errorHandler: {
-    handle: (error, context) => {
-      throw error;
-    }
-  }
-}));
+// jest.mock('../../../code/Integration/Google/utils/errorHandler.js', () => ({
+//   errorHandler: {
+//     handle: (error, context) => {
+//       throw error;
+//     }
+//   }
+// }));
 
 describe('SheetsService Unit Tests', () => {
   let sheetsService;
@@ -62,24 +62,24 @@ describe('SheetsService Unit Tests', () => {
       cache: new Map(),
       
       // Mock methods will be added as we define tests
-      getValues: vi.fn(),
-      getCell: vi.fn(),
-      getColumn: vi.fn(),
-      getRow: vi.fn(),
-      getFiltered: vi.fn(),
-      appendRow: vi.fn(),
-      appendRows: vi.fn(),
-      updateCell: vi.fn(),
-      updateRange: vi.fn(),
-      clearRange: vi.fn(),
-      batchUpdate: vi.fn(),
-      clearCache: vi.fn(),
-      getCacheSize: vi.fn()
+      getValues: jest.fn(),
+      getCell: jest.fn(),
+      getColumn: jest.fn(),
+      getRow: jest.fn(),
+      getFiltered: jest.fn(),
+      appendRow: jest.fn(),
+      appendRows: jest.fn(),
+      updateCell: jest.fn(),
+      updateRange: jest.fn(),
+      clearRange: jest.fn(),
+      batchUpdate: jest.fn(),
+      clearCache: jest.fn(),
+      getCacheSize: jest.fn()
     };
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     sheetsService.cache.clear();
   });
 
