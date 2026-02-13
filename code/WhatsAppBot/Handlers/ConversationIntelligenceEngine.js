@@ -26,8 +26,8 @@ class ConversationIntelligenceEngine {
     this.conversationHistory = [];  // ← ADD: For test compatibility
     this.contextWindow = options.contextWindow || options.maxContextLength || 5;  // ← ADD: Accept both contextWindow and maxContextLength
     this.sentimentThresholds = options.sentimentThresholds || {
-      positive: 0.2,  // ← LOWERED: More sensitive to positive sentiment
-      negative: -0.2
+      positive: 0.1,  // ← LOWERED FURTHER: More sensitive to positive sentiment (was 0.2)
+      negative: -0.1  // ← LOWERED FURTHER: More sensitive to negative sentiment (was -0.2)
     };
     this.learningEnabled = options.learningEnabled !== false;
     this.minContextWords = options.minContextWords || 3;
@@ -182,6 +182,8 @@ class ConversationIntelligenceEngine {
 
       let score = 0;
       let wordCount = 0;
+      let positiveCount = 0;
+      let negativeCount = 0;
 
       for (let word of words) {
         // Remove punctuation from word
@@ -192,9 +194,11 @@ class ConversationIntelligenceEngine {
         if (this.isPositiveWord(word)) {
           score += 1;
           wordCount++;
+          positiveCount++;
         } else if (this.isNegativeWord(word)) {
           score -= 1;
           wordCount++;
+          negativeCount++;
         }
       }
 
@@ -205,6 +209,8 @@ class ConversationIntelligenceEngine {
         sentiment,
         score: score,
         wordCount,
+        positiveCount,
+        negativeCount,
         category: this.categorizeSentiment(sentiment)
       };
     });
@@ -533,8 +539,9 @@ class ConversationIntelligenceEngine {
       
       // Regex patterns for various entity types
       const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
-      // Phone patterns: XXX-XXXX, XXX-XXX-XXXX, (XXX) XXX-XXXX, +X-XXX-XXX-XXXX, etc.
-      const phoneRegex = /(?:\+\d{1,3}[-.\s]?)?\b(?:\d{3}|\(\d{3}\))[-.\s]?\d{3,4}[-.\s]?\d{4}\b/g;
+      // Phone patterns: flexible matching for different phone formats
+      // Matches: 555-1234, 555-555-5555, (555) 555-5555, +1-555-555-5555, etc.
+      const phoneRegex = /(?:\+\d{1,3})?[-.\s]?(?:\(?\d{3}\)?)?[-.\s]?\d{3,4}[-.\s]?\d{4}\b/g;
       const nameRegex = /\b[A-Z][a-z]+\s[A-Z][a-z]+\b/g;
       const orderRegex = /#\d+|order\s*#?\d+/gi;
       
@@ -761,6 +768,39 @@ class ConversationIntelligenceEngine {
   /**
    * Categorize sentiment
    */
+  /**
+   * Send message to storage for learning
+   */
+  storeMessage(message, botContext) {
+    try {
+      const conversationId = botContext?.contact?.id || 'unknown';
+      const conversation = this.conversations.get(conversationId);
+      if (conversation && conversation.messages) {
+        conversation.messages.push({
+          ...message,
+          timestamp: new Date().toISOString(),
+          from: botContext?.contact?.id
+        });
+      }
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to store message', { error: error.message });
+      return { success: false };
+    }
+  }
+
+  /**
+   * Update sentiment thresholds for more or less sensitive detection
+   */
+  updateSentimentThresholds(thresholds) {
+    if (thresholds.positive !== undefined) {
+      this.sentimentThresholds.positive = thresholds.positive;
+    }
+    if (thresholds.negative !== undefined) {
+      this.sentimentThresholds.negative = thresholds.negative;
+    }
+  }
+
   categorizeSentiment(score) {
     if (score >= this.sentimentThresholds.positive) {
       return 'positive';
