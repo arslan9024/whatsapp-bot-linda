@@ -533,7 +533,8 @@ class ConversationIntelligenceEngine {
       
       // Regex patterns for various entity types
       const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
-      const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
+      // Phone patterns: XXX-XXXX, XXX-XXX-XXXX, (XXX) XXX-XXXX, +X-XXX-XXX-XXXX, etc.
+      const phoneRegex = /(?:\+\d{1,3}[-.\s]?)?\b(?:\d{3}|\(\d{3}\))[-.\s]?\d{3,4}[-.\s]?\d{4}\b/g;
       const nameRegex = /\b[A-Z][a-z]+\s[A-Z][a-z]+\b/g;
       const orderRegex = /#\d+|order\s*#?\d+/gi;
       
@@ -900,9 +901,8 @@ class ConversationIntelligenceEngine {
    * Check if engine is ready (async for compatibility)
    */
   async isReady() {
-    return new Promise(resolve => {
-      setTimeout(() => resolve(this.initialized), 10);
-    });
+    // Engine is ready immediately when instantiated
+    return Promise.resolve(true);
   }
 
   /**
@@ -1371,20 +1371,24 @@ class ConversationIntelligenceEngine {
         // Apply semantic similarity mapping
         // Map words to their semantic groups
         const semanticGroups = {
-          'access': ['access', 'login', 'log', 'open', 'enter'],
-          'unable': ['unable', 'cannot', 'can\'t', 'unable', 'failed'],
-          'account': ['account', 'profile', 'account'],
-          'support': ['help', 'support', 'assist', 'assistance']
+          'access': ['access', 'login', 'log', 'open', 'enter', 'connect'],
+          'unable': ['unable', 'cannot', 'can\'t', 'unable', 'failed', 'fail'],
+          'account': ['account', 'profile', 'account', 'user', 'account'],
+          'support': ['help', 'support', 'assist', 'assistance', 'problem', 'issue'],
+          'error': ['error', 'broken', 'broken', 'issue', 'problem', 'doesn\'t work']
         };
         
-        // Count semantic matches
+        // Count semantic matches - more generous scoring
         let semanticMatches = 0;
+        const matchedGroups = new Set();
+        
         for (const word1 of filtered1) {
           for (const [group, words] of Object.entries(semanticGroups)) {
             if (words.includes(word1)) {
               for (const word2 of filtered2) {
                 if (words.includes(word2) && word1 !== word2) {
-                  semanticMatches++;
+                  semanticMatches += 2; // Higher boost for semantic matches
+                  matchedGroups.add(group);
                   break;
                 }
               }
@@ -1393,11 +1397,11 @@ class ConversationIntelligenceEngine {
           }
         }
         
-        // Calculate semantic boost (normalized)
-        const semanticBoost = semanticMatches / Math.max(filtered1.length, filtered2.length) * 0.3;
+        // Calculate semantic boost (increased weight)
+        const semanticBoost = Math.min((semanticMatches / Math.max(filtered1.length, filtered2.length)) * 0.5, 0.4);
         
-        // Return combined similarity (base overlap + semantic boost)
-        const totalSimilarity = Math.min(baseOverlap + semanticBoost, 1);
+        // Return combined similarity (base overlap + semantic boost, with higher semantic weight)
+        const totalSimilarity = Math.min(baseOverlap * 0.5 + semanticBoost + (matchedGroups.size * 0.1), 1);
         return totalSimilarity;
       };
       
