@@ -402,6 +402,39 @@ class AdminConfigInterface {
       logger.error(`❌ Error logging audit: ${error.message}`);
     }
   }
-}
+
+  /**
+   * Toggle handler on/off (wrapper for configureHandler)
+   */
+  toggleHandler(handlerName) {
+    const isCurrentlyEnabled = this.config.handlers.enabled[handlerName] !== undefined;
+    this.configureHandler(handlerName, !isCurrentlyEnabled);
+    return { enabled: !isCurrentlyEnabled };
+  }
+
+  /**
+   * Check if user is authorized
+   */
+  isUserAuthorized(phoneNumber) {
+    return this.config.users.whitelist.includes(phoneNumber) || 
+           !this.config.users.blacklist.includes(phoneNumber);
+  }
+
+  /**
+   * List user permissions
+   */
+  listPermissions(userId) {
+    const isAdmin = this.config.users.admins.includes(userId);
+    const userRole = this.config.users.roles[userId] || 'user';
+    
+    return {
+      isAdmin,
+      role: userRole,
+      canChat: true,
+      canViewStats: isAdmin,
+      canGenerateReports: isAdmin,
+      canManageUsers: isAdmin
+    };
+  }}
 
 export default AdminConfigInterface;
