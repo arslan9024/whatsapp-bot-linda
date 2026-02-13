@@ -1,0 +1,34 @@
+{
+  "accounts": [
+    {
+      "id": "acc-001",
+      "phoneNumber": "+971505760056",
+      "sessionId": "session-971505760056",
+      "displayName": "Arslan Malik",
+      "role": "master",
+      "status": "connected",
+      "linkedAt": "2026-02-11T10:00:00Z",
+      "lastActive": "2026-02-14T15:30:00Z",
+      "features": {
+        "messaging": true,
+        "propertyDetection": true,
+        "inquiryTracking": true,
+        "conversationLearning": true,
+        "dealTracking": true,
+        "agentCommission": true
+      },
+      "statistics": {
+        "messagesProcessed": 1234,
+        "propertiesFound": 45,
+        "inquiriesTracked": 78,
+        "matchesSuggested": 23,
+        "dealsActive": 3,
+        "dealsClosed": 5
+      }
+    }
+  ],
+  "masterAccount": "acc-001",
+  "totalAccounts": 1,
+  "lastUpdated": "2026-02-14T15:30:00Z",
+  "version": "1.0.0"
+}

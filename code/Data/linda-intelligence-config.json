@@ -1,0 +1,151 @@
+{
+  "intelligence": {
+    "propertyDetection": {
+      "enabled": true,
+      "keywords": [
+        "villa",
+        "apartment",
+        "flat",
+        "townhouse",
+        "penthouse",
+        "rent",
+        "sale",
+        "price",
+        "bedrooms",
+        "location",
+        "area",
+        "lease",
+        "furnished"
+      ],
+      "extractFields": [
+        "type",
+        "location",
+        "price",
+        "bedrooms",
+        "bathrooms",
+        "features",
+        "availability"
+      ],
+      "syncToSheet": true,
+      "minConfidenceScore": 0.75
+    },
+    "inquiryTracking": {
+      "enabled": true,
+      "keywords": [
+        "looking for",
+        "interested in",
+        "searching for",
+        "need apartment",
+        "need villa",
+        "want to buy",
+        "want to rent",
+        "budget",
+        "prefer location"
+      ],
+      "trackingSheet": true,
+      "syncToContacts": true,
+      "minConfidenceScore": 0.80
+    },
+    "personaDetection": {
+      "enabled": true,
+      "personas": ["buyer", "seller", "tenant", "landlord", "agent"],
+      "autoDetect": true,
+      "allowManualOverride": true,
+      "detectionKeywords": {
+        "buyer": [
+          "looking for",
+          "want to buy",
+          "can you find",
+          "budget",
+          "interested in"
+        ],
+        "seller": [
+          "selling",
+          "for sale",
+          "asking price",
+          "property for sale",
+          "motivated seller"
+        ],
+        "tenant": [
+          "looking to rent",
+          "need apartment",
+          "lease",
+          "monthly budget",
+          "move in date"
+        ],
+        "landlord": [
+          "renting out",
+          "leasing",
+          "tenant wanted",
+          "monthly rent",
+          "furnished"
+        ],
+        "agent": [
+          "agent",
+          "real estate",
+          "represent",
+          "deal with me",
+          "commission",
+          "exclusive"
+        ]
+      }
+    },
+    "dealMatching": {
+      "enabled": true,
+      "minConfidenceScore": 0.75,
+      "maxSuggestions": 5,
+      "learningMode": true,
+      "scoringWeights": {
+        "budget": 0.3,
+        "location": 0.3,
+        "bedrooms": 0.2,
+        "features": 0.2
+      }
+    },
+    "completionLearning": {
+      "enabled": true,
+      "storeConversations": true,
+      "feedbackCollection": true,
+      "improvementCycle": "weekly"
+    },
+    "dealTracking": {
+      "enabled": true,
+      "stages": [
+        "match_identified",
+        "interest_expressed",
+        "viewing_scheduled",
+        "negotiation",
+        "agreement_reached",
+        "closed"
+      ],
+      "autoNotification": true,
+      "notifyAfterStageChange": true
+    },
+    "agentCommission": {
+      "enabled": true,
+      "trackCommission": true,
+      "defaultRate": 5.0,
+      "currencyFormat": "AED"
+    }
+  },
+  "serviceAccounts": {
+    "contacts": "goraha-contacts",
+    "sheets": "poweragent-sheets"
+  },
+  "sessionManagement": {
+    "sessionDir": "./sessions",
+    "archiveDir": "./sessions/archived",
+    "recoveryCheckpointInterval": 3600000,
+    "healthCheckInterval": 300000,
+    "maxReconnectAttempts": 5,
+    "reconnectBackoffMs": 5000
+  },
+  "dataSync": {
+    "batchSyncInterval": 600000,
+    "deduplicationEnabled": true,
+    "attributionTracking": true
+  },
+  "version": "1.0.0",
+  "lastUpdated": "2026-02-14",
+  "author": "Linda Intelligence System"
+}

@@ -1,0 +1,29 @@
+{
+  "personas": [
+    {
+      "id": "persona-001",
+      "phone": "+971505760056",
+      "name": "Arslan Malik",
+      "primaryRole": "agent",
+      "detectedAt": "2026-02-11T10:00:00Z",
+      "roles": {
+        "agent": {
+          "confidence": 0.95,
+          "since": "2026-02-11",
+          "properties_handled": 12
+        },
+        "seller": {
+          "confidence": 0.60,
+          "since": "2026-02-12"
+        }
+      },
+      "agency": "Goraha Properties",
+      "commission": "5%",
+      "activeDeals": 8,
+      "closedDeals": 5
+    }
+  ],
+  "totalPersonas": 1,
+  "lastUpdated": "2026-02-14T15:30:00Z",
+  "version": "1.0.0"
+}

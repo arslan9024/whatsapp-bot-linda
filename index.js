@@ -45,6 +45,13 @@ import { getAdvancedContactService } from "./code/Services/AdvancedContactServic
 import { ReactionHandler } from "./code/WhatsAppBot/Handlers/ReactionHandler.js";
 import { GroupEventHandler } from "./code/WhatsAppBot/Handlers/GroupEventHandler.js";
 
+// PHASE 7: ADVANCED FEATURES (February 14, 2026)
+// Analytics, Admin Config, Smart Conversations, Reporting
+import AnalyticsDashboard from "./code/Analytics/AnalyticsDashboard.js";
+import AdminConfigInterface from "./code/Admin/AdminConfigInterface.js";
+import AdvancedConversationFeatures from "./code/Conversation/AdvancedConversationFeatures.js";
+import ReportGenerator from "./code/Reports/ReportGenerator.js";
+
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
 import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
 
@@ -70,6 +77,12 @@ let commandHandler = null;  // NEW: Linda AI Command Handler
 // Feature handlers
 let contactHandler = null;
 let gorahaVerificationService = null;
+
+// PHASE 7: Advanced Features Managers
+let analyticsModule = null;  // Real-time metrics & monitoring
+let adminConfigModule = null;  // Dynamic configuration & permissions
+let conversationModule = null;  // AI conversation features
+let reportGeneratorModule = null;  // Professional reporting
 
 // All initialized accounts for graceful shutdown
 let allInitializedAccounts = [];
@@ -442,6 +455,45 @@ async function initializeBot() {
       logBot(`   - Categories: ${LindaCommandRegistry.getCategoryCount()} command types`, "info");
       logBot(`   - Type !help in chat to see all commands`, "info");
     }
+
+    // ============================================
+    // STEP 6.5A: Initialize Phase 7 Advanced Features
+    // ============================================
+    logBot("\n📊 Initializing Phase 7 Advanced Features...", "info");
+    
+    // Initialize Analytics Dashboard
+    if (!analyticsModule) {
+      analyticsModule = new AnalyticsDashboard();
+      await analyticsModule.initialize();
+      global.analytics = analyticsModule;
+      logBot("  ✅ Analytics Dashboard (real-time metrics & monitoring)", "success");
+    }
+
+    // Initialize Admin Config Interface
+    if (!adminConfigModule) {
+      adminConfigModule = new AdminConfigInterface();
+      await adminConfigModule.initialize();
+      global.adminConfig = adminConfigModule;
+      logBot("  ✅ Admin Config Interface (dynamic configuration management)", "success");
+    }
+
+    // Initialize Advanced Conversation Features
+    if (!conversationModule) {
+      conversationModule = new AdvancedConversationFeatures();
+      await conversationModule.initialize();
+      global.conversationAI = conversationModule;
+      logBot("  ✅ Advanced Conversation Features (intent, sentiment, context)", "success");
+    }
+
+    // Initialize Report Generator
+    if (!reportGeneratorModule) {
+      reportGeneratorModule = new ReportGenerator();
+      await reportGeneratorModule.initialize();
+      global.reportGenerator = reportGeneratorModule;
+      logBot("  ✅ Report Generator (daily/weekly/monthly reports)", "success");
+    }
+
+    logBot("✅ Phase 7 modules fully initialized", "success");
 
     // ============================================
     // STEP 6.6: Initialize Phase 1 Services (NEW)
@@ -902,6 +954,26 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
 
     try {
       // ═════════════════════════════════════════════════════════════════════════════
+      // PHASE 7: ANALYTICS TRACKING & ADMIN AUTHORIZATION
+      // ═════════════════════════════════════════════════════════════════════════════
+      // Track all messages for analytics
+      if (analyticsModule) {
+        analyticsModule.trackMessage(msg, {
+          type: msg.type,
+          fromMe: msg.fromMe,
+          isGroup: msg.isGroupMsg,
+          timestamp: new Date(),
+          phoneNumber: phoneNumber
+        });
+      }
+
+      // Check user authorization
+      if (adminConfigModule && !adminConfigModule.isUserAuthorized(msg.from)) {
+        // User not authorized - can still send basic messages but no admin commands
+        logBot(`⚠️  Unauthorized user attempt: ${msg.from}`, "warn");
+      }
+
+      // ═════════════════════════════════════════════════════════════════════════════
       // LINDA AI COMMAND SYSTEM - MASTER ACCOUNT ONLY
       // ═════════════════════════════════════════════════════════════════════════════
       // Only master account processes commands (has Linda's intelligence)
@@ -935,6 +1007,112 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
         
         if (masterPhone) {
           await msg.reply(`📢 Commands are processed by the master account.\n\nYou can still send messages to the master account for help!`);
+        }
+        return;
+      }
+
+      // ═════════════════════════════════════════════════════════════════════════════
+      // PHASE 7: ADMIN COMMANDS (/admin, /report, /dashboard)
+      // ═════════════════════════════════════════════════════════════════════════════
+      if (msg.body.startsWith('/admin ') && adminConfigModule) {
+        // Admin command processing
+        const isAdmin = adminConfigModule.verifyAdminAccess(msg.from).authorized;
+        if (!isAdmin) {
+          await msg.reply('❌ Not authorized for admin commands');
+          return;
+        }
+
+        const parts = msg.body.split(' ');
+        const action = parts[1];
+        const value = parts.slice(2).join(' ');
+
+        try {
+          switch (action) {
+            case 'toggle-handler': {
+              const result = adminConfigModule.toggleHandler(value);
+              await msg.reply(`✅ Handler ${value}: ${result.enabled ? 'ENABLED ✅' : 'DISABLED 🔴'}`);
+              break;
+            }
+            case 'get-stats': {
+              if (analyticsModule) {
+                const snapshot = analyticsModule.getDashboardSnapshot();
+                await msg.reply(`📊 Bot Stats:\n\nMessages: ${snapshot.metrics.messages.total}\nHandlers: ${snapshot.metrics.handlers.totalInvocations}\n✅ Success Rate: ${snapshot.metrics.handlers.successRate}`);
+              }
+              break;
+            }
+            case 'list-perms': {
+              const perms = adminConfigModule.listPermissions(msg.from);
+              await msg.reply(`👤 Your permissions:\n${Object.entries(perms).map(([k, v]) => `${k}: ${v ? '✅' : '❌'}`).join('\n')}`);
+              break;
+            }
+            default:
+              await msg.reply('❓ Unknown admin command. Try: toggle-handler, get-stats, list-perms');
+          }
+        } catch (error) {
+          await msg.reply(`❌ Admin error: ${error.message}`);
+        }
+        return;
+      }
+
+      // ═════════════════════════════════════════════════════════════════════════════
+      // PHASE 7: REPORT COMMAND (/report)
+      // ═════════════════════════════════════════════════════════════════════════════
+      if (msg.body.startsWith('/report ') && reportGeneratorModule) {
+        const reportType = msg.body.split(' ')[1] || 'daily';
+        
+        try {
+          let report;
+          switch (reportType) {
+            case 'daily':
+              report = reportGeneratorModule.generateDailyReport();
+              break;
+            case 'weekly':
+              report = reportGeneratorModule.generateWeeklyReport();
+              break;
+            case 'monthly':
+              report = reportGeneratorModule.generateMonthlyReport();
+              break;
+            default:
+              await msg.reply('❓ Report type: daily, weekly, or monthly\nUsage: /report daily');
+              return;
+          }
+
+          const summary = report.summary;
+          const reportText = `📊 ${reportType.toUpperCase()} REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 ${summary.description}
+💬 Messages: ${summary.metrics.totalMessages}
+👥 Users: ${summary.metrics.uniqueUsers}
+⚙️ Handlers: ${summary.metrics.totalHandlers}
+✅ Success Rate: ${summary.metrics.successRate}
+❌ Errors: ${summary.metrics.errorCount}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          await msg.reply(reportText);
+        } catch (error) {
+          await msg.reply(`❌ Report error: ${error.message}`);
+        }
+        return;
+      }
+
+      // ═════════════════════════════════════════════════════════════════════════════
+      // PHASE 7: DASHBOARD COMMAND (/dashboard)
+      // ═════════════════════════════════════════════════════════════════════════════
+      if (msg.body === '/dashboard' && analyticsModule) {
+        try {
+          const snapshot = analyticsModule.getDashboardSnapshot();
+          const dashText = `📊 ANALYTICS DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏰ ${new Date(snapshot.timestamp).toLocaleTimeString()}
+💬 Messages: ${snapshot.metrics.messages.total}
+👥 Users: Object.keys(snapshot.metrics.messages.byUser).length
+🎯 Health: ${snapshot.systemHealth.status} (${snapshot.systemHealth.score}%)
+❌ Errors: ${snapshot.systemHealth.errorCount}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          await msg.reply(dashText);
+        } catch (error) {
+          await msg.reply(`❌ Dashboard error: ${error.message}`);
         }
         return;
       }
