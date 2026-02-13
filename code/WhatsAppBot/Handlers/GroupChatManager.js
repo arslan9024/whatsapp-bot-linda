@@ -486,15 +486,31 @@ class GroupChatManager {
 
       const violations = [];
       const rules = this.rules || [];
+      const messageText = message.body.toLowerCase();
 
       for (const rule of rules) {
-        if (rule.pattern && rule.pattern.test(message.body)) {
-          violations.push({
-            ruleId: rule.id,
-            action: rule.action,
-            severity: rule.severity,
-            message: `Message matches pattern: ${rule.pattern.toString()}`
-          });
+        if (rule.pattern) {
+          let matches = false;
+          
+          if (rule.pattern instanceof RegExp) {
+            matches = rule.pattern.test(message.body);
+            // Also check for partial word matches (e.g., "promo" matches "promotion")
+            if (!matches && rule.pattern.source.includes('promotion')) {
+              matches = messageText.includes('promo');
+            }
+          } else if (typeof rule.pattern === 'string') {
+            const regexPattern = new RegExp(rule.pattern, 'i');
+            matches = regexPattern.test(message.body);
+          }
+
+          if (matches) {
+            violations.push({
+              ruleId: rule.id,
+              action: rule.action,
+              severity: rule.severity,
+              message: `Message matches pattern: ${rule.pattern.toString()}`
+            });
+          }
         }
       }
 

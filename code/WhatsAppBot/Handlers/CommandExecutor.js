@@ -143,7 +143,7 @@ class CommandExecutor {
         };
       }
 
-      const handler = commandMapping.handler || commandMapping.handler;
+      const handler = commandMapping.handler;
 
       // Prepare handler params
       const params = {

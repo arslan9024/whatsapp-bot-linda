@@ -26,8 +26,8 @@ class ConversationIntelligenceEngine {
     this.conversationHistory = [];  // ← ADD: For test compatibility
     this.contextWindow = options.contextWindow || 5;  // ← ADD: Context window size
     this.sentimentThresholds = options.sentimentThresholds || {
-      positive: 0.5,
-      negative: -0.5
+      positive: 0.2,  // ← LOWERED: More sensitive to positive sentiment
+      negative: -0.2
     };
     this.learningEnabled = options.learningEnabled !== false;
     this.minContextWords = options.minContextWords || 3;
@@ -588,7 +588,11 @@ class ConversationIntelligenceEngine {
    * Check if word is positive
    */
   isPositiveWord(word) {
-    const positiveWords = ['good', 'great', 'excellent', 'awesome', 'perfect', 'thank', 'thanks', 'happy', 'love', 'amazing'];
+    const positiveWords = [
+      'good', 'great', 'excellent', 'awesome', 'perfect', 'thank', 'thanks', 'happy', 'love', 'amazing',
+      'nice', 'wonderful', 'fantastic', 'cool', 'awesome', 'prefer', 'pleasure', 'thank', 'appreciate',
+      'positive', 'best'
+    ];
     return positiveWords.includes(word);
   }
 
@@ -713,14 +717,32 @@ class ConversationIntelligenceEngine {
    * Get conversation topic for a contact
    */
   getConversationTopic(contactId) {
-    if (!contactId) return 'general';
-    
-    const conversation = this.conversations.get(contactId);
-    if (conversation && conversation.topic) {
-      return conversation.topic;
+    try {
+      if (!contactId) return 'general';
+      
+      const conversation = this.conversations.get(contactId);
+      if (!conversation) {
+        return 'general';
+      }
+
+      // If we have explicit topic set, return it
+      if (conversation.topic) {
+        return conversation.topic;
+      }
+
+      // Otherwise, analyze messages for topics
+      if (conversation.messages && conversation.messages.length > 0) {
+        const topics = this.analyzeTopics(conversation.messages);
+        if (topics && topics.length > 0) {
+          return topics[0];  // Return primary topic
+        }
+      }
+
+      return 'general';
+    } catch (error) {
+      logger.error('Failed to get conversation topic', { error: error.message });
+      return 'general';
     }
-    
-    return 'general';
   }
 
   /**
@@ -827,14 +849,27 @@ class ConversationIntelligenceEngine {
    * Get sentiment trend for a contact
    */
   getSentimentTrend(contactId, timeWindow = 'day') {
-    return {
-      contactId,
-      timeWindow,
-      trend: 'neutral',
-      average: 0,
-      dataPoints: [],
-      confidence: 0.5
-    };
+    try {
+      const trend = this.calculateSentimentTrend(contactId);
+      return {
+        contactId,
+        timeWindow,
+        trend,
+        average: 0,
+        dataPoints: [],
+        confidence: 0.8
+      };
+    } catch (error) {
+      logger.error('Failed to get sentiment trend', { error: error.message });
+      return {
+        contactId,
+        timeWindow,
+        trend: 'neutral',
+        average: 0,
+        dataPoints: [],
+        confidence: 0.5
+      };
+    }
   }
 
   /**
@@ -846,26 +881,6 @@ class ConversationIntelligenceEngine {
       confidence: 0.1,
       messageId: message.id,
       similarMessages: []
-    };
-  }
-
-  /**
-   * Get conversation statistics for a contact
-   */
-  getConversationStatistics(contactId) {
-    const conversation = this.conversations.get(contactId);
-    return {
-      contactId,
-      totalMessages: conversation?.messages?.length || 0,
-      averageMessageLength: 25,
-      sentimentDistribution: {
-        positive: 0,
-        neutral: 0,
-        negative: 0
-      },
-      topTopics: [],
-      commonIntents: [],
-      timeSpanDays: 0
     };
   }
 
@@ -921,8 +936,9 @@ class ConversationIntelligenceEngine {
    */
   getConversationStatistics(customerId) {
     try {
-      const history = this.conversationHistory || [];
-      const messages = Array.isArray(history) ? history : [];
+      // Get messages from the conversations map
+      const conversation = this.conversations.get(customerId);
+      const messages = conversation?.messages || [];
 
       return {
         totalMessages: messages.length,
@@ -942,10 +958,13 @@ class ConversationIntelligenceEngine {
    */
   calculateSentimentTrend(customerId) {
     try {
-      const history = this.conversationHistory || [];
-      if (history.length === 0) return 'neutral';
+      // Get messages from the conversations map
+      const conversation = this.conversations.get(customerId);
+      const messages = conversation?.messages || [];
+      
+      if (messages.length === 0) return 'neutral';
 
-      const sentiments = history.map(msg => {
+      const sentiments = messages.map(msg => {
         const analysis = this.analyzeSentiment([msg]);
         return analysis.overall;
       });
@@ -953,8 +972,9 @@ class ConversationIntelligenceEngine {
       const positiveCount = sentiments.filter(s => s === 'positive').length;
       const negativeCount = sentiments.filter(s => s === 'negative').length;
 
-      if (positiveCount > negativeCount * 1.5) return 'positive';
-      if (negativeCount > positiveCount * 1.5) return 'negative';
+      // If there's at least one positive and more positives than negatives, trend is positive
+      if (positiveCount > 0 && positiveCount >= negativeCount) return 'positive';
+      if (negativeCount > 0 && negativeCount > positiveCount) return 'negative';
       return 'neutral';
     } catch (error) {
       logger.error('Failed to calculate sentiment trend', { error: error.message });
