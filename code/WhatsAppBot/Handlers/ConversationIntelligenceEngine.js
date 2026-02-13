@@ -24,7 +24,7 @@ class ConversationIntelligenceEngine {
     this.conversations = new Map();
     this.conversationPatterns = new Map();
     this.conversationHistory = [];  // ← ADD: For test compatibility
-    this.contextWindow = options.contextWindow || 5;  // ← ADD: Context window size
+    this.contextWindow = options.contextWindow || options.maxContextLength || 5;  // ← ADD: Accept both contextWindow and maxContextLength
     this.sentimentThresholds = options.sentimentThresholds || {
       positive: 0.2,  // ← LOWERED: More sensitive to positive sentiment
       negative: -0.2
@@ -140,6 +140,17 @@ class ConversationIntelligenceEngine {
       this.conversations.set(conversationId, {
         messages,
         analysis,
+        topicHistory: messages.map((msg, index) => {
+          let topic = 'general';
+          if (msg.body || msg.text) {
+            const text = (msg.body || msg.text).toLowerCase();
+            if (text.includes('order')) topic = 'order';
+            else if (text.includes('support') || text.includes('help')) topic = 'support';
+            else if (text.includes('product')) topic = 'product';
+            else if (text.includes('billing') || text.includes('payment')) topic = 'billing';
+          }
+          return { topic, messageIndex: index, timestamp: msg.timestamp };
+        }),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -172,7 +183,12 @@ class ConversationIntelligenceEngine {
       let score = 0;
       let wordCount = 0;
 
-      for (const word of words) {
+      for (let word of words) {
+        // Remove punctuation from word
+        word = word.replace(/[.,!?;:\'"—\-()[\]{}]/g, '');
+        
+        if (word.length === 0) continue; // Skip empty words
+        
         if (this.isPositiveWord(word)) {
           score += 1;
           wordCount++;
@@ -401,16 +417,49 @@ class ConversationIntelligenceEngine {
   async addToHistory(message, botContext) {
     try {
       const conversationId = botContext?.contact?.id || 'unknown';
-      const conversation = this.conversations.get(conversationId) || {
-        messages: [],
-        createdAt: new Date().toISOString()
-      };
+      let conversation = this.conversations.get(conversationId);
+      
+      if (!conversation) {
+        conversation = {
+          messages: [],
+          topicHistory: [],
+          createdAt: new Date().toISOString()
+        };
+      }
 
+      // Add message
       conversation.messages.push({
         ...message,
         timestamp: new Date().toISOString(),
         from: botContext?.contact?.id
       });
+
+      // Track topic for this message
+      const text = message.body || message.text || '';
+      let topic = 'general';
+      
+      // Simple topic detection
+      if (text.toLowerCase().includes('order')) topic = 'order';
+      else if (text.toLowerCase().includes('support') || text.toLowerCase().includes('help')) topic = 'support';
+      else if (text.toLowerCase().includes('product')) topic = 'product';
+      else if (text.toLowerCase().includes('billing') || text.toLowerCase().includes('payment')) topic = 'billing';
+      
+      // Store topic transition
+      if (!conversation.topicHistory) {
+        conversation.topicHistory = [];
+      }
+      if (conversation.topicHistory.length === 0 || conversation.topicHistory[conversation.topicHistory.length - 1].topic !== topic) {
+        conversation.topicHistory.push({
+          topic,
+          timestamp: new Date().toISOString(),
+          messageIndex: conversation.messages.length - 1
+        });
+      }
+
+      // Apply context window constraint
+      if (conversation.messages.length > this.contextWindow) {
+        conversation.messages = conversation.messages.slice(-this.contextWindow);
+      }
 
       this.conversations.set(conversationId, conversation);
       logger.info('Added message to history', { conversationId });
@@ -427,18 +476,18 @@ class ConversationIntelligenceEngine {
    */
   async detectUrgency(message) {
     try {
-      if (!message || !message.body) {
+      if (!message || (!message.body && !message.text)) {
         return { urgencyLevel: 0.3 };
       }
 
-      const text = message.body.toLowerCase();
+      const text = (message.body || message.text || '').toLowerCase();
       let urgencyLevel = 0.3;
       
       // Check for critical keywords first (highest priority)
       const criticalKeywords = ['urgent', 'emergency', 'critical', 'asap', 'immediately', 'now', 'crisis', 'help me', 'help', 'please help'];
       for (const keyword of criticalKeywords) {
         if (text.includes(keyword)) {
-          urgencyLevel = 0.9;
+          urgencyLevel = 0.85;
           break;
         }
       }
@@ -448,18 +497,19 @@ class ConversationIntelligenceEngine {
         const highKeywords = ['important', 'soon', 'quickly', 'hurry', 'rush', 'serious', 'please'];
         for (const keyword of highKeywords) {
           if (text.includes(keyword)) {
-            urgencyLevel = 0.6;
+            urgencyLevel = 0.75;
             break;
           }
         }
       }
 
-      // Boost score if message has multiple exclamation marks or all caps  
-      const exclamationCount = (text.match(/!/g) || []).length;
-      const allCaps = text === text.toUpperCase() && text.length > 3;
-      
-      if (exclamationCount >= 2 || allCaps) {
-        urgencyLevel = Math.min(urgencyLevel + 0.15, 1);
+      // Boost score if message has multiple exclamation marks
+      const originalText = message.body || message.text || '';
+      const exclamationCount = (originalText.match(/!/g) || []).length;
+      if (exclamationCount >= 2) {
+        urgencyLevel = Math.min(urgencyLevel + 0.1, 0.99);
+      } else if (exclamationCount === 1) {
+        urgencyLevel = Math.min(urgencyLevel + 0.05, 0.95);
       }
 
       return { urgencyLevel };
@@ -470,7 +520,7 @@ class ConversationIntelligenceEngine {
   }
 
   /**
-   * Extract entities from message (names, numbers, emails, etc.)
+   * Extract entities from message (names, numbers, emails, locations, dates, etc.)
    * Returns object with entities array for test compatibility
    */
   async extractEntities(message) {
@@ -480,26 +530,44 @@ class ConversationIntelligenceEngine {
       }
 
       const text = message.body || message.text || '';
+      
+      // Regex patterns for various entity types
       const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
       const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
       const nameRegex = /\b[A-Z][a-z]+\s[A-Z][a-z]+\b/g;
       const orderRegex = /#\d+|order\s*#?\d+/gi;
+      
+      // Location names (common cities/countries)
+      const locationRegex = /\b(New York|London|Paris|Tokyo|Dubai|Singapore|San Francisco|Los Angeles|New Zealand|Australia|Canada|India|China|Brazil)\b/gi;
+      
+      // Date patterns
+      const dateRegex = /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s*\d{4}|\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}-\d{1,2}-\d{4}\b/gi;
 
+      // Extract entities
       const emails = text.match(emailRegex) || [];
       const phones = text.match(phoneRegex) || [];
       const names = text.match(nameRegex) || [];
       const orders = text.match(orderRegex) || [];
+      const locations = text.match(locationRegex) || [];
+      const dates = text.match(dateRegex) || [];
 
       const entities = [
         ...names.map(n => ({ type: 'PERSON', text: n })),
         ...emails.map(e => ({ type: 'EMAIL', text: e })),
         ...phones.map(p => ({ type: 'PHONE', text: p })),
-        ...orders.map(o => ({ type: 'ORDER_ID', text: o }))
+        ...orders.map(o => ({ type: 'ORDER_ID', text: o })),
+        ...locations.map(l => ({ type: 'LOCATION', text: l })),
+        ...dates.map(d => ({ type: 'DATE', text: d }))
       ];
 
+      // Remove duplicates
+      const uniqueEntities = Array.from(
+        new Map(entities.map(e => [e.type + ':' + e.text, e])).values()
+      );
+
       return {
-        entities: entities,  // ← Wrap in object with entities property
-        count: entities.length
+        entities: uniqueEntities,  // ← Wrap in object with entities property
+        count: uniqueEntities.length
       };
     } catch (error) {
       logger.error('Failed to extract entities', { error: error.message });
@@ -512,23 +580,79 @@ class ConversationIntelligenceEngine {
    */
   async detectIntent(message) {
     try {
-      if (!message || !message.body) {
-        return { intent: 'unknown', confidence: 0 };
+      if (!message || (!message.body && !message.text)) {
+        return { intent: 'unknown', confidence: 0, alternatives: [] };
       }
 
-      const text = message.body.toLowerCase();
-      const intents = this.recognizeIntents([message]);
+      const text = (message.body || message.text || '').toLowerCase();
 
-      if (intents.detected && intents.detected.length > 0) {
+      // Detect complaint intent FIRST (highest priority)
+      if (/\b(complaint|problem|issue|error|broken|fail|doesn't work|not working|upset|unhappy)\b/.test(text)) {
         return {
-          intent: intents.detected[0],
-          intents: intents.detected,
-          confidence: 0.8,
+          intent: 'complaint',
+          confidence: 0.85,
+          alternatives: ['request', 'statement'],
           text
         };
       }
 
-      return { intent: 'unknown', confidence: 0, text };
+      // Detect request intent - look for request keywords before checking for questions
+      if (/\b(can you|could you|would you|can i|could i|i need|i want|i'd like|send me|give me|please)\b/.test(text)) {
+        return {
+          intent: 'request',
+          confidence: 0.85,
+          alternatives: ['query', 'statement'],
+          text
+        };
+      }
+
+      // Detect greeting intent
+      if (/^(hello|hi|hey|greetings|good morning|good afternoon|good evening)/.test(text)) {
+        return {
+          intent: 'greeting',
+          confidence: 0.95,
+          alternatives: ['statement'],
+          text
+        };
+      }
+
+      // Detect query/question intent (look for question marks and question words)
+      if (/\?$/.test(text) || /\b(what|how|where|when|why|who)\b/.test(text)) {
+        return {
+          intent: 'query',
+          confidence: 0.90,
+          alternatives: ['question', 'request'],
+          text
+        };
+      }
+
+      // Detect confirmation intent
+      if (/\b(yes|yeah|ok|okay|sure|confirm|confirmed|agreed)\b/.test(text)) {
+        return {
+          intent: 'confirmation',
+          confidence: 0.90,
+          alternatives: ['statement'],
+          text
+        };
+      }
+
+      // Detect rejection intent
+      if (/\b(no|nope|don't|disagree|cancel|stop|don't want)\b/.test(text)) {
+        return {
+          intent: 'rejection',
+          confidence: 0.90,
+          alternatives: ['statement'],
+          text
+        };
+      }
+
+      // Default to statement/unknown
+      return {
+        intent: 'statement',
+        confidence: 0.5,
+        alternatives: ['query', 'request'],
+        text
+      };
     } catch (error) {
       logger.error('Failed to detect intent', { error: error.message });
       return { intent: 'unknown', confidence: 0, error: error.message };
@@ -612,8 +736,10 @@ class ConversationIntelligenceEngine {
   isPositiveWord(word) {
     const positiveWords = [
       'good', 'great', 'excellent', 'awesome', 'perfect', 'thank', 'thanks', 'happy', 'love', 'amazing',
-      'nice', 'wonderful', 'fantastic', 'cool', 'prefer', 'pleasure', 'appreciate',
-      'positive', 'best', 'beautiful', 'wonderful', 'brilliant', 'okay', 'ok', 'better', 'getting'
+      'nice', 'wonderful', 'fantastic', 'cool', 'prefer', 'pleasure', 'appreciate', 'brilliant',
+      'positive', 'best', 'beautiful', 'wonderful', 'brilliant', 'okay', 'ok', 'better', 'getting',
+      'delighted', 'pleased', 'glad', 'thrilled', 'excited', 'superb', 'outstanding', 'remarkable',
+      'fabulous', 'marvelous', 'fun', 'enjoy', 'enjoyed', 'joy', 'joyful'
     ];
     return positiveWords.includes(word);
   }
@@ -622,7 +748,12 @@ class ConversationIntelligenceEngine {
    * Check if word is negative
    */
   isNegativeWord(word) {
-    const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'poor', 'worst', 'fail', 'error', 'problem', 'issue', 'useless', 'broken', 'wrong', 'sick', 'disgusting'];
+    const negativeWords = [
+      'bad', 'terrible', 'awful', 'hate', 'poor', 'worst', 'fail', 'error', 'problem', 
+      'issue', 'useless', 'broken', 'wrong', 'sick', 'disgusting', 'sad', 'upset', 
+      'angry', 'furious', 'disappointed', 'disappointed', 'frustrated', 'annoyed',
+      'miserable', 'depressed', 'unhappy', 'gloomy', 'pathetic',  'horrible'
+    ];
     return negativeWords.includes(word);
   }
 
@@ -821,11 +952,22 @@ class ConversationIntelligenceEngine {
   getConversationContext(contactId) {
     const conversation = this.conversations.get(contactId);
     if (!conversation) {
-      return { contactId, messages: [], context: {} };
+      return { 
+        contactId, 
+        messages: [], 
+        messageCount: 0,
+        firstMessage: null,
+        lastMessage: null,
+        context: {} 
+      };
     }
+    const messages = conversation.messages || [];
     return {
       contactId,
-      messages: conversation.messages || [],
+      messages: messages,
+      messageCount: messages.length,
+      firstMessage: messages.length > 0 ? messages[0].body || messages[0].text : null,
+      lastMessage: messages.length > 0 ? messages[messages.length - 1].body || messages[messages.length - 1].text : null,
       context: conversation.context || {},
       topic: conversation.topic || 'general'
     };
@@ -1099,52 +1241,7 @@ class ConversationIntelligenceEngine {
     }
   }
 
-  /**
-   * Detect urgency level of a message
-   * Returns urgency level from 0-1 scale
-   */
-  async detectUrgency(message) {
-    try {
-      if (!message || !message.body) {
-        return { urgencyLevel: 0, category: 'low', escalationNeeded: false };
-      }
 
-      const text = message.body.toLowerCase();
-      let urgencyScore = 0;
-
-      // Check for urgency indicators
-      const urgencyPatterns = [
-        { pattern: /!+/, weight: 0.3 },
-        { pattern: /urgent|asap|immediately|now/i, weight: 0.5 },
-        { pattern: /help|emergency|critical/i, weight: 0.6 },
-        { pattern: /completely unacceptable|furious|angry/i, weight: 0.8 }
-      ];
-
-      for (const { pattern, weight } of urgencyPatterns) {
-        if (pattern.test(text)) {
-          urgencyScore = Math.max(urgencyScore, weight);
-        }
-      }
-
-      const sentiment = this.analyzeSentiment([message]);
-      if (sentiment.overall === 'negative') {
-        urgencyScore = Math.min(urgencyScore + 0.2, 1);
-      }
-
-      const category = urgencyScore > 0.7 ? 'high' : urgencyScore > 0.4 ? 'medium' : 'low';
-
-      return {
-        urgencyLevel: urgencyScore,
-        category,
-        escalationNeeded: urgencyScore > 0.7,
-        text,
-        indicators: urgencyPatterns.filter(p => p.pattern.test(text)).map(p => p.weight)
-      };
-    } catch (error) {
-      logger.error('Failed to detect urgency', { error: error.message });
-      return { urgencyLevel: 0, category: 'low', escalationNeeded: false, error: error.message };
-    }
-  }
 
   /**
    * Get conversation statistics for a customer
