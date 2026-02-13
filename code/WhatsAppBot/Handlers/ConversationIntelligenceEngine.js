@@ -54,7 +54,8 @@ class ConversationIntelligenceEngine {
    */
   async processMessage(message, botContext) {
     try {
-      if (!message || !message.body) {
+      const messageText = message?.body || message?.text;
+      if (!message || !messageText) {
         return {
           success: true,
           isEmpty: true,
@@ -64,8 +65,8 @@ class ConversationIntelligenceEngine {
         };
       }
 
-      const tokens = message.body.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-      const sentiment = this.analyzeSentiment([message]);
+      const tokens = messageText.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      const sentiment = await this.analyzeSentiment([message]);
       const topics = this.extractTopics([message]);
       const intents = this.recognizeIntents([message]);
 
@@ -83,7 +84,7 @@ class ConversationIntelligenceEngine {
           wordCount: tokens.length
         },
         tokens,
-        body: message.body,
+        body: messageText,
         metadata: {
           from: botContext?.contact?.id,
           timestamp: new Date().toISOString(),
@@ -220,7 +221,7 @@ class ConversationIntelligenceEngine {
    */
   extractTopics(messages) {
     const topics = {};
-    const text = messages.map(m => m.text?.toLowerCase() || m.body?.toLowerCase() || '').join(' ');
+    const text = messages.map(m => (m.body || m.text || '').toLowerCase()).join(' ');
 
     for (const [topic, keywords] of Object.entries(this.topicKewords)) {
       const matches = keywords.filter(kw => text.includes(kw)).length;
@@ -236,7 +237,7 @@ class ConversationIntelligenceEngine {
       .sort((a, b) => b[1].count - a[1].count)
       .map(([topic, data]) => ({ topic, ...data }));
 
-    return sortedTopics;
+    return sortedTopics.length > 0 ? sortedTopics : [];
   }
 
   /**
@@ -246,7 +247,7 @@ class ConversationIntelligenceEngine {
     const intents = [];
 
     for (const message of messages) {
-      const text = message.text?.toLowerCase() || '';
+      const text = (message.body || message.text || '').toLowerCase();
       const detected = {
         messageId: message.id,
         intents: []
@@ -273,6 +274,10 @@ class ConversationIntelligenceEngine {
         detected.intents.push({ intent: 'rejection', confidence: 0.9 });
       }
 
+      if (/\b(complaint|problem|issue|error|broken|fail)\b/.test(text)) {
+        detected.intents.push({ intent: 'complaint', confidence: 0.85 });
+      }
+
       if (detected.intents.length > 0) {
         intents.push(detected);
       }
@@ -285,17 +290,18 @@ class ConversationIntelligenceEngine {
    * Identify conversation patterns
    */
   identifyPatterns(messages) {
+    const lengths = messages.map(m => (m.body || m.text || '').length);
     const patterns = {
       conversationLength: messages.length,
-      averageMessageLength: messages.reduce((sum, m) => sum + (m.text?.length || 0), 0) / messages.length,
-      longestMessage: Math.max(...messages.map(m => m.text?.length || 0)),
-      shortestMessage: Math.min(...messages.map(m => m.text?.length || 0)),
-      totalCharacters: messages.reduce((sum, m) => sum + (m.text?.length || 0), 0),
-      questionCount: messages.filter(m => m.text?.includes('?')).length,
-      exclamationCount: messages.filter(m => m.text?.includes('!')).length,
-      hasUrls: messages.some(m => /https?:\/\//.test(m.text || '')),
-      hasEmojis: messages.some(m => /[\u{1F600}-\u{1F64F}]/u.test(m.text || '')),
-      hasNumbers: messages.some(m => /\d+/.test(m.text || ''))
+      averageMessageLength: lengths.reduce((sum, len) => sum + len, 0) / messages.length || 0,
+      longestMessage: Math.max(...lengths, 0),
+      shortestMessage: Math.min(...lengths.filter(l => l > 0), 0),
+      totalCharacters: lengths.reduce((sum, len) => sum + len, 0),
+      questionCount: messages.filter(m => (m.body || m.text || '').includes('?')).length,
+      exclamationCount: messages.filter(m => (m.body || m.text || '').includes('!')).length,
+      hasUrls: messages.some(m => /https?:\/\//.test(m.body || m.text || '')),
+      hasEmojis: messages.some(m => /[\u{1F600}-\u{1F64F}]/u.test(m.body || m.text || '')),
+      hasNumbers: messages.some(m => /\d+/.test(m.body || m.text || ''))
     };
 
     // Store pattern for learning
@@ -850,20 +856,93 @@ class ConversationIntelligenceEngine {
   }
 
   /**
-   * Analyze context of a message
+   * Analyze context - can be called with:
+   * - analyzeContext(message, contactId) - analyze single message context
+   * - analyzeContext(contactId) - analyze whole conversation context
    */
-  analyzeContext(message, contactId) {
-    return {
-      messageId: message.id,
-      contactId,
-      context: {
-        topic: 'general',
-        sentiment: 'neutral',
-        intent: 'statement',
-        entities: []
-      },
-      confidence: 0.5
-    };
+  async analyzeContext(messageOrContactId, contactIdParam) {
+    try {
+      // Determine if we're analyzing a message or whole conversation
+      let contactId, message;
+      if (typeof messageOrContactId === 'string') {
+        // Called with just contactId
+        contactId = messageOrContactId;
+        message = null;
+      } else {
+        // Called with message and contactId
+        message = messageOrContactId;
+        contactId = contactIdParam;
+      }
+
+      const conversation = this.conversations.get(contactId);
+      const messages = conversation?.messages || [];
+
+      if (message) {
+        // Analyze single message context
+        return {
+          messageId: message.id,
+          contactId,
+          context: {
+            topic: 'general',
+            sentiment: 'neutral',
+            intent: 'statement',
+            entities: []
+          },
+          pronounResolution: [],
+          confidence: 0.5
+        };
+      } else {
+        // Analyze conversation context
+        // Try to resolve pronouns in conversation (e.g., "It" in "I bought a laptop" / "It is very fast")
+        const pronounResolution = [];
+        const pronouns = ['it', 'he', 'she', 'they', 'them', 'his', 'her', 'their'];
+        
+        for (let i = 0; i < messages.length; i++) {
+          const text = (messages[i].body || messages[i].text || '').toLowerCase();
+          const words = text.split(/\s+/);
+          
+          for (const pronoun of pronouns) {
+            if (words.includes(pronoun) && i > 0) {
+              // Try to find antecedent in previous message
+              const prevText = (messages[i - 1].body || messages[i - 1].text || '').toLowerCase();
+              const nouns = prevText.match(/\b[a-z]+\b/g) || [];
+              if (nouns.length > 0) {
+                pronounResolution.push({
+                  pronoun,
+                  potentialAntecedent: nouns[nouns.length - 1],
+                  messageIndex: i
+                });
+              }
+            }
+          }
+        }
+
+        return {
+          contactId,
+          conversationLength: messages.length,
+          pronounResolution,
+          context: {
+            topic: 'general',
+            sentiment: 'neutral',
+            intent: 'statement',
+            entities: []
+          },
+          confidence: 0.5
+        };
+      }
+    } catch (error) {
+      logger.error('Failed to analyze context', { error: error.message });
+      return {
+        pronounResolution: [],
+        context: {
+          topic: 'general',
+          sentiment: 'neutral',
+          intent: 'statement',
+          entities: []
+        },
+        confidence: 0.1
+      };
+    }
   }
 
   /**
