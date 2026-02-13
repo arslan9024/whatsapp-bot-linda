@@ -66,7 +66,7 @@ class ConversationIntelligenceEngine {
       }
 
       const tokens = messageText.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-      const sentiment = await this.analyzeSentiment([message]);
+      const sentiment = this.analyzeSentiment([message]);
       const topics = this.extractTopics([message]);
       const intents = this.recognizeIntents([message]);
 
@@ -172,7 +172,7 @@ class ConversationIntelligenceEngine {
    * Analyze sentiment of messages
    * Handles both single message and array of messages
    */
-  async analyzeSentiment(messages) {
+  analyzeSentiment(messages) {
     // Handle both single message and array of messages
     const messageArray = Array.isArray(messages) ? messages : [messages];
     
@@ -843,7 +843,8 @@ class ConversationIntelligenceEngine {
   getUserProfile(userId) {
     try {
       const conversation = this.conversations.get(userId);
-      if (!conversation) {
+      
+      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
         return {
           userId,
           conversationCount: 0,
@@ -855,7 +856,7 @@ class ConversationIntelligenceEngine {
         };
       }
 
-      const messages = conversation.messages || [];
+      const messages = conversation.messages;
       
       // Extract name and company from messages
       let name = null;
@@ -863,27 +864,70 @@ class ConversationIntelligenceEngine {
       const preferences = [];
       
       for (const message of messages) {
-        const text = message.body || '';
+        if (!message) continue;
         
-        // Extract name (pattern: "My name is John" or "Name: John")
-        // Case-insensitive match for keywords, but capture actual name
-        const nameMatch = text.match(/(?:my name is|name:\s*)([A-Za-z]+)/i);
-        if (nameMatch && !name) {
-          // Capitalize first letter of matched name
-          name = nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1).toLowerCase();
+        // Support both body and text fields - try to extract text
+        let text = '';
+        if (message.body) {
+          text = String(message.body).trim();
+        } else if (message.text) {
+          text = String(message.text).trim();
         }
         
-        // Extract company (pattern: "I work at Google" or "Company: Google")
-        const companyMatch = text.match(/(?:work at|work for|company:\s*)([A-Za-z0-9\s&]+?)(?:\s|$|\.|\,|\s+and)/i);
-        if (companyMatch && !company) {
-          company = companyMatch[1].trim();
+        if (!text) continue;
+        
+        // Extract name - multiple patterns
+        if (!name) {
+          // Pattern 1: "My name is John"
+          let match = text.match(/my\s+name\s+is\s+([A-Za-z]+)/i);
+          if (match) {
+            name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+          }
+          
+          // Pattern 2: "Name: John"
+          if (!match) {
+            match = text.match(/name\s*:\s*([A-Za-z]+)/i);
+            if (match) {
+              name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+            }
+          }
+          
+          // Pattern 3: Look for capitalized words that look like names (fallback)
+          if (!match) {
+            const words = text.split(/\s+/);
+            for (const word of words) {
+              // Check if word is capitalized and not a common word
+              const commonWords = ['my', 'name', 'is', 'and', 'i', 'work', 'at', 'for', 'the', 'a', 'an'];
+              if (/^[A-Z][a-z]+$/.test(word) && !commonWords.includes(word.toLowerCase())) {
+                name = word;
+                break;
+              }
+            }
+          }
         }
         
-        // Extract preferences (pattern: "I prefer X" or "prefer: X")
-        const prefMatch = text.match(/(?:i prefer|prefer|always|prefer to)\s+([^.!?]+[.!?]?)/gi);
+        // Extract company - multiple patterns
+        if (!company) {
+          // Pattern 1: "I work at Google" or "work at Google"
+          let match = text.match(/(?:work\s+at|work\s+for)\s+([A-Za-z0-9&\s]+?)(?:\s+and|\s+or|$|\.)/i);
+          if (match) {
+            company = match[1].trim();
+          }
+          
+          // Pattern 2: "Company: Google"
+          if (!match) {
+            match = text.match(/company\s*:\s*([A-Za-z0-9&\s]+?)(?:\s|$|\.)/i);
+            if (match) {
+              company = match[1].trim();
+            }
+          }
+        }
+        
+        // Extract preferences
+        const prefMatch = text.match(/(?:i\s+prefer|prefer)\s+([^.!?]+)/gi);
         if (prefMatch) {
           prefMatch.forEach(pref => {
-            const cleaned = pref.replace(/^(?:i prefer|prefer|always|prefer to)\s+/i, '').trim();
+            const cleaned = pref.replace(/^(?:i\s+prefer|prefer)\s+/i, '').trim();
             if (cleaned && !preferences.includes(cleaned)) {
               preferences.push(cleaned);
             }
