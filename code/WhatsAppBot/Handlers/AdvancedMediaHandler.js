@@ -167,7 +167,7 @@ class AdvancedMediaHandler {
   async downloadMedia(media, mediaId) {
     try {
       if (!media) {
-        return { success: false, error: 'Media object is required' };
+        return { success: false, errorMessage: 'Media object is required' };
       }
 
       const filename = media.filename || `media_${mediaId}`;
@@ -190,7 +190,7 @@ class AdvancedMediaHandler {
       };
     } catch (error) {
       logger.error('Failed to download media', { error: error.message });
-      return { success: false, error: error.message };
+      return { success: false, errorMessage: error.message };
     }
   }
 

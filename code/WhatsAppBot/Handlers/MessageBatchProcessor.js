@@ -210,6 +210,7 @@ class MessageBatchProcessor extends EventEmitter {
           success: true,
           batchId,
           processed: messages.length,
+          progress: batch.progress,
           batch
         };
       } else {
@@ -296,6 +297,7 @@ class MessageBatchProcessor extends EventEmitter {
         batchId,
         processed: batch.progress.sent,
         failed: batch.progress.failed,
+        progress: batch.progress,
         batch
       };
     } catch (error) {
