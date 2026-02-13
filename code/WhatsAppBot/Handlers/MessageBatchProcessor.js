@@ -243,6 +243,7 @@ class MessageBatchProcessor extends EventEmitter {
       this.processingBatches.add(batchId);
       batch.status = 'processing';
       batch.startedAt = new Date().toISOString();
+      const startTime = Date.now();
 
       logger.info('Processing batch started', { batchId });
       this.emit('batch:started', { batchId });
@@ -288,6 +289,8 @@ class MessageBatchProcessor extends EventEmitter {
       batch.status = 'completed';
       batch.completedAt = new Date().toISOString();
       this.processingBatches.delete(batchId);
+      
+      const duration = Date.now() - startTime;
 
       logger.info('Batch processing completed', { batchId, processed: batch.progress.sent });
       this.emit('batch:completed', { batchId, batch });
@@ -298,6 +301,7 @@ class MessageBatchProcessor extends EventEmitter {
         processed: batch.progress.sent,
         failed: batch.progress.failed,
         progress: batch.progress,
+        duration,
         batch
       };
     } catch (error) {

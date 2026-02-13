@@ -17,14 +17,22 @@ const logger = require('../Integration/Google/utils/logger');
 
 class CommandExecutor {
   constructor(options = {}) {
+    this.logger = options.logger || logger;
     this.commands = new Map();
+    this.aliases = new Map(); // Map aliases to command names
     this.commandHistory = [];
     this.userContexts = new Map();
+    this.userCooldowns = new Map(); // Track cooldown expiration times
+    this.maxCommandLength = options.maxCommandLength || 1000; // Default 1000 chars
+    this.commandDelimiter = options.commandDelimiter || '/'; // Default /
     this.initialized = false;
     this.whatsappService = options.whatsappService;
     this.contactsService = options.contactsService;
     this.sheetsService = options.sheetsService;
     this.conversationEngine = options.conversationEngine;
+    
+    // Register built-in commands on construction
+    this.registerBuiltInCommands();
   }
 
   /**
@@ -32,12 +40,15 @@ class CommandExecutor {
    */
   async initialize() {
     try {
-      this.registerBuiltInCommands();
+      // Only register if not already initialized
+      if (!this.initialized) {
+        this.registerBuiltInCommands();
+      }
       this.initialized = true;
-      logger.info('Command Executor initialized successfully');
+      this.logger.info('Command Executor initialized successfully');
       return { success: true, message: 'Command executor ready' };
     } catch (error) {
-      logger.error('Failed to initialize command executor', { error: error.message });
+      this.logger.error('Failed to initialize command executor', { error: error.message });
       throw error;
     }
   }
@@ -66,6 +77,7 @@ class CommandExecutor {
     // System commands
     this.registerCommand('help', this.handleHelpCommand.bind(this));
     this.registerCommand('status', this.handleStatusCommand.bind(this));
+    this.registerCommand('version', this.handleVersionCommand.bind(this));
   }
 
   /**
@@ -75,12 +87,36 @@ class CommandExecutor {
     // Handle both (name, handler) and (configObject) signatures
     if (typeof commandName === 'object' && commandName.name) {
       const config = commandName;
-      this.commands.set(config.name.toLowerCase(), {
+      
+      // Validate handler
+      if (!config.handler) {
+        throw new Error('Command handler is required');
+      }
+      
+      // Check for duplicate
+      const cmdNameLower = config.name.toLowerCase();
+      if (this.commands.has(cmdNameLower)) {
+        throw new Error(`Command "${config.name}" is already registered`);
+      }
+      
+      this.commands.set(cmdNameLower, {
         name: config.name,
         handler: config.handler,
+        cooldown: config.cooldown || 0,
+        description: config.description,
+        validators: config.validators || [],
+        permissions: config.permissions || [],
         registeredAt: new Date().toISOString()
       });
-      logger.info('Command registered', { commandName: config.name });
+
+      // Register aliases
+      if (config.aliases && Array.isArray(config.aliases)) {
+        for (const alias of config.aliases) {
+          this.aliases.set(alias.toLowerCase(), config.name.toLowerCase());
+        }
+      }
+
+      this.logger.info('Command registered', { commandName: config.name });
       return;
     }
 
@@ -88,14 +124,28 @@ class CommandExecutor {
     if (typeof commandName !== 'string') {
       throw new Error('Command name must be a string');
     }
+    
+    // Validate handler
+    if (!handler) {
+      throw new Error('Command handler is required');
+    }
+    
+    // Check for duplicate
+    const cmdNameLower = commandName.toLowerCase();
+    if (this.commands.has(cmdNameLower)) {
+      throw new Error(`Command "${commandName}" is already registered`);
+    }
 
-    this.commands.set(commandName.toLowerCase(), {
+    this.commands.set(cmdNameLower, {
       name: commandName,
       handler,
+      cooldown: 0,
+      validators: [],
+      permissions: [],
       registeredAt: new Date().toISOString()
     });
 
-    logger.info('Command registered', { commandName });
+    this.logger.info('Command registered', { commandName });
   }
 
   /**
@@ -133,31 +183,86 @@ class CommandExecutor {
         ? commandInput.substring(1) 
         : commandInput;
 
-      const commandLower = command.toLowerCase().split(/\s+/)[0];
+      let commandLower = command.toLowerCase().split(/\s+/)[0];
+      
+      // Resolve alias to command name
+      if (this.aliases.has(commandLower)) {
+        commandLower = this.aliases.get(commandLower);
+      }
+
       const commandMapping = this.commands.get(commandLower);
 
       if (!commandMapping) {
         return {
           success: false,
-          message: `Unknown command: ${command}`,
-          errorMessage: `Unknown command: ${command}`
+          message: `Command not found: ${command}`,
+          errorMessage: `Command not found: ${command}`
         };
       }
 
       const handler = commandMapping.handler;
+
+      // Check cooldown
+      const cooldownKey = `${userId}:${commandLower}`;
+      const now = Date.now();
+      const lastExecutionTime = this.userCooldowns.get(cooldownKey) || 0;
+      const cooldownMs = commandMapping.cooldown || 0;
+
+      if (cooldownMs > 0 && now < lastExecutionTime + cooldownMs) {
+        const remainingMs = lastExecutionTime + cooldownMs - now;
+        return {
+          success: false,
+          message: `Command is on cooldown. Try again in ${Math.ceil(remainingMs / 1000)}s`,
+          errorMessage: `Command is on cooldown. Try again in ${Math.ceil(remainingMs / 1000)}s`
+        };
+      }
+
+      // Check permissions
+      const requiredPermissions = commandMapping.permissions || [];
+      if (requiredPermissions.length > 0) {
+        const userPermissions = this.getUserPermissions(botContext);
+        const hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm));
+        
+        if (!hasPermission) {
+          return {
+            success: false,
+            message: `You do not have permission to execute this command. Required: ${requiredPermissions.join(', ')}`,
+            errorMessage: `You do not have permission to execute this command. Required: ${requiredPermissions.join(', ')}`
+          };
+        }
+      }
+
+      // Parse command arguments
+      const commandParts = command.split(/\s+/);
+      const args = commandParts.slice(1);
+
+      // Run validators
+      const validators = commandMapping.validators || [];
+      for (const validator of validators) {
+        const validation = validator({ command: commandLower, args, input: commandInput });
+        if (validation) {
+          return {
+            success: false,
+            message: validation,
+            errorMessage: validation
+          };
+        }
+      }
 
       // Prepare handler params
       const params = {
         userId,
         command: commandLower,
         input: commandInput,
+        args,
         botContext
       };
 
       // Execute the command
       let result;
       if (typeof handler === 'function') {
-        result = await handler(params);
+        // Call handler with params and botContext as separate arguments
+        result = await handler(params, botContext);
       } else {
         result = { success: false, message: 'Handler is not a function' };
       }
@@ -167,17 +272,23 @@ class CommandExecutor {
         result = { success: false, message: 'Invalid command result' };
       }
 
+      // Update cooldown if command succeeded
+      if (result.success && cooldownMs > 0) {
+        this.userCooldowns.set(cooldownKey, now);
+      }
+
       // Record in history
       this.recordCommand({
         userId,
         command: commandLower,
+        status: result.success,
         result: result.success,
         timestamp: new Date().toISOString()
       });
 
       return result;
     } catch (error) {
-      logger.error('Command execution failed', { error: error.message });
+      this.logger.error('Command execution failed', { error: error.message });
       return {
         success: false,
         message: `Error executing command: ${error.message}`,
@@ -432,15 +543,43 @@ class CommandExecutor {
     const topic = args?.[0]?.toLowerCase() || 'all';
 
     if (topic === 'all') {
+      // Return help for all topics and registered commands
+      let allHelp = Object.values(helpText).join('\n');
+      
+      // Add help for dynamically registered commands
+      for (const [cmdName, cmdConfig] of this.commands.entries()) {
+        if (!helpText[cmdName] && cmdConfig.description) {
+          allHelp += `\n${cmdName} - ${cmdConfig.description}`;
+        }
+      }
+
       return {
         success: true,
-        help: Object.values(helpText).join('\n')
+        help: allHelp
       };
     }
 
+    // Check if it's a static help topic
+    if (helpText[topic]) {
+      return {
+        success: true,
+        help: helpText[topic]
+      };
+    }
+
+    // Check if it's a registered command
+    const cmd = this.commands.get(topic);
+    if (cmd && cmd.description) {
+      return {
+        success: true,
+        help: cmd.description
+      };
+    }
+
+    // Not found
     return {
       success: true,
-      help: helpText[topic] || `Unknown topic: ${topic}`
+      message: `Command help not found for: ${topic}`
     };
   }
 
@@ -448,7 +587,7 @@ class CommandExecutor {
    * Handle status command
    */
   async handleStatusCommand(params) {
-    const { context } = params;
+    const { botContext } = params;
 
     return {
       success: true,
@@ -458,9 +597,47 @@ class CommandExecutor {
         sheetsConnected: !!this.sheetsService,
         learningEnabled: !!this.conversationEngine,
         totalCommands: this.commandHistory.length,
-        userLearnings: (context.learnings || []).length
+        userLearnings: (botContext?.learnings || []).length
       }
     };
+  }
+
+  /**
+   * Handle version command
+   */
+  async handleVersionCommand(params) {
+    return {
+      success: true,
+      version: '1.0.0',
+      releaseDate: '2026-02-26',
+      features: [
+        'WhatsApp Multi-Account Management',
+        'Google Contacts Integration',
+        'Google Sheets Integration',
+        'Conversation Learning Engine'
+      ]
+    };
+  }
+
+  /**
+   * Get user permissions from context
+   */
+  getUserPermissions(botContext) {
+    const permissions = ['user']; // Everyone has 'user' permission
+    
+    if (botContext?.isAdmin) {
+      permissions.push('admin');
+    }
+    
+    if (botContext?.isOwner) {
+      permissions.push('owner');
+    }
+    
+    if (botContext?.contact?.isVerified) {
+      permissions.push('verified');
+    }
+    
+    return permissions;
   }
 
   /**
@@ -469,32 +646,67 @@ class CommandExecutor {
   parseCommand(input) {
     const trimmed = input.trim();
     
-    // Remove leading / if present
-    const withoutSlash = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+    // Check for command delimiter
+    if (!trimmed.startsWith(this.commandDelimiter)) {
+      return null;
+    }
+    
+    // Check for oversized command
+    if (trimmed.length > this.maxCommandLength) {
+      return null;
+    }
+    
+    // Remove leading delimiter
+    const withoutDelimiter = trimmed.slice(this.commandDelimiter.length);
     
     // Split by spaces, but respect quoted strings
-    const parts = this.splitCommand(withoutSlash);
+    const parts = this.splitCommand(withoutDelimiter);
     
     if (parts.length === 0) {
       return null;
     }
 
     const command = parts[0];
-    const subcommand = parts[1] || null;
     const args = [];
     const flags = {};
+    const options = {}; // For mapping flag names
 
-    // Parse remaining parts
-    for (let i = 2; i < parts.length; i++) {
-      if (parts[i].startsWith('-')) {
-        const [key, value] = parts[i].slice(1).split('=');
-        flags[key] = value || true;
+    // Parse remaining parts for args and flags
+    for (let i = 1; i < parts.length; i++) {
+      if (parts[i].startsWith('--')) {
+        // Handle double dash flags (--flag or --flag=value)
+        const [key, valueFromEq] = parts[i].slice(2).split('=');
+        let value = valueFromEq;
+        
+        // If no = sign and next part is not a flag, use it as value
+        if (!valueFromEq && i + 1 < parts.length && !parts[i + 1].startsWith('-')) {
+          value = parts[++i];
+        } else if (!value) {
+          value = true;
+        }
+        
+        flags[key] = value;
+        options[key] = value;
+      } else if (parts[i].startsWith('-') && parts[i] !== '-') {
+        // Handle single dash flags (-f or -f=value)
+        const [key, valueFromEq] = parts[i].slice(1).split('=');
+        let value = valueFromEq;
+        
+        // If no = sign and next part is not a flag, use it as value
+        if (!valueFromEq && i + 1 < parts.length && !parts[i + 1].startsWith('-')) {
+          value = parts[++i];
+        } else if (!value) {
+          value = true;
+        }
+        
+        flags[key] = value;
+        options[key] = value;
       } else {
         args.push(parts[i]);
       }
     }
 
-    return { command, subcommand, args, flags };
+    return { command, args, flags, options };
   }
 
   /**
@@ -636,7 +848,7 @@ class CommandExecutor {
         primary: suggestions[0] || null
       };
     } catch (error) {
-      logger.error('Failed to suggest command', { error: error.message });
+      this.logger.error('Failed to suggest command', { error: error.message });
       return { intent, suggestions: [], error: error.message };
     }
   }
@@ -674,7 +886,7 @@ class CommandExecutor {
     this.commandHistory = [];
     this.userContexts.clear();
     this.initialized = false;
-    logger.debug('CommandExecutor state reset');
+    this.logger.debug('CommandExecutor state reset');
   }
 }
 
