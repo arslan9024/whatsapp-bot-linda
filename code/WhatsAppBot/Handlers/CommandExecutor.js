@@ -139,7 +139,8 @@ class CommandExecutor {
       if (!commandMapping) {
         return {
           success: false,
-          message: `Unknown command: ${command}`
+          message: `Unknown command: ${command}`,
+          errorMessage: `Unknown command: ${command}`
         };
       }
 
@@ -179,7 +180,8 @@ class CommandExecutor {
       logger.error('Command execution failed', { error: error.message });
       return {
         success: false,
-        message: `Error executing command: ${error.message}`
+        message: `Error executing command: ${error.message}`,
+        errorMessage: `Error executing command: ${error.message}`
       };
     }
   }
@@ -569,6 +571,26 @@ class CommandExecutor {
     if (this.commandHistory.length > 1000) {
       this.commandHistory.shift();
     }
+  }
+
+  /**
+   * Get command execution statistics
+   */
+  getStatistics() {
+    const total = this.commandHistory.length;
+    const successful = this.commandHistory.filter(cmd => cmd.result === true).length;
+    const failed = this.commandHistory.filter(cmd => cmd.result === false).length;
+    const successRate = total > 0 ? Math.round((successful / total) * 100) : 0;
+
+    return {
+      totalCommands: total,
+      totalExecuted: total,
+      successful,
+      failed,
+      successRate,
+      failureRate: 100 - successRate,
+      lastCommandTime: this.commandHistory[this.commandHistory.length - 1]?.timestamp || null
+    };
   }
 
   /**
