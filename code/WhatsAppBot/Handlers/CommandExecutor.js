@@ -100,52 +100,83 @@ class CommandExecutor {
 
   /**
    * Execute a command
+   * Supports both (userId, input) and (commandString, context) signatures
    */
-  async executeCommand(userId, input) {
+  async executeCommand(userIdOrCommand, inputOrContext) {
     try {
-      const parsed = this.parseCommand(input);
-      if (!parsed) {
+      let commandInput;
+      let userId;
+      let botContext = {};
+
+      // Handle both parameter styles
+      if (typeof userIdOrCommand === 'string') {
+        commandInput = userIdOrCommand;
+        // Check if this looks like a context object
+        if (typeof inputOrContext === 'object' && inputOrContext.contact) {
+          // New style: executeCommand('/command', botContext)
+          botContext = inputOrContext;
+          userId = botContext.contact?.id || `user_${Date.now()}`;
+        } else {
+          // Old style: executeCommand(userId, input)
+          userId = userIdOrCommand;
+          commandInput = inputOrContext;
+        }
+      } else {
         return {
           success: false,
-          message: 'Invalid command format'
+          message: 'First parameter must be a command string or user ID'
         };
       }
 
-      const command = this.commands.get(parsed.command.toLowerCase());
-      if (!command) {
+      // Parse command if it starts with /
+      const command = commandInput.startsWith('/') 
+        ? commandInput.substring(1) 
+        : commandInput;
+
+      const commandLower = command.toLowerCase().split(/\s+/)[0];
+      const commandMapping = this.commands.get(commandLower);
+
+      if (!commandMapping) {
         return {
           success: false,
-          message: `Unknown command: ${parsed.command}`
+          message: `Unknown command: ${command}`
         };
       }
 
-      // Get or create user context
-      const context = this.getUserContext(userId);
-      context.lastCommand = parsed.command;
-      context.lastInput = input;
+      const handler = commandMapping.handler || commandMapping.handler;
+
+      // Prepare handler params
+      const params = {
+        userId,
+        command: commandLower,
+        input: commandInput,
+        botContext
+      };
 
       // Execute the command
-      const result = await command.handler({
-        userId,
-        subcommand: parsed.subcommand,
-        args: parsed.args,
-        flags: parsed.flags,
-        context
-      });
+      let result;
+      if (typeof handler === 'function') {
+        result = await handler(params);
+      } else {
+        result = { success: false, message: 'Handler is not a function' };
+      }
+
+      // Ensure result has success property
+      if (!result || typeof result !== 'object') {
+        result = { success: false, message: 'Invalid command result' };
+      }
 
       // Record in history
       this.recordCommand({
         userId,
-        command: parsed.command,
-        subcommand: parsed.subcommand,
-        args: parsed.args,
+        command: commandLower,
         result: result.success,
         timestamp: new Date().toISOString()
       });
 
       return result;
     } catch (error) {
-      logger.error('Command execution failed', { error: error.message, input });
+      logger.error('Command execution failed', { error: error.message });
       return {
         success: false,
         message: `Error executing command: ${error.message}`

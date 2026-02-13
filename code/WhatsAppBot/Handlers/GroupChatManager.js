@@ -21,6 +21,7 @@ class GroupChatManager {
   constructor(options = {}) {
     this.groupRegistry = new Map();
     this.memberRegistry = new Map();
+    this.rules = [];  // ← ADD: Initialize rules array
     this.permissionLevels = {
       ADMIN: 'admin',
       MODERATOR: 'moderator',

@@ -129,6 +129,35 @@ class MessageTemplateEngine {
   }
 
   /**
+   * Register a template (alias for createTemplate)
+   */
+  registerTemplate(templateConfig) {
+    try {
+      const templateId = templateConfig.id || templateConfig.name || this.generateTemplateId();
+      const template = {
+        id: templateId,
+        name: templateConfig.name || templateId,
+        content: templateConfig.content,
+        variables: this.extractVariables(templateConfig.content),
+        category: templateConfig.category || 'custom',
+        locale: templateConfig.locale || this.defaultLocale,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        usageCount: 0,
+        lastUsedAt: null
+      };
+
+      this.templates.set(templateId, template);
+      logger.info('Template registered', { templateId, name: template.name });
+
+      return { success: true, templateId, template };
+    } catch (error) {
+      logger.error('Failed to register template', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * Extract variables from template content
    */
   extractVariables(content) {
@@ -149,17 +178,47 @@ class MessageTemplateEngine {
 
   /**
    * Render template with variable substitution
+   * Supports both (templateId, variables) and (templateObject) signatures
    */
-  renderTemplate(templateId, variables = {}) {
+  renderTemplate(templateIdOrObject, variables = {}) {
     try {
-      const template = this.templates.get(templateId);
+      let template;
+      let templateId;
+      let finalVariables = variables;
+
+      // Handle both parameter styles
+      if (typeof templateIdOrObject === 'string') {
+        // Old style: renderTemplate(id, variables)
+        templateId = templateIdOrObject;
+        template = this.templates.get(templateId);
+        if (!template) {
+          throw new Error(`Template not found: ${templateId}`);
+        }
+        finalVariables = variables || {};
+      } else if (typeof templateIdOrObject === 'object') {
+        // New style: renderTemplate({ name, content, variables })
+        // First register the template if not already registered
+        const name = templateIdOrObject.name || `temp_${Date.now()}`;
+        templateId = name;
+
+        // Register the template temporarily
+        if (!this.templates.has(templateId)) {
+          this.registerTemplate(templateIdOrObject);
+        }
+
+        template = this.templates.get(templateId);
+        finalVariables = templateIdOrObject.variables || {};
+      } else {
+        throw new Error('Invalid template parameter: must be string ID or template object');
+      }
+
       if (!template) {
         throw new Error(`Template not found: ${templateId}`);
       }
 
       // Validate variables
       for (const varName of template.variables) {
-        if (!(varName in variables)) {
+        if (!(varName in finalVariables)) {
           logger.warn('Missing variable in template rendering', { templateId, varName });
         }
       }
@@ -167,11 +226,11 @@ class MessageTemplateEngine {
       let content = template.content;
 
       // Handle conditionals
-      content = this.processConditionals(content, variables);
+      content = this.processConditionals(content, finalVariables);
 
       // Handle variable substitution
       content = content.replace(this.variablePattern, (match, varName) => {
-        return variables[varName] !== undefined ? variables[varName] : match;
+        return finalVariables[varName] !== undefined ? finalVariables[varName] : match;
       });
 
       // Update usage statistics
@@ -181,10 +240,10 @@ class MessageTemplateEngine {
       this.templateHistory.push({
         templateId,
         timestamp: new Date().toISOString(),
-        variables: Object.keys(variables)
+        variables: Object.keys(finalVariables)
       });
 
-      logger.info('Template rendered', { templateId, variableCount: Object.keys(variables).length });
+      logger.info('Template rendered', { templateId, variableCount: Object.keys(finalVariables).length });
 
       return {
         success: true,

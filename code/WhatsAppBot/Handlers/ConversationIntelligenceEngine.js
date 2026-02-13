@@ -160,12 +160,12 @@ class ConversationIntelligenceEngine {
    * Analyze sentiment of messages
    * Handles both single message and array of messages
    */
-  analyzeSentiment(messages) {
+  async analyzeSentiment(messages) {
     // Handle both single message and array of messages
     const messageArray = Array.isArray(messages) ? messages : [messages];
     
     const sentiments = messageArray.map(msg => {
-      const text = msg.text?.toLowerCase() || '';
+      const text = msg.body?.toLowerCase() || msg.text?.toLowerCase() || '';
       const words = text.split(/\s+/);
 
       let score = 0;
@@ -193,10 +193,12 @@ class ConversationIntelligenceEngine {
     });
 
     const averageSentiment = sentiments.reduce((sum, s) => sum + s.sentiment, 0) / sentiments.length;
+    const category = this.categorizeSentiment(averageSentiment);
 
     return {
-      overall: this.categorizeSentiment(averageSentiment),
-      score: averageSentiment.toFixed(2),
+      overall: category,
+      sentiment: category,  // ← ADD: For backward compatibility
+      score: parseFloat(averageSentiment.toFixed(2)),
       details: sentiments,
       positive: sentiments.filter(s => s.category === 'positive').length,
       neutral: sentiments.filter(s => s.category === 'neutral').length,
@@ -209,14 +211,14 @@ class ConversationIntelligenceEngine {
    */
   extractTopics(messages) {
     const topics = {};
-    const text = messages.map(m => m.text?.toLowerCase() || '').join(' ');
+    const text = messages.map(m => m.text?.toLowerCase() || m.body?.toLowerCase() || '').join(' ');
 
     for (const [topic, keywords] of Object.entries(this.topicKewords)) {
       const matches = keywords.filter(kw => text.includes(kw)).length;
       if (matches > 0) {
         topics[topic] = {
           count: matches,
-          relevance: (matches / message.length).toFixed(2)
+          relevance: (matches / messages.length).toFixed(2)
         };
       }
     }
@@ -454,35 +456,32 @@ class ConversationIntelligenceEngine {
    */
   async extractEntities(message) {
     try {
-      if (!message || !message.body) {
-        return { entities: [], names: [], emails: [], phones: [] };
+      if (!message || (!message.body && !message.text)) {
+        return [];  // ← Return array directly for .find() compatibility
       }
 
-      const text = message.body;
+      const text = message.body || message.text || '';
       const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
       const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
       const nameRegex = /\b[A-Z][a-z]+\s[A-Z][a-z]+\b/g;
+      const orderRegex = /#\d+|order\s*#?\d+/gi;
 
       const emails = text.match(emailRegex) || [];
       const phones = text.match(phoneRegex) || [];
       const names = text.match(nameRegex) || [];
+      const orders = text.match(orderRegex) || [];
 
       const entities = [
-        ...names.map(n => ({ type: 'person', value: n })),
-        ...emails.map(e => ({ type: 'email', value: e })),
-        ...phones.map(p => ({ type: 'phone', value: p }))
+        ...names.map(n => ({ type: 'PERSON', text: n })),
+        ...emails.map(e => ({ type: 'EMAIL', text: e })),
+        ...phones.map(p => ({ type: 'PHONE', text: p })),
+        ...orders.map(o => ({ type: 'ORDER_ID', text: o }))
       ];
 
-      return {
-        entities,
-        names,
-        emails,
-        phones,
-        entityCount: entities.length
-      };
+      return entities;  // ← Return array for .find() to work
     } catch (error) {
       logger.error('Failed to extract entities', { error: error.message });
-      return { entities: [], names: [], emails: [], phones: [], error: error.message };
+      return [];  // ← Return empty array on error
     }
   }
 
@@ -868,6 +867,132 @@ class ConversationIntelligenceEngine {
       commonIntents: [],
       timeSpanDays: 0
     };
+  }
+
+  /**
+   * Detect urgency level of a message
+   * Returns urgency level from 0-1 scale
+   */
+  async detectUrgency(message) {
+    try {
+      if (!message || !message.body) {
+        return { urgencyLevel: 0, category: 'low', escalationNeeded: false };
+      }
+
+      const text = message.body.toLowerCase();
+      let urgencyScore = 0;
+
+      // Check for urgency indicators
+      const urgencyPatterns = [
+        { pattern: /!+/, weight: 0.3 },
+        { pattern: /urgent|asap|immediately|now/i, weight: 0.5 },
+        { pattern: /help|emergency|critical/i, weight: 0.6 },
+        { pattern: /completely unacceptable|furious|angry/i, weight: 0.8 }
+      ];
+
+      for (const { pattern, weight } of urgencyPatterns) {
+        if (pattern.test(text)) {
+          urgencyScore = Math.max(urgencyScore, weight);
+        }
+      }
+
+      const sentiment = this.analyzeSentiment([message]);
+      if (sentiment.overall === 'negative') {
+        urgencyScore = Math.min(urgencyScore + 0.2, 1);
+      }
+
+      const category = urgencyScore > 0.7 ? 'high' : urgencyScore > 0.4 ? 'medium' : 'low';
+
+      return {
+        urgencyLevel: urgencyScore,
+        category,
+        escalationNeeded: urgencyScore > 0.7,
+        text,
+        indicators: urgencyPatterns.filter(p => p.pattern.test(text)).map(p => p.weight)
+      };
+    } catch (error) {
+      logger.error('Failed to detect urgency', { error: error.message });
+      return { urgencyLevel: 0, category: 'low', escalationNeeded: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get conversation statistics for a customer
+   */
+  getConversationStatistics(customerId) {
+    try {
+      const history = this.conversationHistory || [];
+      const messages = Array.isArray(history) ? history : [];
+
+      return {
+        totalMessages: messages.length,
+        averageLength: messages.length > 0 ? messages.reduce((s, m) => s + (m.body?.length || 0), 0) / messages.length : 0,
+        totalCharacters: messages.reduce((s, m) => s + (m.body?.length || 0), 0),
+        customerId,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('Failed to get conversation statistics', { error: error.message });
+      return { totalMessages: 0, averageLength: 0, totalCharacters: 0, customerId };
+    }
+  }
+
+  /**
+   * Calculate sentiment trend from conversation history
+   */
+  calculateSentimentTrend(customerId) {
+    try {
+      const history = this.conversationHistory || [];
+      if (history.length === 0) return 'neutral';
+
+      const sentiments = history.map(msg => {
+        const analysis = this.analyzeSentiment([msg]);
+        return analysis.overall;
+      });
+
+      const positiveCount = sentiments.filter(s => s === 'positive').length;
+      const negativeCount = sentiments.filter(s => s === 'negative').length;
+
+      if (positiveCount > negativeCount * 1.5) return 'positive';
+      if (negativeCount > positiveCount * 1.5) return 'negative';
+      return 'neutral';
+    } catch (error) {
+      logger.error('Failed to calculate sentiment trend', { error: error.message });
+      return 'neutral';
+    }
+  }
+
+  /**
+   * Analyze topics from conversation history
+   */
+  analyzeTopics(history) {
+    try {
+      const messages = Array.isArray(history) ? history : [];
+      if (messages.length === 0) return ['general'];
+
+      const text = messages.map(m => m.body?.toLowerCase() || '').join(' ');
+      const detectedTopics = [];
+
+      // Simple topic detection based on keywords
+      const topicKeywords = {
+        'order': ['order', 'purchase', 'buy', 'product', 'item'],
+        'payment': ['payment', 'pay', 'charge', 'price', 'cost', 'refund'],
+        'shipping': ['shipping', 'delivery', 'address', 'track', 'arrive'],
+        'technical': ['error', 'bug', 'broken', 'crash', 'issue'],
+        'account': ['account', 'login', 'password', 'email', 'profile']
+      };
+
+      for (const [topic, keywords] of Object.entries(topicKeywords)) {
+        if (keywords.some(kw => text.includes(kw))) {
+          detectedTopics.push(topic);
+        }
+      }
+
+      return detectedTopics.length > 0 ? detectedTopics : ['general'];
+    } catch (error) {
+      logger.error('Failed to analyze topics', { error: error.message });
+      return ['general'];
+    }
   }
 
   /**
