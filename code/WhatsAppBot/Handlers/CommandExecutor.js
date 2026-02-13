@@ -54,9 +54,15 @@ class CommandExecutor {
   }
 
   /**
-   * Register built-in commands
+   * Register built-in commands (idempotent - safe to call multiple times)
    */
   registerBuiltInCommands() {
+    // Skip if already registered
+    if (this.commands.has('whatsapp')) {
+      this.logger.debug('Built-in commands already registered, skipping');
+      return;
+    }
+
     // WhatsApp commands
     this.registerCommand('whatsapp', this.handleWhatsAppCommand.bind(this));
     this.registerCommand('wa', this.handleWhatsAppCommand.bind(this));
@@ -883,9 +889,13 @@ class CommandExecutor {
    */
   reset() {
     this.commands.clear();
+    this.aliases.clear();
     this.commandHistory = [];
     this.userContexts.clear();
+    this.userCooldowns.clear();
     this.initialized = false;
+    // Re-register built-in commands after reset for test isolation
+    this.registerBuiltInCommands();
     this.logger.debug('CommandExecutor state reset');
   }
 }
