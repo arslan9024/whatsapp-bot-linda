@@ -23,7 +23,8 @@ class MessageTemplateEngine {
     this.templates = new Map();
     this.templateHistory = [];
     this.defaultLocale = options.defaultLocale || 'en-US';
-    this.variablePattern = /\{\{(\w+)\}\}/g;
+    // Updated pattern to support both single braces {var} and double braces {{var}}
+    this.variablePattern = /\{\{?(\w+)\}?\}/g;
     this.conditionPattern = /\{\{#if\s+(\w+)\}\}(.*?)\{\{\/if\}\}/gs;
     this.initialized = false;
   }
