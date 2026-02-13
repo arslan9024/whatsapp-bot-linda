@@ -10,6 +10,7 @@ const CommandExecutor = require('../../code/WhatsAppBot/Handlers/CommandExecutor
 const GroupChatManager = require('../../code/WhatsAppBot/Handlers/GroupChatManager');
 const WhatsAppMultiAccountManager = require('../../code/WhatsAppBot/Handlers/WhatsAppMultiAccountManager');
 const ConversationIntelligenceEngine = require('../../code/WhatsAppBot/Handlers/ConversationIntelligenceEngine');
+const HandlerOrchestrator = require('../helpers/HandlerOrchestrator');
 const { MockLogger } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 
@@ -24,9 +25,12 @@ describe('Handler Integration Tests', () => {
   let mockLogger;
   let mockBotContext;
   let testTemplateIds = {}; // Store created template IDs
+  let orchestrator; // Handler orchestrator for proper initialization
+  let handlers; // All handlers collection
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockLogger = new MockLogger();
+    orchestrator = new HandlerOrchestrator(mockLogger);
 
     mockBotContext = {
       message: fixtures.whatsappMessage.text,
@@ -39,10 +43,29 @@ describe('Handler Integration Tests', () => {
       }
     };
 
-    // Initialize all handlers
+    // Create all handler instances
     templateEngine = new MessageTemplateEngine({ logger: mockLogger });
-    templateEngine.loadDefaultTemplates(); // Ensure templates are loaded
-    
+    batchProcessor = new MessageBatchProcessor({ logger: mockLogger });
+    mediaHandler = new AdvancedMediaHandler({ logger: mockLogger });
+    commandExecutor = new CommandExecutor({ logger: mockLogger });
+    groupManager = new GroupChatManager({ logger: mockLogger });
+    accountManager = new WhatsAppMultiAccountManager({ logger: mockLogger });
+    conversationEngine = new ConversationIntelligenceEngine({ logger: mockLogger });
+
+    // Bind into handlers collection
+    handlers = {
+      template: templateEngine,
+      batch: batchProcessor,
+      media: mediaHandler,
+      command: commandExecutor,
+      group: groupManager,
+      account: accountManager,
+      conversation: conversationEngine
+    };
+
+    // Initialize all handlers using orchestrator (ensures proper order)
+    await orchestrator.initializeAll(handlers, {});
+
     // Register test templates for integration tests
     const greetingResult = templateEngine.createTemplate({
       id: 'tpl_greeting_test',
@@ -58,19 +81,14 @@ describe('Handler Integration Tests', () => {
       variables: ['command']
     });
     testTemplateIds.help = helpResult.templateId;
-    
-    batchProcessor = new MessageBatchProcessor({ logger: mockLogger });
-    mediaHandler = new AdvancedMediaHandler({ logger: mockLogger });
-    commandExecutor = new CommandExecutor({ logger: mockLogger });
-    // Initialize command executor to register built-in commands
-    commandExecutor.registerBuiltInCommands();
-    
-    groupManager = new GroupChatManager({ logger: mockLogger });
-    accountManager = new WhatsAppMultiAccountManager({ logger: mockLogger });
-    conversationEngine = new ConversationIntelligenceEngine({ logger: mockLogger });
+
   });
 
   afterEach(() => {
+    // Cleanup and reset all handlers
+    if (orchestrator && handlers) {
+      orchestrator.resetAll(handlers);
+    }
     jest.clearAllMocks();
   });
 
