@@ -12,7 +12,9 @@
  */
 
 import fs from 'fs';
-import { logger } from '../Integration/Google/utils/logger.js';
+import getSafeLogger from '../utils/SafeLogger.js';
+
+const logger = getSafeLogger('AdvancedConversationFeatures');
 
 class AdvancedConversationFeatures {
   constructor(config = {}) {

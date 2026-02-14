@@ -1,0 +1,123 @@
+{
+  "auditLog": [
+    {
+      "timestamp": "2026-02-14T00:16:22.211Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-phone"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.211Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler enabled",
+      "metadata": {
+        "handler": "testHandler",
+        "enabled": true,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.675Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-number"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.676Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler disabled",
+      "metadata": {
+        "handler": "testHandler",
+        "enabled": false,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.677Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler2 enabled",
+      "metadata": {
+        "handler": "testHandler2",
+        "enabled": true,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.686Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-phone"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.686Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "handler1 enabled",
+      "metadata": {
+        "handler": "handler1",
+        "enabled": true,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.915Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-phone"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:22.915Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler enabled",
+      "metadata": {
+        "handler": "testHandler",
+        "enabled": true,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:23.602Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-phone"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:23.602Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler disabled",
+      "metadata": {
+        "handler": "testHandler",
+        "enabled": false,
+        "settings": {}
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:24.269Z",
+      "action": "DENIED",
+      "description": "Unauthorized admin access attempt",
+      "metadata": {
+        "adminId": "admin-phone"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T00:16:24.269Z",
+      "action": "HANDLER_CONFIGURED",
+      "description": "testHandler enabled",
+      "metadata": {
+        "handler": "testHandler",
+        "enabled": true,
+        "settings": {}
+      }
+    }
+  ],
+  "lastUpdated": "2026-02-14T00:16:24.269Z"
+}

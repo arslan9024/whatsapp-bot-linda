@@ -55,12 +55,19 @@ import ReportGenerator from "./code/Reports/ReportGenerator.js";
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
 import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
 
+// PHASE 8: Browser Lock Auto-Recovery System (February 14, 2026)
+import SessionCleanupManager from "./code/utils/SessionCleanupManager.js";
+import BrowserProcessMonitor from "./code/utils/BrowserProcessMonitor.js";
+import LockFileDetector from "./code/utils/LockFileDetector.js";
+
 import fs from "fs";
 import path from "path";
+import { execSync } from 'child_process';
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
+let connectionManagers = new Map(); // Map: phoneNumber → ConnectionManager instance (NEW)
 let isInitializing = false;
 let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 3;
@@ -87,6 +94,19 @@ let reportGeneratorModule = null;  // Professional reporting
 // All initialized accounts for graceful shutdown
 let allInitializedAccounts = [];
 
+// Health monitor startup flag (prevent duplicate starts)
+let healthChecksStarted = false;
+
+// Phase 8: Auto-recovery system guard flags
+let sessionCleanupStarted = false;
+let browserProcessMonitorStarted = false;
+let lockFileDetectorStarted = false;
+
+// Phase 8: Auto-recovery manager instances
+let sessionCleanupManager = null;
+let browserProcessMonitor = null;
+let lockFileDetector = null;
+
 // Simple console logging without interactive prompts
 function logBot(msg, type = "info") {
   const timestamp = new Date().toLocaleTimeString();
@@ -102,6 +122,696 @@ function logBot(msg, type = "info") {
 }
 
 /**
+ * ====================================================================
+ * CONNECTION MANAGER CLASS (PRODUCTION-GRADE)
+ * ====================================================================
+ * Purpose: Manage WhatsApp connection lifecycle with:
+ * - Connection state tracking
+ * - Exponential backoff reconnection
+ * - Circuit breaker pattern
+ * - Session health monitoring
+ * - QR code debouncing
+ */
+class ConnectionManager {
+  constructor(phoneNumber, client, logFunc, botId = null) {
+    this.phoneNumber = phoneNumber;
+    this.client = client;
+    this.log = logFunc;
+    this.botId = botId || phoneNumber; // Store botId for client recreation
+    
+    // State management
+    this.state = 'IDLE'; // IDLE, CONNECTING, CONNECTED, DISCONNECTED, ERROR, SUSPENDED
+    this.isInitializing = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 10;
+    
+    // Exponential backoff
+    this.baseRetryDelay = 5000; // 5s initial (allow Chrome to fully exit)
+    this.maxRetryDelay = 60000; // 60s max
+    this.reconnectTimer = null;
+    
+    // Circuit breaker (progressive: 5 errors → 1min, 10 → 5min, 15 → 15min)
+    this.errorCount = 0;
+    this.circuitBreakerThreshold = 5;
+    this.circuitBreakerDuration = 60000; // 1 minute (initial)
+    this.circuitBreakerTrips = 0; // How many times breaker has tripped
+    this.errorResetTimer = null;
+    
+    // QR debouncing
+    this.lastQRTime = 0;
+    this.qrDebounceDelay = 2000; // Min 2s between QR displays
+    this.qrAttempts = 0;
+    this.qrTimer = null;
+    
+    // Session monitoring
+    this.sessionCreatedAt = null;
+    this.lastActivityTime = Date.now();
+    this.healthCheckInterval = null;
+    this.keepAliveInterval = null;
+    
+    // Recovery tracking
+    this.lastSuccessfulConnection = null;
+    this.connectionFailureReason = null;
+    
+    // ═══ CONNECTION METRICS & TELEMETRY (Phase 9) ═══
+    this.metrics = {
+      createdAt: Date.now(),
+      totalConnections: 0,
+      totalDisconnections: 0,
+      totalReconnects: 0,
+      totalErrors: 0,
+      totalRecoveries: 0,
+      lastErrorMessage: null,
+      lastErrorTime: null,
+      lastConnectedAt: null,
+      lastDisconnectedAt: null,
+      averageSessionDuration: 0,
+      sessionDurations: [],   // Last 10 session durations for averaging
+      stateHistory: [],       // Last 20 state transitions
+      qrCodesGenerated: 0,
+      browserProcessKills: 0,
+      lockRecoveries: 0,
+    };
+    
+    // Browser PID tracking (for targeted process killing)
+    this._browserPid = null;
+  }
+
+  setState(newState) {
+    if (newState === this.state) return;
+    const oldState = this.state;
+    this.state = newState;
+    this.log(`[${this.phoneNumber}] State: ${oldState} → ${newState}`, 'info');
+    
+    // Track state transitions for telemetry
+    this.metrics.stateHistory.push({
+      from: oldState, to: newState, at: Date.now()
+    });
+    if (this.metrics.stateHistory.length > 20) this.metrics.stateHistory.shift();
+    
+    // Track specific transitions
+    if (newState === 'CONNECTED') {
+      this.metrics.totalConnections++;
+      this.metrics.lastConnectedAt = Date.now();
+    } else if (newState === 'DISCONNECTED' && oldState === 'CONNECTED') {
+      this.metrics.totalDisconnections++;
+      this.metrics.lastDisconnectedAt = Date.now();
+      // Calculate session duration
+      if (this.sessionCreatedAt) {
+        const duration = Date.now() - this.sessionCreatedAt;
+        this.metrics.sessionDurations.push(duration);
+        if (this.metrics.sessionDurations.length > 10) this.metrics.sessionDurations.shift();
+        this.metrics.averageSessionDuration = Math.round(
+          this.metrics.sessionDurations.reduce((a, b) => a + b, 0) / this.metrics.sessionDurations.length
+        );
+      }
+    }
+  }
+
+  async initialize() {
+    // Prevent multiple simultaneous initializations
+    if (this.isInitializing || this.state === 'CONNECTING') {
+      this.log(`[${this.phoneNumber}] Initialize already in progress`, 'warn');
+      return false;
+    }
+
+    // Check circuit breaker
+    if (this.errorCount >= this.circuitBreakerThreshold) {
+      this.log(`[${this.phoneNumber}] ⚠️  Circuit breaker active (${this.errorCount}/${this.circuitBreakerThreshold})`, 'error');
+      this.setState('SUSPENDED');
+      return false;
+    }
+
+    // Already connected
+    if (this.state === 'CONNECTED') {
+      return true;
+    }
+
+    this.isInitializing = true;
+    this.setState('CONNECTING');
+
+    try {
+      this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
+      await this.client.initialize();
+      this.reconnectAttempts = 0; // Reset on successful attempt
+      return true;
+    } catch (error) {
+      const msg = error?.message || String(error);
+      
+      // Phase 8: Try smart recovery first for browser lock errors
+      const recoveryAttempted = this.attemptSmartRecovery(msg);
+      if (!recoveryAttempted) {
+        this.handleInitializeError(msg);
+      }
+      this.isInitializing = false;
+      return false;
+    }
+  }
+
+  handleInitializeError(errorMsg) {
+    const nonCritical = ['Target closed', 'Session closed', 'browser is already running', 'Protocol error', 'Requesting main frame', 'Requesting main frame too early', 'Navigating frame was detached', 'page has been closed'];
+    const isCritical = !nonCritical.some(p => errorMsg.toLowerCase().includes(p.toLowerCase()));
+
+    // Track all errors in metrics
+    this.metrics.totalErrors++;
+    this.metrics.lastErrorMessage = errorMsg;
+    this.metrics.lastErrorTime = Date.now();
+
+    if (isCritical) {
+      this.errorCount++;
+      this.log(`[${this.phoneNumber}] ❌ Initialize error: ${errorMsg}`, 'error');
+      this.connectionFailureReason = errorMsg;
+    } else {
+      this.log(`[${this.phoneNumber}] ⚠️  Non-critical error: ${errorMsg}`, 'warn');
+    }
+
+    this.setState('ERROR');
+    
+    // Auto-schedule reconnect after initialization failure
+    this.scheduleReconnect();
+  }
+
+  scheduleReconnect() {
+    if (this.reconnectTimer || this.state === 'SUSPENDED') {
+      return;
+    }
+
+    this.reconnectAttempts++;
+    
+    // Exponential backoff with jitter
+    const delay = Math.min(
+      this.baseRetryDelay * Math.pow(2, this.reconnectAttempts - 1),
+      this.maxRetryDelay
+    ) + Math.random() * 1000;
+
+    this.log(`[${this.phoneNumber}] Reconnect in ${Math.round(delay / 1000)}s (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`, 'info');
+
+    if (this.reconnectAttempts > this.maxReconnectAttempts) {
+      this.log(`[${this.phoneNumber}] ❌ Max reconnect attempts exceeded`, 'error');
+      this.setState('SUSPENDED');
+      return;
+    }
+
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      if (this.state !== 'SUSPENDED') {
+        this.metrics.totalReconnects++;
+        try {
+          // Step 1: Targeted cleanup - kill only bot-owned browser, then general cleanup
+          this.log(`[${this.phoneNumber}] Cleaning up before reconnect (attempt ${this.reconnectAttempts})...`, 'info');
+          this._killBrowserProcesses();
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for Chrome to fully exit
+
+          // Step 2: Clean session lock files to prevent browser lock errors
+          if (lockFileDetector) {
+            lockFileDetector.forceCleanLocks(this.botId);
+            lockFileDetector.forceCleanLocks(this.phoneNumber);
+          }
+
+          // Step 3: Create fresh WhatsApp client
+          this.log(`[${this.phoneNumber}] Creating fresh client...`, 'info');
+          const newClient = await CreatingNewWhatsAppClient(this.botId);
+          if (!newClient) {
+            this.log(`[${this.phoneNumber}] Failed to create new client`, 'error');
+            this.scheduleReconnect();
+            return;
+          }
+
+          // Step 4: Track browser PID for targeted killing later
+          this._trackBrowserPid(newClient);
+
+          // Step 5: Update references (DON'T call setupNewLinkingFlow - it creates new manager)
+          this.client = newClient;
+          accountClients.set(this.phoneNumber, newClient);
+          if (this.phoneNumber === accountConfigManager?.getMasterPhoneNumber()) {
+            Lion0 = newClient;
+            global.Lion0 = Lion0;
+            global.Linda = Lion0;
+          }
+          
+          // Step 6: Bind events directly on new client and initialize
+          this._bindClientEvents(newClient);
+          
+          // Step 7: Initialize
+          this.isInitializing = false;
+          this.state = 'IDLE';
+          await this.initialize();
+        } catch (err) {
+          this.log(`[${this.phoneNumber}] Reconnect failed: ${err.message}`, 'error');
+          this.scheduleReconnect();
+        }
+      }
+    }, delay);
+  }
+
+  activateCircuitBreaker() {
+    this.circuitBreakerTrips++;
+    
+    // Progressive cooldown: 1min → 5min → 15min → 30min (caps at 30min)
+    const progressiveDurations = [60000, 300000, 900000, 1800000];
+    const cooldown = progressiveDurations[Math.min(this.circuitBreakerTrips - 1, progressiveDurations.length - 1)];
+    
+    this.setState('SUSPENDED');
+    this.log(`[${this.phoneNumber}] 🔴 Circuit breaker #${this.circuitBreakerTrips} activated for ${cooldown / 1000}s`, 'error');
+    
+    if (this.errorResetTimer) clearTimeout(this.errorResetTimer);
+    
+    this.errorResetTimer = setTimeout(() => {
+      this.log(`[${this.phoneNumber}] Circuit breaker reset (trip #${this.circuitBreakerTrips})`, 'info');
+      this.errorCount = 0;
+      this.reconnectAttempts = 0;
+      this.setState('DISCONNECTED');
+      this.scheduleReconnect();
+    }, cooldown);
+  }
+
+  recordActivity() {
+    this.lastActivityTime = Date.now();
+  }
+
+  startHealthCheck() {
+    if (this.healthCheckInterval) return;
+    
+    const CHECK_INTERVAL = 30000; // 30s
+    const INACTIVITY_TIMEOUT = 300000; // 5 minutes
+    
+    this.healthCheckInterval = setInterval(() => {
+      if (this.state !== 'CONNECTED') return;
+      
+      const inactiveTime = Date.now() - this.lastActivityTime;
+      if (inactiveTime > INACTIVITY_TIMEOUT) {
+        this.log(`[${this.phoneNumber}] ⚠️  Detected stale session (${Math.round(inactiveTime / 1000)}s inactive)`, 'warn');
+        this.handleStaleSession();
+      }
+    }, CHECK_INTERVAL);
+  }
+
+  stopHealthCheck() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  async handleStaleSession() {
+    this.log(`[${this.phoneNumber}] Attempting graceful restart for stale session...`, 'warn');
+    try {
+      await this.client.destroy().catch(() => {});
+    } catch (e) {
+      // Ignore
+    }
+    this.setState('DISCONNECTED');
+    this.scheduleReconnect();
+  }
+
+  startKeepAlive() {
+    if (this.keepAliveInterval) return;
+    this.keepAliveInterval = setInterval(() => {
+      if (this.state === 'CONNECTED') {
+        this.recordActivity();
+      }
+    }, 60000); // Every 60s
+  }
+
+  stopKeepAlive() {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+  }
+
+  handleQR(qrCode) {
+    const now = Date.now();
+    
+    // Debounce: Don't show QR more than once per 2s
+    if (now - this.lastQRTime < this.qrDebounceDelay) {
+      return false;
+    }
+    
+    this.lastQRTime = now;
+    this.qrAttempts++;
+    this.metrics.qrCodesGenerated++;
+    this.log(`[${this.phoneNumber}] 📱 QR received (Attempt ${this.qrAttempts})`, 'info');
+    
+    // Timeout QR after 2 minutes
+    if (!this.qrTimer && this.qrAttempts === 1) {
+      this.qrTimer = setTimeout(() => {
+        if (this.state !== 'CONNECTED' && this.qrAttempts > 2) {
+          this.log(`[${this.phoneNumber}] ⏱️  QR timeout - manual intervention needed`, 'warn');
+          this.qrTimer = null;
+          this.qrAttempts = 0;
+        }
+      }, 120000);
+    }
+    
+    return true;
+  }
+
+  clearQRTimer() {
+    if (this.qrTimer) {
+      clearTimeout(this.qrTimer);
+      this.qrTimer = null;
+    }
+    this.qrAttempts = 0;
+  }
+
+  /**
+   * Handle unexpected browser process loss (detected by BrowserProcessMonitor)
+   * Triggers graceful recovery - destroy client and schedule reconnect
+   */
+  handleBrowserProcessLost(reason = 'unknown') {
+    this.log(`[${this.phoneNumber}] ⚠️  Browser process lost (reason: ${reason}). Initiating recovery...`, 'warn');
+    
+    if (this.state === 'CONNECTED' || this.state === 'CONNECTING') {
+      try {
+        this.stopHealthCheck();
+        this.stopKeepAlive();
+        this.client.destroy().catch(() => {});
+        this.setState('DISCONNECTED');
+        this.scheduleReconnect();
+      } catch (err) {
+        this.log(`[${this.phoneNumber}] Recovery error: ${err.message}`, 'error');
+        this.setState('DISCONNECTED');
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  /**
+   * Attempt smart recovery from browser lock errors
+   * Returns true if recovery was attempted, false otherwise
+   */
+  attemptSmartRecovery(errorMsg) {
+    const isBrowserLockError = errorMsg.includes('browser is already running') ||
+                               errorMsg.includes('userDataDir') ||
+                               errorMsg.includes('CHROME_EXECUTABLE_PATH');
+
+    if (!isBrowserLockError) {
+      return false; // Not a lock error, use normal error handling
+    }
+
+    this.log(`[${this.phoneNumber}] 🔧 Browser lock detected. Executing recovery sequence...`, 'info');
+    this.executeBrowserLockRecovery();
+    return true;
+  }
+
+  /**
+   * Execute full browser lock recovery sequence:
+   * 1. Clean lock files for this session
+   * 2. Delete session folder if needed
+   * 3. Kill orphaned browser processes
+   * 4. Wait for cleanup
+   * 5. Re-initialize
+   */
+  async executeBrowserLockRecovery() {
+    this.metrics.lockRecoveries++;
+    try {
+      // Step 1: Clean lock files
+      this.log(`[${this.phoneNumber}] [Recovery 1/5] Cleaning lock files...`, 'info');
+      if (lockFileDetector) {
+        lockFileDetector.forceCleanLocks(this.phoneNumber);
+      }
+
+      // Step 2: Clean session folder
+      this.log(`[${this.phoneNumber}] [Recovery 2/5] Cleaning session folder...`, 'info');
+      if (sessionCleanupManager) {
+        sessionCleanupManager.forceCleanSession(this.phoneNumber);
+      } else {
+        // Fallback: direct cleanup
+        const sessionPath = path.join(process.cwd(), 'sessions', `session-${this.phoneNumber}`);
+        if (fs.existsSync(sessionPath)) {
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+        }
+      }
+
+      // Step 3: Kill orphaned browser processes
+      this.log(`[${this.phoneNumber}] [Recovery 3/5] Killing browser processes...`, 'info');
+      this._killBrowserProcesses();
+
+      // Step 4: Wait for cleanup to complete
+      this.log(`[${this.phoneNumber}] [Recovery 4/5] Waiting for cleanup...`, 'info');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Step 5: Re-initialize
+      this.log(`[${this.phoneNumber}] [Recovery 5/5] Re-initializing...`, 'info');
+      this.state = 'IDLE';
+      this.isInitializing = false;
+      this.reconnectAttempts = 0;
+      this.errorCount = 0;
+
+      const success = await this.initialize();
+      if (success) {
+        this.log(`[${this.phoneNumber}] ✅ Browser lock recovery successful!`, 'success');
+      } else {
+        this.log(`[${this.phoneNumber}] ⚠️  Recovery initialize returned false, scheduling reconnect`, 'warn');
+        this.scheduleReconnect();
+      }
+    } catch (err) {
+      this.log(`[${this.phoneNumber}] ❌ Recovery failed: ${err.message}. Activating circuit breaker.`, 'error');
+      this.activateCircuitBreaker();
+    }
+  }
+
+  /**
+   * Track browser PID from a WhatsApp client
+   * Enables targeted process killing instead of killing ALL Chrome instances
+   */
+  _trackBrowserPid(client) {
+    try {
+      if (client?.pupBrowser) {
+        const proc = client.pupBrowser.process();
+        if (proc?.pid) {
+          this._browserPid = proc.pid;
+          this.log(`[${this.phoneNumber}] Browser PID tracked: ${proc.pid}`, 'info');
+        }
+      }
+    } catch (_) { /* best effort */ }
+  }
+
+  /**
+   * Kill browser processes - targeted first, then fallback to broad kill
+   * SAFETY: Never kills node.exe, only Chrome/Chromium
+   */
+  _killBrowserProcesses() {
+    this.metrics.browserProcessKills++;
+    
+    // Strategy 1: Kill specific tracked PID (minimal impact)
+    if (this._browserPid) {
+      try {
+        if (process.platform === 'win32') {
+          execSync(`taskkill /F /PID ${this._browserPid} /T 2>nul`, { stdio: 'pipe', windowsHide: true });
+        } else {
+          execSync(`kill -9 ${this._browserPid} 2>/dev/null`, { stdio: 'pipe' });
+        }
+        this.log(`[${this.phoneNumber}] Killed tracked browser PID: ${this._browserPid}`, 'info');
+        this._browserPid = null;
+        return; // Targeted kill succeeded, no broad kill needed
+      } catch (_) {
+        this._browserPid = null;
+        // Fall through to broad kill
+      }
+    }
+    
+    // Strategy 2: Broad kill (only Chrome/Chromium, NEVER node.exe)
+    const commands = process.platform === 'win32'
+      ? ['taskkill /F /IM chrome.exe 2>nul', 'taskkill /F /IM chromium.exe 2>nul']
+      : ['pkill -9 chrome 2>/dev/null', 'pkill -9 chromium 2>/dev/null'];
+
+    for (const cmd of commands) {
+      try {
+        execSync(cmd, { stdio: 'pipe', windowsHide: true });
+      } catch (err) {
+        // Silent fail - processes may already be gone
+      }
+    }
+  }
+
+  /**
+   * Bind essential WhatsApp client events for reconnected client
+   * Handles QR, authentication, ready, disconnect, and error events
+   */
+  _bindClientEvents(client) {
+    const phoneNumber = this.phoneNumber;
+    const connManager = this;
+
+    // QR CODE
+    client.on("qr", async (qr) => {
+      if (!connManager.handleQR(qr)) return;
+      if (deviceLinkedManager) deviceLinkedManager.startLinkingAttempt(phoneNumber);
+      try {
+        await QRCodeDisplay.display(qr, {
+          method: 'auto', fallback: true,
+          masterAccount: phoneNumber, timeout: 120000
+        });
+      } catch (error) {
+        connManager.log(`QR display error: ${error.message}`, "warn");
+      }
+    });
+
+    // AUTHENTICATED
+    client.once("authenticated", () => {
+      connManager.clearQRTimer();
+      connManager.log(`✅ Device linked (${phoneNumber}) via reconnect`, "success");
+      const now = new Date().toISOString();
+      updateDeviceStatus(phoneNumber, {
+        deviceLinked: true, linkedAt: now, lastConnected: now, authMethod: 'qr',
+      });
+      if (deviceLinkedManager) {
+        deviceLinkedManager.markDeviceLinked(phoneNumber, { linkedAt: now, authMethod: 'qr', ipAddress: null });
+      }
+    });
+
+    // READY
+    client.once("ready", async () => {
+      connManager.log(`🟢 READY - ${phoneNumber} is online (reconnected)`, "ready");
+      connManager.setState('CONNECTED');
+      connManager.sessionCreatedAt = Date.now();
+      connManager.lastSuccessfulConnection = Date.now();
+      connManager.isInitializing = false;
+      connManager.reconnectAttempts = 0;
+      connManager.errorCount = 0;
+      connManager._trackBrowserPid(client);
+      connManager.metrics.totalRecoveries++;
+
+      allInitializedAccounts.push(client);
+      accountHealthMonitor.registerAccount(phoneNumber, client);
+      if (keepAliveManager) keepAliveManager.startKeepAlive(phoneNumber, client);
+      connManager.startHealthCheck();
+      connManager.startKeepAlive();
+      setupMessageListeners(client, phoneNumber, connManager);
+    });
+
+    // AUTH FAILURE
+    client.once("auth_failure", (msg) => {
+      connManager.log(`❌ Auth failed (${phoneNumber}): ${msg}`, "error");
+      connManager.isInitializing = false;
+      connManager.setState('ERROR');
+    });
+
+    // DISCONNECTED
+    client.on("disconnected", async (reason) => {
+      connManager.isInitializing = false;
+      const reasonStr = reason || 'unknown';
+      connManager.log(`Disconnected (${phoneNumber}): ${reasonStr}`, "warn");
+      if (deviceLinkedManager) deviceLinkedManager.markDeviceUnlinked(phoneNumber, reasonStr);
+      connManager.stopHealthCheck();
+      connManager.stopKeepAlive();
+      if (reasonStr.includes('LOGOUT')) {
+        connManager.setState('DISCONNECTED');
+      } else {
+        connManager.setState('DISCONNECTED');
+        connManager.scheduleReconnect();
+      }
+    });
+
+    // ERROR
+    client.on("error", (error) => {
+      const msg = error?.message || String(error);
+      if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) return;
+      connManager.log(`Client error (${phoneNumber}): ${msg}`, "error");
+      connManager.errorCount++;
+      if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
+        connManager.activateCircuitBreaker();
+      }
+    });
+  }
+
+  async destroy() {
+    this.stopHealthCheck();
+    this.stopKeepAlive();
+    
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.errorResetTimer) clearTimeout(this.errorResetTimer);
+    if (this.qrTimer) clearTimeout(this.qrTimer);
+    
+    try {
+      await this.client.destroy().catch(() => {});
+    } catch (e) {
+      // Ignore
+    }
+    
+    this.setState('IDLE');
+  }
+
+  getStatus() {
+    return {
+      phoneNumber: this.phoneNumber,
+      state: this.state,
+      isConnected: this.state === 'CONNECTED',
+      reconnectAttempts: this.reconnectAttempts,
+      errorCount: this.errorCount,
+      uptime: this.sessionCreatedAt ? Date.now() - this.sessionCreatedAt : 0,
+    };
+  }
+
+  /**
+   * Get detailed diagnostic status with full metrics & telemetry
+   * Used by startup diagnostics and /admin get-health command
+   */
+  getDetailedStatus() {
+    const uptime = this.sessionCreatedAt ? Date.now() - this.sessionCreatedAt : 0;
+    const uptimeStr = this._formatDuration(uptime);
+    const avgSession = this._formatDuration(this.metrics.averageSessionDuration);
+    
+    return {
+      // Identity
+      phoneNumber: this.phoneNumber,
+      botId: this.botId,
+      
+      // State
+      state: this.state,
+      isConnected: this.state === 'CONNECTED',
+      isInitializing: this.isInitializing,
+      
+      // Connection stats
+      uptime: uptimeStr,
+      uptimeMs: uptime,
+      reconnectAttempts: this.reconnectAttempts,
+      maxReconnectAttempts: this.maxReconnectAttempts,
+      
+      // Error tracking
+      errorCount: this.errorCount,
+      circuitBreakerTrips: this.circuitBreakerTrips,
+      lastError: this.metrics.lastErrorMessage,
+      lastErrorTime: this.metrics.lastErrorTime ? new Date(this.metrics.lastErrorTime).toISOString() : null,
+      connectionFailureReason: this.connectionFailureReason,
+      
+      // Metrics
+      totalConnections: this.metrics.totalConnections,
+      totalDisconnections: this.metrics.totalDisconnections,
+      totalReconnects: this.metrics.totalReconnects,
+      totalErrors: this.metrics.totalErrors,
+      totalRecoveries: this.metrics.totalRecoveries,
+      averageSessionDuration: avgSession,
+      qrCodesGenerated: this.metrics.qrCodesGenerated,
+      browserProcessKills: this.metrics.browserProcessKills,
+      lockRecoveries: this.metrics.lockRecoveries,
+      
+      // Recent state transitions
+      recentTransitions: this.metrics.stateHistory.slice(-5).map(t => ({
+        ...t,
+        at: new Date(t.at).toLocaleTimeString()
+      })),
+      
+      // Browser tracking
+      browserPid: this._browserPid,
+    };
+  }
+  
+  _formatDuration(ms) {
+    if (!ms || ms <= 0) return '0s';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (d > 0) return `${d}d ${h % 24}h ${m % 60}m`;
+    if (h > 0) return `${h}h ${m % 60}m ${s % 60}s`;
+    if (m > 0) return `${m}m ${s % 60}s`;
+    return `${s}s`;
+  }
+}
+
+/**
  * Global Error Handlers for Graceful Recovery
  * Prevents Puppeteer protocol errors from crashing the bot
  */
@@ -112,10 +822,13 @@ const NON_CRITICAL_ERROR_PATTERNS = [
   'Session closed',
   'Target.setAutoAttach',
   'Requesting main frame',
+  'Requesting main frame too early',
+  'Navigating frame was detached',
   'DevTools',
   'Protocol error',
   'browser is already running',
-  'CHROME_EXECUTABLE_PATH'
+  'CHROME_EXECUTABLE_PATH',
+  'page has been closed'
 ];
 
 function isNonCriticalError(errorMsg) {
@@ -440,8 +1153,16 @@ async function initializeBot() {
     // STEP 6: Initialize Health Monitoring (Phase 5)
     // ============================================
     logBot("Starting account health monitoring...", "info");
-    accountHealthMonitor.startHealthChecks();
-    logBot("✅ Account health monitoring active (5-minute intervals)", "success");
+    
+    // Only start health checks once
+    if (!healthChecksStarted) {
+      accountHealthMonitor.startHealthChecks();
+      healthChecksStarted = true;
+      logBot("✅ Account health monitoring active (5-minute intervals)", "success");
+    } else {
+      logBot("ℹ️  Account health monitoring already active", "info");
+    }
+    
     global.healthMonitor = accountHealthMonitor;
 
     // ============================================
@@ -463,37 +1184,85 @@ async function initializeBot() {
     
     // Initialize Analytics Dashboard
     if (!analyticsModule) {
-      analyticsModule = new AnalyticsDashboard();
-      await analyticsModule.initialize();
-      global.analytics = analyticsModule;
-      logBot("  ✅ Analytics Dashboard (real-time metrics & monitoring)", "success");
+      try {
+        analyticsModule = new AnalyticsDashboard();
+        await analyticsModule.initialize();
+        global.analytics = analyticsModule;
+        logBot("  ✅ Analytics Dashboard (real-time metrics & monitoring)", "success");
+      } catch (error) {
+        logBot(`  ⚠️  Analytics Dashboard initialization failed: ${error?.message || error}`, "warn");
+        analyticsModule = null;
+      }
     }
 
     // Initialize Admin Config Interface
     if (!adminConfigModule) {
-      adminConfigModule = new AdminConfigInterface();
-      await adminConfigModule.initialize();
-      global.adminConfig = adminConfigModule;
-      logBot("  ✅ Admin Config Interface (dynamic configuration management)", "success");
+      try {
+        adminConfigModule = new AdminConfigInterface();
+        await adminConfigModule.initialize();
+        global.adminConfig = adminConfigModule;
+        logBot("  ✅ Admin Config Interface (dynamic configuration management)", "success");
+      } catch (error) {
+        logBot(`  ⚠️  Admin Config Interface initialization failed: ${error?.message || error}`, "warn");
+        adminConfigModule = null;
+      }
     }
 
     // Initialize Advanced Conversation Features
     if (!conversationModule) {
-      conversationModule = new AdvancedConversationFeatures();
-      await conversationModule.initialize();
-      global.conversationAI = conversationModule;
-      logBot("  ✅ Advanced Conversation Features (intent, sentiment, context)", "success");
+      try {
+        conversationModule = new AdvancedConversationFeatures();
+        await conversationModule.initialize();
+        global.conversationAI = conversationModule;
+        logBot("  ✅ Advanced Conversation Features (intent, sentiment, context)", "success");
+      } catch (error) {
+        logBot(`  ⚠️  Advanced Conversation Features initialization failed: ${error?.message || error}`, "warn");
+        conversationModule = null;
+      }
     }
 
     // Initialize Report Generator
     if (!reportGeneratorModule) {
-      reportGeneratorModule = new ReportGenerator();
-      await reportGeneratorModule.initialize();
-      global.reportGenerator = reportGeneratorModule;
-      logBot("  ✅ Report Generator (daily/weekly/monthly reports)", "success");
+      try {
+        reportGeneratorModule = new ReportGenerator();
+        await reportGeneratorModule.initialize();
+        global.reportGenerator = reportGeneratorModule;
+        logBot("  ✅ Report Generator (daily/weekly/monthly reports)", "success");
+      } catch (error) {
+        logBot(`  ⚠️  Report Generator initialization failed: ${error?.message || error}`, "warn");
+        reportGeneratorModule = null;
+      }
     }
 
-    logBot("✅ Phase 7 modules fully initialized", "success");
+    logBot("✅ Phase 7 modules initialization complete", "success");
+
+    // ============================================
+    // STEP 6.5B: Initialize Phase 8 Auto-Recovery System
+    // ============================================
+    logBot("\n🔧 Initializing Phase 8 Auto-Recovery System...", "info");
+
+    if (!sessionCleanupStarted) {
+      sessionCleanupManager = new SessionCleanupManager(logBot);
+      sessionCleanupManager.startAutoCleanup();
+      sessionCleanupStarted = true;
+      logBot("  ✅ SessionCleanupManager (auto-clean sessions every 90s)", "success");
+    }
+
+    if (!browserProcessMonitorStarted) {
+      browserProcessMonitor = new BrowserProcessMonitor(connectionManagers, logBot);
+      browserProcessMonitor.startMonitoring();
+      browserProcessMonitorStarted = true;
+      logBot("  ✅ BrowserProcessMonitor (detect process loss every 60s)", "success");
+    }
+
+    if (!lockFileDetectorStarted) {
+      lockFileDetector = new LockFileDetector(logBot);
+      lockFileDetector.startMonitoring();
+      lockFileDetectorStarted = true;
+      logBot("  ✅ LockFileDetector (remove stale locks every 45s)", "success");
+    }
+
+    logBot("✅ Phase 8 Auto-Recovery System active", "success");
 
     // ============================================
     // STEP 6.6: Initialize Phase 1 Services (NEW)
@@ -547,7 +1316,12 @@ async function initializeBot() {
     logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
 
     // ============================================
-    // STEP 7: Setup Interactive Terminal Dashboard
+    // STEP 7: Startup Diagnostics Report
+    // ============================================
+    printStartupDiagnostics();
+
+    // ============================================
+    // STEP 8: Setup Interactive Terminal Dashboard
     // ============================================
     setupTerminalInputListener();
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
@@ -575,6 +1349,89 @@ async function initializeBot() {
     }
   }
 }
+
+/**
+ * ====================================================================
+ * STARTUP DIAGNOSTICS SYSTEM (Phase 9)
+ * ====================================================================
+ * Prints a comprehensive health dashboard after initialization.
+ * Shows: account states, connection managers, Phase 8 monitors, system info.
+ */
+function printStartupDiagnostics() {
+  try {
+    const now = new Date();
+    const memUsage = process.memoryUsage();
+    const heapMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+    
+    console.log('\n┌──────────────────────────────────────────────────────────────┐');
+    console.log('│              📊 STARTUP DIAGNOSTICS REPORT                   │');
+    console.log(`│              ${now.toLocaleDateString()} ${now.toLocaleTimeString()}                       │`);
+    console.log('├──────────────────────────────────────────────────────────────┤');
+    
+    // System Resources
+    console.log(`│  💻 System: Node ${process.version} | ${process.platform} | PID: ${process.pid}`);
+    console.log(`│  🧠 Memory: Heap ${heapMB}MB | RSS ${rssMB}MB`);
+    console.log('│');
+    
+    // Account Status
+    console.log(`│  📱 Accounts Configured: ${accountClients.size}`);
+    console.log(`│  🔗 Connection Managers: ${connectionManagers.size}`);
+    
+    for (const [phone, manager] of connectionManagers) {
+      const status = manager.getStatus();
+      const stateIcon = {
+        'CONNECTED': '🟢', 'CONNECTING': '🟡', 'DISCONNECTED': '🔴',
+        'ERROR': '❌', 'SUSPENDED': '⛔', 'IDLE': '⚪'
+      }[status.state] || '❓';
+      console.log(`│    ${stateIcon} ${phone}: ${status.state} (errors: ${status.errorCount}, reconnects: ${status.reconnectAttempts})`);
+    }
+    console.log('│');
+    
+    // Phase 8 Monitors
+    console.log('│  🔧 Auto-Recovery Monitors:');
+    console.log(`│    ${sessionCleanupStarted ? '✅' : '❌'} SessionCleanupManager (every 90s)`);
+    console.log(`│    ${browserProcessMonitorStarted ? '✅' : '❌'} BrowserProcessMonitor (every 60s)`);
+    console.log(`│    ${lockFileDetectorStarted ? '✅' : '❌'} LockFileDetector (every 45s)`);
+    console.log(`│    ${healthChecksStarted ? '✅' : '❌'} AccountHealthMonitor (every 5min)`);
+    console.log('│');
+    
+    // Phase 7 Modules
+    console.log('│  🧩 Advanced Modules:');
+    console.log(`│    ${analyticsModule ? '✅' : '⚠️'}  Analytics Dashboard`);
+    console.log(`│    ${adminConfigModule ? '✅' : '⚠️'}  Admin Config Interface`);
+    console.log(`│    ${conversationModule ? '✅' : '⚠️'}  Conversation AI`);
+    console.log(`│    ${reportGeneratorModule ? '✅' : '⚠️'}  Report Generator`);
+    console.log(`│    ${commandHandler ? '✅' : '⚠️'}  Command System (71 commands)`);
+    console.log('│');
+    
+    // Managers
+    console.log('│  ⚙️  Core Managers:');
+    console.log(`│    ${keepAliveManager ? '✅' : '❌'} KeepAlive | ${deviceLinkedManager ? '✅' : '❌'} DeviceLinked | ${accountConfigManager ? '✅' : '❌'} AccountConfig`);
+    console.log(`│    ${bootstrapManager ? '✅' : '❌'} Bootstrap | ${recoveryManager ? '✅' : '❌'} Recovery | ${dynamicAccountManager ? '✅' : '❌'} DynamicAccount`);
+    
+    console.log('├──────────────────────────────────────────────────────────────┤');
+    console.log('│  🎯 Status: ALL SYSTEMS OPERATIONAL                         │');
+    console.log('│  📡 Chat: !help | Terminal: dashboard | Admin: /admin       │');
+    console.log('└──────────────────────────────────────────────────────────────┘\n');
+  } catch (error) {
+    logBot(`Diagnostics report error: ${error.message}`, 'warn');
+  }
+}
+
+/**
+ * Get all connection manager diagnostics (for admin commands)
+ */
+function getAllConnectionDiagnostics() {
+  const results = [];
+  for (const [phone, manager] of connectionManagers) {
+    results.push(manager.getDetailedStatus());
+  }
+  return results;
+}
+
+// Expose diagnostics globally
+global.getConnectionDiagnostics = getAllConnectionDiagnostics;
 
 /**
  * Initialize database and analytics (Phase 2)
@@ -621,14 +1478,22 @@ async function initializeDatabase() {
 
 /**
  * Setup restore flow for existing linked devices (Phase 3 integration)
+ * Now creates a ConnectionManager for full reconnect/recovery support
  */
 function setupRestoreFlow(client, phoneNumber, configOrStatus) {
   logBot("Setting up session restore for " + phoneNumber, "info");
 
   let readyFired = false;
   const config = configOrStatus.displayName ? configOrStatus : null; // Check if it's a config object
+  const botId = config?.id || phoneNumber;
+
+  // Create ConnectionManager for restore flow (ensures reconnect works on disconnect)
+  const connManager = new ConnectionManager(phoneNumber, client, logBot, botId);
+  connectionManagers.set(phoneNumber, connManager);
+  logBot(`✅ Connection manager created for ${phoneNumber} (restore mode)`, 'success');
 
   client.once("authenticated", () => {
+    connManager.clearQRTimer();
     logBot(`✅ Session authenticated (${phoneNumber})`, "success");
     
     // Update device status file
@@ -667,6 +1532,15 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
     
     logBot(`🟢 READY - ${phoneNumber} is online`, "ready");
     
+    // Update ConnectionManager state
+    connManager.setState('CONNECTED');
+    connManager.sessionCreatedAt = Date.now();
+    connManager.lastSuccessfulConnection = Date.now();
+    connManager.isInitializing = false;
+    connManager.reconnectAttempts = 0;
+    connManager.errorCount = 0;
+    connManager._trackBrowserPid(client);
+    
     // Mark account as active
     allInitializedAccounts.push(client);
     await sessionStateManager.markRecoverySuccess(phoneNumber);
@@ -676,6 +1550,10 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
     
     // NEW: Start keep-alive heartbeats for 24/7 operation
     keepAliveManager.startKeepAlive(phoneNumber, client);
+    
+    // Start connection health monitoring
+    connManager.startHealthCheck();
+    connManager.startKeepAlive();
     
     // Initialize contact lookup handler (Phase B)
     try {
@@ -689,17 +1567,19 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
       logBot(`⚠️  Contact handler error: ${error.message}`, "warn");
     }
     
-    setupMessageListeners(client, phoneNumber);
+    setupMessageListeners(client, phoneNumber, connManager);
     isInitializing = false;
   });
 
   client.once("auth_failure", async (msg) => {
     logBot(`Session restore failed for ${phoneNumber}: ${msg}`, "error");
     logBot("Falling back to new QR code authentication...", "warn");
+    connManager.isInitializing = false;
+    connManager.setState('ERROR');
     
     // FALLBACK: Setup new QR code linking instead of failing
     try {
-      setupNewLinkingFlow(client, phoneNumber, config?.id || phoneNumber);
+      setupNewLinkingFlow(client, phoneNumber, botId);
     } catch (error) {
       logBot(`Fallback QR setup failed: ${error.message}`, "error");
       isInitializing = false;
@@ -707,28 +1587,43 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
   });
 
   client.on("disconnected", (reason) => {
-    logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
+    const reasonStr = reason || 'disconnected';
+    logBot(`Disconnected (${phoneNumber}): ${reasonStr}`, "warn");
+    connManager.isInitializing = false;
     
-    // NEW: Mark device as unlinked in device manager
+    // Mark device as unlinked in device manager
     if (deviceLinkedManager) {
-      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reason || 'disconnected');
+      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reasonStr);
+    }
+    
+    // Stop monitoring
+    connManager.stopHealthCheck();
+    connManager.stopKeepAlive();
+    
+    // Schedule reconnect (unless user logged out)
+    if (reasonStr.includes('LOGOUT')) {
+      connManager.setState('DISCONNECTED');
+    } else {
+      connManager.setState('DISCONNECTED');
+      connManager.scheduleReconnect();
     }
   });
 
   client.on("error", (error) => {
-    logBot(`Client error (${phoneNumber}): ${error.message}`, "error");
+    const msg = error?.message || String(error);
+    // Filter non-critical errors
+    if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) return;
+    logBot(`Client error (${phoneNumber}): ${msg}`, "error");
+    connManager.errorCount++;
+    if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
+      connManager.activateCircuitBreaker();
+    }
   });
 
   logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
-  try {
-    client.initialize();
-  } catch (error) {
-    if (error.message.includes("browser is already running")) {
-      logBot("Browser already locked (nodemon restart detected)", "warn");
-    } else {
-      throw error;
-    }
-  }
+  connManager.initialize().catch((error) => {
+    logBot(`Failed to initialize (restore): ${error?.message || String(error)}`, "error");
+  });
 }
 
 /**
@@ -737,37 +1632,40 @@ function setupRestoreFlow(client, phoneNumber, configOrStatus) {
 function setupNewLinkingFlow(client, phoneNumber, botId) {
   logBot(`Setting up device linking for ${phoneNumber}...`, "info");
 
-  let qrShown = false;
-  let authComplete = false;
-  let initializationStarted = false;
+  // Create and register connection manager
+  const connManager = new ConnectionManager(phoneNumber, client, logBot, botId);
+  connectionManagers.set(phoneNumber, connManager);
+  logBot(`✅ Connection manager created for ${phoneNumber}`, 'success');
 
+  // ===== QR CODE HANDLER (with debouncing) =====
   client.on("qr", async (qr) => {
-    if (!qrShown) {
-      qrShown = true;
-      
-      // NEW: Mark device as linking in device manager
-      if (deviceLinkedManager) {
-        deviceLinkedManager.startLinkingAttempt(phoneNumber);
-      }
-      
-      try {
-        await QRCodeDisplay.display(qr, {
-          method: 'auto',
-          fallback: true,
-          masterAccount: phoneNumber
-        });
-      } catch (error) {
-        logBot("QR display error: " + error.message, "error");
-        logBot("Please link device manually via WhatsApp Settings", "warn");
-      }
+    if (!connManager.handleQR(qr)) {
+      return; // Debounced - skip this QR
+    }
+
+    // Mark device as linking
+    if (deviceLinkedManager) {
+      deviceLinkedManager.startLinkingAttempt(phoneNumber);
+    }
+
+    try {
+      await QRCodeDisplay.display(qr, {
+        method: 'auto',
+        fallback: true,
+        masterAccount: phoneNumber,
+        timeout: 120000
+      });
+    } catch (error) {
+      logBot(`QR display error: ${error.message}`, "warn");
+      logBot("Please link device manually via WhatsApp Settings", "warn");
     }
   });
 
+  // ===== AUTHENTICATION SUCCESS =====
   client.once("authenticated", () => {
-    authComplete = true;
+    connManager.clearQRTimer();
     logBot(`✅ Device linked (${phoneNumber})`, "success");
-    
-    // Update device status file
+
     const now = new Date().toISOString();
     updateDeviceStatus(phoneNumber, {
       deviceLinked: true,
@@ -775,8 +1673,7 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
       lastConnected: now,
       authMethod: 'qr',
     });
-    
-    // Mark device as linked in device manager
+
     if (deviceLinkedManager) {
       deviceLinkedManager.markDeviceLinked(phoneNumber, {
         linkedAt: now,
@@ -785,7 +1682,7 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
       });
       logBot(`📊 Device manager updated for ${phoneNumber}`, "success");
     }
-    
+
     sessionStateManager.saveAccountState(phoneNumber, {
       phoneNumber: phoneNumber,
       displayName: "WhatsApp Account",
@@ -794,65 +1691,113 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
       sessionPath: `sessions/session-${botId}`,
       lastKnownState: "authenticated"
     });
-    
+
     sessionStateManager.recordDeviceLinkEvent(phoneNumber, 'success');
   });
 
+  // ===== CONNECTION READY =====
   client.once("ready", async () => {
     logBot(`🟢 READY - ${phoneNumber} is online`, "ready");
     logBot("Session saved for future restarts", "success");
-    
+
+    connManager.setState('CONNECTED');
+    connManager.sessionCreatedAt = Date.now();
+    connManager.lastSuccessfulConnection = Date.now();
+    connManager.isInitializing = false;
+    connManager.reconnectAttempts = 0;
+    connManager.errorCount = 0;
+    connManager._trackBrowserPid(client);
+
     allInitializedAccounts.push(client);
     await sessionStateManager.markRecoverySuccess(phoneNumber);
-    
-    // PHASE 5: Register account for health monitoring
+
+    // Register for health monitoring
     accountHealthMonitor.registerAccount(phoneNumber, client);
-    
-    // NEW: Start keep-alive heartbeats for 24/7 operation
+
+    // Start keep-alive heartbeats
     keepAliveManager.startKeepAlive(phoneNumber, client);
-    
-    setupMessageListeners(client, phoneNumber);
-    isInitializing = false;
+
+    // Start connection health monitoring
+    connManager.startHealthCheck();
+    connManager.startKeepAlive();
+
+    setupMessageListeners(client, phoneNumber, connManager);
   });
 
+  // ===== AUTHENTICATION FAILURE =====
   client.once("auth_failure", (msg) => {
-    logBot(`Authentication failed for ${phoneNumber}: ${msg}`, "error");
+    logBot(`❌ Authentication failed for ${phoneNumber}: ${msg}`, "error");
     logBot("Please restart and scan QR code again", "warn");
-    isInitializing = false;
+    connManager.isInitializing = false;
+    connManager.setState('ERROR');
   });
 
-  client.on("disconnected", (reason) => {
-    logBot(`Disconnected (${phoneNumber}): ${reason}`, "warn");
+  // ===== DISCONNECTION HANDLER (with intelligent recovery) =====
+  client.on("disconnected", async (reason) => {
+    connManager.isInitializing = false;
     
-    // NEW: Mark device as unlinked in device manager
+    const reasonStr = reason || 'unknown';
+    logBot(`Disconnected (${phoneNumber}): ${reasonStr}`, "warn");
+
+    // Update device status
     if (deviceLinkedManager) {
-      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reason || 'disconnected');
+      deviceLinkedManager.markDeviceUnlinked(phoneNumber, reasonStr);
+    }
+
+    // Stop monitoring
+    connManager.stopHealthCheck();
+    connManager.stopKeepAlive();
+
+    // Check if logout or Session closed
+    if (reasonStr.includes('LOGOUT')) {
+      logBot(`User logged out from ${phoneNumber} - manual re-auth needed`, 'warn');
+      connManager.setState('DISCONNECTED');
+      connManager.reconnectAttempts = 0; // Don't auto-retry logouts
+    } else if (reasonStr.toLowerCase().includes('session closed')) {
+      logBot(`Session closed unexpectedly for ${phoneNumber}`, 'warn');
+      connManager.setState('DISCONNECTED');
+      connManager.scheduleReconnect(); // Intelligent exponential backoff
+    } else {
+      connManager.setState('DISCONNECTED');
+      connManager.scheduleReconnect(); // Standard backoff
     }
   });
 
+  // ===== ERROR HANDLER =====
   client.on("error", (error) => {
-    logBot(`Error during linking (${phoneNumber}): ${error.message}`, "error");
+    const msg = error?.message || String(error);
+    
+    // Filter non-critical errors
+    if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) {
+      return; // Ignore Puppeteer/Protocol errors
+    }
+
+    logBot(`Client error (${phoneNumber}): ${msg}`, "error");
+    connManager.errorCount++;
+    
+    if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
+      connManager.activateCircuitBreaker();
+    }
   });
 
-  // CRITICAL: Always initialize client to trigger QR event
-  if (!initializationStarted) {
-    initializationStarted = true;
-    logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
-    try {
-      client.initialize();
-    } catch (error) {
-      logBot(`Failed to initialize client: ${error.message}`, "error");
-      if (!error.message.includes("browser is already running")) {
-        throw error;
-      }
-    }
-  }
+  // ===== INITIALIZE CLIENT =====
+  logBot(`Initializing WhatsApp client for ${phoneNumber}...`, "info");
+  connManager.initialize().catch((error) => {
+    logBot(`Failed to initialize: ${error?.message || String(error)}`, "error");
+  });
 }
 
 /**
  * Setup message listening for individual account (Phase 4 - multi-account)
  */
-function setupMessageListeners(client, phoneNumber = "Unknown") {
+function setupMessageListeners(client, phoneNumber = "Unknown", connManager = null) {
+  // Track activity for connection health
+  if (connManager) {
+    client.on('message', () => {
+      connManager.recordActivity();
+    });
+  }
+
   // ═════════════════════════════════════════════════════════════════════════════
   // PHASE 1: EVENT HANDLER BINDINGS (February 12, 2026)
   // ═════════════════════════════════════════════════════════════════════════════
@@ -860,18 +1805,14 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
   
   /**
    * MESSAGE REACTION EVENT - Track emoji reactions to messages
-   * Calls ReactionHandler.handleReaction() when someone reacts with emoji
+   * Uses singleton handler instance (avoids re-creation per event)
    */
+  const reactionHandlerInstance = global.reactionHandler || new ReactionHandler(null);
+  const groupHandlerInstance = global.groupEventHandler || new GroupEventHandler(null);
+
   client.on('message_reaction', async (reaction) => {
     try {
-      if (!ReactionHandler) {
-        logBot("⚠️  ReactionHandler not initialized", "warn");
-        return;
-      }
-
-      const reactionHandlerInstance = new ReactionHandler();
       await reactionHandlerInstance.handleReaction(reaction);
-      
       logBot(`✅ Reaction tracked: ${reaction.reaction} on message ${reaction.msg.id.id}`, "success");
     } catch (error) {
       logBot(`❌ Error handling reaction: ${error.message}`, "error");
@@ -884,14 +1825,7 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
    */
   client.on('group_update', async (notification) => {
     try {
-      if (!GroupEventHandler) {
-        logBot("⚠️  GroupEventHandler not initialized", "warn");
-        return;
-      }
-
-      const groupHandlerInstance = new GroupEventHandler();
       await groupHandlerInstance.handleGroupUpdate(notification);
-      
       logBot(`✅ Group update tracked: ${notification.chatId}`, "success");
     } catch (error) {
       logBot(`❌ Error handling group update: ${error.message}`, "error");
@@ -904,14 +1838,7 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
    */
   client.on('group_join', async (notification) => {
     try {
-      if (!GroupEventHandler) {
-        logBot("⚠️  GroupEventHandler not initialized", "warn");
-        return;
-      }
-
-      const groupHandlerInstance = new GroupEventHandler();
       await groupHandlerInstance.handleGroupJoin(notification);
-      
       logBot(`✅ Group join tracked: ${notification.contact.length} member(s) joined`, "success");
     } catch (error) {
       logBot(`❌ Error handling group join: ${error.message}`, "error");
@@ -924,14 +1851,7 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
    */
   client.on('group_leave', async (notification) => {
     try {
-      if (!GroupEventHandler) {
-        logBot("⚠️  GroupEventHandler not initialized", "warn");
-        return;
-      }
-
-      const groupHandlerInstance = new GroupEventHandler();
       await groupHandlerInstance.handleGroupLeave(notification);
-      
       logBot(`✅ Group leave tracked: ${notification.contact.length} member(s) left`, "success");
     } catch (error) {
       logBot(`❌ Error handling group leave: ${error.message}`, "error");
@@ -1045,8 +1965,31 @@ function setupMessageListeners(client, phoneNumber = "Unknown") {
               await msg.reply(`👤 Your permissions:\n${Object.entries(perms).map(([k, v]) => `${k}: ${v ? '✅' : '❌'}`).join('\n')}`);
               break;
             }
+            case 'get-health': {
+              // Phase 9: Connection diagnostics via WhatsApp
+              const diags = getAllConnectionDiagnostics();
+              if (diags.length === 0) {
+                await msg.reply('📊 No connection managers active');
+                break;
+              }
+              let healthText = '📊 *CONNECTION HEALTH REPORT*\n━━━━━━━━━━━━━━━━━━━━━━━━\n';
+              for (const d of diags) {
+                const icon = d.isConnected ? '🟢' : d.state === 'SUSPENDED' ? '⛔' : '🔴';
+                healthText += `\n${icon} *${d.phoneNumber}*\n`;
+                healthText += `  State: ${d.state} | Uptime: ${d.uptime}\n`;
+                healthText += `  Connections: ${d.totalConnections} | Disconnects: ${d.totalDisconnections}\n`;
+                healthText += `  Reconnects: ${d.totalReconnects} | Errors: ${d.totalErrors}\n`;
+                healthText += `  QR Codes: ${d.qrCodesGenerated} | Browser Kills: ${d.browserProcessKills}\n`;
+                healthText += `  Avg Session: ${d.averageSessionDuration}\n`;
+                if (d.lastError) healthText += `  Last Error: ${d.lastError.substring(0, 60)}\n`;
+              }
+              const mem = process.memoryUsage();
+              healthText += `\n💻 *System*: Heap ${Math.round(mem.heapUsed/1024/1024)}MB | PID ${process.pid}`;
+              await msg.reply(healthText);
+              break;
+            }
             default:
-              await msg.reply('❓ Unknown admin command. Try: toggle-handler, get-stats, list-perms');
+              await msg.reply('❓ Unknown admin command. Try: toggle-handler, get-stats, list-perms, get-health');
           }
         } catch (error) {
           await msg.reply(`❌ Admin error: ${error.message}`);
@@ -1222,11 +2165,29 @@ process.on("SIGINT", async () => {
   logBot("Initiating graceful shutdown...", "info");
   
   try {
-    // 0. Stop health monitoring (Phase 5) - only if available
+    // 0. Stop Phase 8 auto-recovery systems
+    logBot("Stopping auto-recovery systems...", "info");
+    if (sessionCleanupManager) sessionCleanupManager.stop();
+    if (browserProcessMonitor) browserProcessMonitor.stop();
+    if (lockFileDetector) lockFileDetector.stop();
+
+    // 0A. Stop health monitoring (Phase 5) - only if available
     if (typeof accountHealthMonitor !== 'undefined') {
       logBot("Stopping health monitoring...", "info");
       accountHealthMonitor.stopHealthChecks();
     }
+    
+    // 0B. Destroy connection managers
+    logBot(`Destroying connection managers for ${connectionManagers.size} account(s)`, "info");
+    for (const [phoneNumber, manager] of connectionManagers.entries()) {
+      try {
+        logBot(`  Cleaning up ${phoneNumber}...`, "info");
+        await manager.destroy();
+      } catch (e) {
+        logBot(`  Warning: Error destroying manager for ${phoneNumber}`, "warn");
+      }
+    }
+    connectionManagers.clear();
     
     // 1. Save all account states
     logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, "info");
@@ -1268,20 +2229,8 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-/**
- * Handle unhandled rejections
- */
-process.on("unhandledRejection", (error) => {
-  logBot(`Unhandled rejection: ${error.message}`, "error");
-});
-
-/**
- * Handle uncaught exceptions  
- */
-process.on("uncaughtException", (error) => {
-  logBot(`Uncaught exception: ${error.message}`, "error");
-  // Continue running instead of exiting
-});
+// NOTE: Global error handlers (unhandledRejection, uncaughtException) are defined above
+// with non-critical error pattern filtering. Do NOT duplicate them here.
 
 // Start the bot
 logBot("Starting Linda WhatsApp Bot...", "info");

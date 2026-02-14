@@ -1,0 +1,98 @@
+{
+  "config": {
+    "handlers": {
+      "enabled": {
+        "testHandler2": {
+          "name": "testHandler2",
+          "enabled": true,
+          "settings": {
+            "maxInvocations": null,
+            "timeout": 30000,
+            "cacheable": true,
+            "priority": "normal"
+          },
+          "configuredAt": "2026-02-14T00:16:22.677Z"
+        },
+        "handler1": {
+          "name": "handler1",
+          "enabled": true,
+          "settings": {
+            "maxInvocations": null,
+            "timeout": 30000,
+            "cacheable": true,
+            "priority": "normal"
+          },
+          "configuredAt": "2026-02-14T00:16:22.686Z"
+        },
+        "testHandler": {
+          "name": "testHandler",
+          "enabled": true,
+          "settings": {
+            "maxInvocations": null,
+            "timeout": 30000,
+            "cacheable": true,
+            "priority": "normal"
+          },
+          "configuredAt": "2026-02-14T00:16:24.269Z"
+        }
+      },
+      "disabled": {},
+      "settings": {
+        "testHandler": {
+          "maxInvocations": null,
+          "timeout": 30000,
+          "cacheable": true,
+          "priority": "normal"
+        },
+        "testHandler2": {
+          "maxInvocations": null,
+          "timeout": 30000,
+          "cacheable": true,
+          "priority": "normal"
+        },
+        "handler1": {
+          "maxInvocations": null,
+          "timeout": 30000,
+          "cacheable": true,
+          "priority": "normal"
+        }
+      }
+    },
+    "features": {
+      "enabled": {},
+      "disabled": {},
+      "betaFeatures": {}
+    },
+    "users": {
+      "admins": [],
+      "whitelist": [],
+      "blacklist": [],
+      "roles": {}
+    },
+    "messaging": {
+      "templates": {},
+      "defaultLanguage": "en",
+      "messageQuotas": {},
+      "autoRespond": true
+    },
+    "security": {
+      "rateLimit": {
+        "enabled": true,
+        "maxMessagesPerMinute": 10
+      },
+      "commandValidation": true,
+      "encryptSensitiveData": true,
+      "apiKeyRotation": {
+        "enabled": true,
+        "intervalDays": 30
+      }
+    },
+    "monitoring": {
+      "logLevel": "info",
+      "errorReporting": true,
+      "performanceTracking": true,
+      "analyticsEnabled": true
+    }
+  },
+  "lastUpdated": "2026-02-14T00:16:24.269Z"
+}

@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
 const execAsync = promisify(exec);
 const { LocalAuth, Client } = pkg;
 
@@ -14,20 +15,36 @@ function sleep(ms) {
 }
 
 /**
- * Kill any running browser/node processes that might be locking the session
+ * Kill orphaned Chrome/Chromium processes that might be locking the session.
+ * SAFETY: Never kills node.exe (would kill the running bot!)
+ * Only kills browser processes, not the application itself.
  */
 async function cleanupBrowserLocks() {
   try {
-    // Kill any lingering node processes
     if (process.platform === 'win32') {
-      await execAsync('taskkill /F /IM node.exe 2>nul', { windowsHide: true }).catch(() => {});
+      // SAFETY: Only kill Chrome/Chromium - NEVER kill node.exe
       await execAsync('taskkill /F /IM chrome.exe 2>nul', { windowsHide: true }).catch(() => {});
       await execAsync('taskkill /F /IM chromium.exe 2>nul', { windowsHide: true }).catch(() => {});
     } else {
-      await execAsync('pkill -9 node', { shell: '/bin/bash' }).catch(() => {});
-      await execAsync('pkill -9 chrome', { shell: '/bin/bash' }).catch(() => {});
+      await execAsync('pkill -9 chrome 2>/dev/null', { shell: '/bin/bash' }).catch(() => {});
+      await execAsync('pkill -9 chromium 2>/dev/null', { shell: '/bin/bash' }).catch(() => {});
     }
-    console.log('🧹 Browser locks cleaned');
+    
+    // Also clean lock files in session directories
+    const sessionsDir = path.join(process.cwd(), 'sessions');
+    if (fs.existsSync(sessionsDir)) {
+      const lockPatterns = ['.lock', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+      const entries = fs.readdirSync(sessionsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        for (const lockName of lockPatterns) {
+          const lockPath = path.join(sessionsDir, entry.name, lockName);
+          try { if (fs.existsSync(lockPath)) fs.unlinkSync(lockPath); } catch (_) {}
+        }
+      }
+    }
+    
+    console.log('🧹 Browser locks cleaned (safe mode - node.exe preserved)');
   } catch (error) {
     // Silently fail - this is best effort cleanup
   }
@@ -54,12 +71,16 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-gpu",
-        "--single-process",
         "--disable-dev-shm-usage",
-        "--disable-web-resources",
         "--disable-extensions",
         "--disable-plugins",
-        "--disable-sync"
+        "--disable-sync",
+        "--disable-features=IsolateOrigins,site-per-process",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-background-networking",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding"
       ]
     };
 
@@ -92,9 +113,8 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       // Puppeteer configuration for proper browser handling
       puppeteer: puppeteerArgs,
       webVersionCache: {
-        type: "remote",
-        remotePath:
-          "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html"
+        type: "local",
+        path: ".wwebjs_cache"
       }
     });
 
