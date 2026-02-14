@@ -1,6 +1,11 @@
 /**
  * Jest Setup File
  * Initializes test environment with global utilities
+ * 
+ * Phase 10 - Production Hardening:
+ * - Added proper afterEach/afterAll teardown
+ * - Timer cleanup prevents open handle leaks
+ * - Mock restoration prevents test pollution
  */
 
 // Mock logger globally
@@ -60,3 +65,34 @@ if (process.env.TEST_VERBOSE !== 'true') {
   jest.spyOn(global.console, 'error').mockImplementation(() => {});
   jest.spyOn(global.console, 'warn').mockImplementation(() => {});
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GLOBAL TEARDOWN (Phase 10 - Prevents open handles and test pollution)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+afterEach(() => {
+  // Clear all mocks between tests to prevent cross-test contamination
+  jest.clearAllMocks();
+  
+  // Clear all pending timers (setTimeout, setInterval) to prevent open handles
+  jest.clearAllTimers();
+});
+
+afterAll(() => {
+  // Restore all mocks to their original implementations
+  jest.restoreAllMocks();
+  
+  // Use real timers if fake timers were enabled
+  try {
+    jest.useRealTimers();
+  } catch (e) {
+    // Already using real timers - ignore
+  }
+  
+  // Clear global test references to allow garbage collection
+  if (global.mockLogger) {
+    Object.values(global.mockLogger).forEach(fn => {
+      if (typeof fn.mockClear === 'function') fn.mockClear();
+    });
+  }
+});

@@ -35,6 +35,10 @@ describe('AdvancedMediaHandler', () => {
   });
 
   afterEach(() => {
+    // Reset handler to clear cache timers and prevent open handles
+    if (handler && typeof handler.reset === 'function') {
+      handler.reset();
+    }
     jest.clearAllMocks();
   });
 

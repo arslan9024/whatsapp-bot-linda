@@ -58,5 +58,6 @@ module.exports = {
   setupFiles: [],
   resetMocks: true,
   restoreMocks: true,
-  clearMocks: true
+  clearMocks: true,
+  forceExit: true
 };

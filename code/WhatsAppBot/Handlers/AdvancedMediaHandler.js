@@ -26,6 +26,7 @@ class AdvancedMediaHandler {
   constructor(options = {}) {
     // Cache and storage
     this.mediaCache = new Map();
+    this._cacheTimers = new Map(); // Track cache expiration timers for cleanup
     this.processingQueue = [];
     this.cacheTTL = options.cacheTTL || 3600000; // 1 hour
     this.maxFileSize = options.maxFileSize || 100 * 1024 * 1024; // 100MB
@@ -511,11 +512,20 @@ class AdvancedMediaHandler {
       };
       this.mediaCache.set(messageId, cacheEntry);
       
-      // Set expiration
+      // Clear any existing timer for this messageId
+      if (this._cacheTimers.has(messageId)) {
+        clearTimeout(this._cacheTimers.get(messageId));
+      }
+      
+      // Set expiration with tracked timer
       if (ttl > 0) {
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           this.mediaCache.delete(messageId);
+          this._cacheTimers.delete(messageId);
         }, ttl);
+        // Allow process to exit even if timer is pending
+        if (timer.unref) timer.unref();
+        this._cacheTimers.set(messageId, timer);
       }
       return { success: true };
     } catch (error) {
@@ -634,21 +644,62 @@ class AdvancedMediaHandler {
   }
 
   encryptData(data) {
-    // Mock encryption - in production use real encryption
+    // Production-grade encryption using AES-256-CBC with random IV
+    // Key sourced from environment variable (never hardcoded)
     try {
-      // Handle Buffer or existing buffer data
       const bufferData = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      const cipher = crypto.createCipher('aes192', 'password');
-      let encrypted = cipher.update(bufferData, 'binary', 'hex');
-      encrypted += cipher.final('hex');
-      return Buffer.from(encrypted);
+      
+      // Derive a 32-byte key from env secret using SHA-256
+      const secret = process.env.ENCRYPTION_KEY || process.env.MEDIA_ENCRYPTION_KEY;
+      if (!secret) {
+        logger.warn('⚠️  ENCRYPTION_KEY not set in environment. Media encryption disabled. Set ENCRYPTION_KEY env var for production.');
+        return bufferData; // Return unencrypted with explicit warning
+      }
+      
+      const key = crypto.createHash('sha256').update(secret).digest(); // 32 bytes for AES-256
+      const iv = crypto.randomBytes(16); // Random IV for each encryption
+      
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+      const encrypted = Buffer.concat([cipher.update(bufferData), cipher.final()]);
+      
+      // Prepend IV to ciphertext (IV is not secret, needed for decryption)
+      return Buffer.concat([iv, encrypted]);
     } catch (error) {
-      // Fallback if encryption fails
+      logger.error(`Encryption failed: ${error.message}. Returning unencrypted data.`);
       return Buffer.from(typeof data === 'string' ? data : JSON.stringify(data));
     }
   }
 
+  /**
+   * Decrypt data encrypted by encryptData()
+   * Extracts the 16-byte IV prefix, then decrypts the rest with AES-256-CBC
+   */
+  decryptData(encryptedBuffer) {
+    try {
+      const secret = process.env.ENCRYPTION_KEY || process.env.MEDIA_ENCRYPTION_KEY;
+      if (!secret) {
+        logger.warn('⚠️  ENCRYPTION_KEY not set. Cannot decrypt.');
+        return encryptedBuffer;
+      }
+      
+      const key = crypto.createHash('sha256').update(secret).digest();
+      const iv = encryptedBuffer.subarray(0, 16);
+      const ciphertext = encryptedBuffer.subarray(16);
+      
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (error) {
+      logger.error(`Decryption failed: ${error.message}`);
+      return encryptedBuffer; // Return as-is on failure
+    }
+  }
+
   reset() {
+    // Clear all cache expiration timers to prevent leaks
+    for (const timer of this._cacheTimers.values()) {
+      clearTimeout(timer);
+    }
+    this._cacheTimers.clear();
     this.mediaCache.clear();
     this.processingQueue = [];
     this.metrics = {

@@ -629,10 +629,22 @@ class ConnectionManager {
   /**
    * Bind essential WhatsApp client events for reconnected client
    * Handles QR, authentication, ready, disconnect, and error events
+   * SAFETY: Removes all existing listeners first to prevent memory leaks
    */
   _bindClientEvents(client) {
     const phoneNumber = this.phoneNumber;
     const connManager = this;
+
+    // ═══ LISTENER CLEANUP (Phase 10 - Memory Leak Prevention) ═══
+    // Remove ALL existing listeners before rebinding to prevent duplication.
+    // This is critical: each reconnect creates a fresh client, but if the same
+    // client object is reused (e.g., during recovery), listeners would stack.
+    try {
+      client.removeAllListeners();
+      connManager.log(`[${phoneNumber}] 🧹 Cleaned existing event listeners before rebind`, 'info');
+    } catch (e) {
+      connManager.log(`[${phoneNumber}] ⚠️  Listener cleanup warning: ${e.message}`, 'warn');
+    }
 
     // QR CODE
     client.on("qr", async (qr) => {
@@ -723,6 +735,19 @@ class ConnectionManager {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.errorResetTimer) clearTimeout(this.errorResetTimer);
     if (this.qrTimer) clearTimeout(this.qrTimer);
+    
+    // ═══ LISTENER CLEANUP (Phase 10) ═══
+    // Remove all event listeners from the client before destroying
+    // to prevent orphaned listeners from firing after destroy
+    try {
+      if (this.client) {
+        this.client.removeAllListeners();
+        this.log(`[${this.phoneNumber}] 🧹 All listeners removed before destroy`, 'info');
+      }
+    } catch (e) { /* best effort */ }
+    
+    // Kill tracked browser process for clean shutdown
+    this._killBrowserProcesses();
     
     try {
       await this.client.destroy().catch(() => {});
@@ -1791,6 +1816,18 @@ function setupNewLinkingFlow(client, phoneNumber, botId) {
  * Setup message listening for individual account (Phase 4 - multi-account)
  */
 function setupMessageListeners(client, phoneNumber = "Unknown", connManager = null) {
+  // ═══ LISTENER CLEANUP (Phase 10 - Memory Leak Prevention) ═══
+  // Remove message-related listeners before rebinding to prevent duplication
+  // DO NOT use removeAllListeners() here - that would remove QR/auth/ready/disconnect
+  // listeners bound by _bindClientEvents(). Only clean message-specific events.
+  const messageEvents = ['message', 'message_reaction', 'group_update', 'group_join', 'group_leave'];
+  for (const event of messageEvents) {
+    try {
+      client.removeAllListeners(event);
+    } catch (e) { /* best effort */ }
+  }
+  logBot(`🧹 Cleaned message listeners for ${phoneNumber} before rebind`, "info");
+
   // Track activity for connection health
   if (connManager) {
     client.on('message', () => {
@@ -2157,12 +2194,35 @@ function setupMessageListeners(client, phoneNumber = "Unknown", connManager = nu
 }
 
 /**
- * Graceful shutdown with multi-account support (Phase 4)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * GRACEFUL SHUTDOWN (Phase 10 - Production Hardening)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * - Handles both SIGINT (Ctrl+C) and SIGTERM (process managers, Docker, PM2)
+ * - 15-second timeout guard prevents hanging shutdown
+ * - Prevents double-shutdown from rapid signal delivery
+ * - Cleans up ALL resources: listeners, connections, managers, intervals, database
  */
-process.on("SIGINT", async () => {
+let isShuttingDown = false;
+const SHUTDOWN_TIMEOUT_MS = 15000; // 15s max for graceful shutdown
+
+async function gracefulShutdown(signal = 'UNKNOWN') {
+  // Prevent double-shutdown from rapid signals
+  if (isShuttingDown) {
+    logBot(`Shutdown already in progress (${signal} ignored)`, "warn");
+    return;
+  }
+  isShuttingDown = true;
+  
   console.log("\n");
-  logBot("Received shutdown signal", "warn");
-  logBot("Initiating graceful shutdown...", "info");
+  logBot(`Received ${signal} - Initiating graceful shutdown...`, "warn");
+  
+  // Timeout guard: force-kill if shutdown takes too long
+  const forceExitTimer = setTimeout(() => {
+    logBot(`⚠️  Shutdown timeout (${SHUTDOWN_TIMEOUT_MS / 1000}s) exceeded. Force exiting...`, "error");
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  // Don't let the timer prevent natural exit
+  forceExitTimer.unref();
   
   try {
     // 0. Stop Phase 8 auto-recovery systems
@@ -2177,7 +2237,7 @@ process.on("SIGINT", async () => {
       accountHealthMonitor.stopHealthChecks();
     }
     
-    // 0B. Destroy connection managers
+    // 0B. Destroy connection managers (incl. listener cleanup, browser kill)
     logBot(`Destroying connection managers for ${connectionManagers.size} account(s)`, "info");
     for (const [phoneNumber, manager] of connectionManagers.entries()) {
       try {
@@ -2200,11 +2260,13 @@ process.on("SIGINT", async () => {
     for (const [phoneNumber, client] of accountClients.entries()) {
       try {
         logBot(`  Disconnecting ${phoneNumber}...`, "info");
+        client.removeAllListeners(); // Prevent events during destroy
         await client.destroy();
       } catch (e) {
         logBot(`  Warning: Error closing ${phoneNumber}`, "warn");
       }
     }
+    accountClients.clear();
     
     // 3. Write safe point file
     logBot("Writing session checkpoint", "info");
@@ -2220,14 +2282,22 @@ process.on("SIGINT", async () => {
       }
     }
     
+    // 5. Clear global references
+    allInitializedAccounts = [];
+    
     logBot("✅ Graceful shutdown complete", "success");
   } catch (error) {
     logBot(`Error during shutdown: ${error.message}`, "error");
   }
   
+  clearTimeout(forceExitTimer);
   logBot("Bot stopped. Nodemon will restart on code changes...", "info");
   process.exit(0);
-});
+}
+
+// Handle both SIGINT (Ctrl+C, dev) and SIGTERM (PM2, Docker, systemd, cloud)
+process.on("SIGINT", () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown('SIGTERM'));
 
 // NOTE: Global error handlers (unhandledRejection, uncaughtException) are defined above
 // with non-critical error pattern filtering. Do NOT duplicate them here.
