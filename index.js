@@ -1,11 +1,9 @@
 import 'dotenv/config';
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceStatus.js";
-import { fullCleanup, killBrowserProcesses, sleep, setupShutdownHandlers } from "./code/utils/browserCleanup.js";
-import SessionManager from "./code/utils/SessionManager.js";
+import { fullCleanup, killBrowserProcesses, sleep } from "./code/utils/browserCleanup.js";
 import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
-import readline from 'readline';
 
 // PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
 // Multi-account orchestration, device recovery, health monitoring, keep-alive system
@@ -34,34 +32,12 @@ import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
 import LindaCommandHandler from "./code/Commands/LindaCommandHandler.js";
 import LindaCommandRegistry from "./code/Commands/LindaCommandRegistry.js";
 
-// PHASE 1: WHATSAPP-WEB.JS FEATURE INTEGRATION (February 11, 2026)
-// Message enhancement, reactions, group management, chat organization, contacts
-import { getMessageEnhancementService } from "./code/Services/MessageEnhancementService.js";
-import { getReactionTracker } from "./code/Services/ReactionTracker.js";
-import { getGroupManagementService } from "./code/Services/GroupManagementService.js";
-import { getChatOrganizationService } from "./code/Services/ChatOrganizationService.js";
-import { getAdvancedContactService } from "./code/Services/AdvancedContactService.js";
-import { ReactionHandler } from "./code/WhatsAppBot/Handlers/ReactionHandler.js";
-import { GroupEventHandler } from "./code/WhatsAppBot/Handlers/GroupEventHandler.js";
-
 // PHASE 11: Extracted modules (ClientFlowSetup, MessageRouter)
 import { setupClientFlow } from "./code/WhatsAppBot/ClientFlowSetup.js";
 import { setupMessageListeners as messageRouter } from "./code/WhatsAppBot/MessageRouter.js";
 
-// PHASE 7: ADVANCED FEATURES (February 14, 2026)
-// Analytics, Admin Config, Smart Conversations, Reporting
-import AnalyticsDashboard from "./code/Analytics/AnalyticsDashboard.js";
-import AdminConfigInterface from "./code/Admin/AdminConfigInterface.js";
-import AdvancedConversationFeatures from "./code/Conversation/AdvancedConversationFeatures.js";
-import ReportGenerator from "./code/Reports/ReportGenerator.js";
-
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
 import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
-
-// PHASE 8: Browser Lock Auto-Recovery System (February 14, 2026)
-import SessionCleanupManager from "./code/utils/SessionCleanupManager.js";
-import BrowserProcessMonitor from "./code/utils/BrowserProcessMonitor.js";
-import LockFileDetector from "./code/utils/LockFileDetector.js";
 
 // CONNECTION MANAGER (Extracted - Phase 10)
 import ConnectionManager from "./code/utils/ConnectionManager.js";
@@ -74,6 +50,10 @@ import { installProcessErrorHandlers } from "./code/utils/ProcessErrorHandlers.j
 import { createGracefulShutdown, installShutdownHandlers } from "./code/utils/GracefulShutdown.js";
 import { printStartupDiagnostics } from "./code/utils/StartupDiagnostics.js";
 import { initializeDatabase } from "./code/utils/DatabaseInitializer.js";
+
+// PHASE 13: Feature initializers & terminal setup
+import { initializeAdvancedFeatures, initializeAutoRecovery, initializePhase1Services } from "./code/utils/FeatureInitializer.js";
+import { setupTerminalInputListener } from "./code/utils/TerminalDashboardSetup.js";
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
@@ -217,87 +197,7 @@ sharedContext.setMasterRef = (newClient) => {
  */
 installProcessErrorHandlers(logBot);
 
-/**
- * Setup terminal input listener for interactive health dashboard & device management
- * Allows users to:
- * - View WhatsApp device status in real-time
- * - Re-link master or specific accounts
- * - Monitor system health
- * - Switch to 6-digit authentication
- */
-function setupTerminalInputListener() {
-  try {
-    // Setup interactive monitoring with device manager callbacks
-    const callbacks = {
-      onRelinkMaster: async (masterPhone) => {
-        // Fallback to AccountConfigManager if master phone not provided
-        if (!masterPhone && accountConfigManager) {
-          masterPhone = accountConfigManager.getMasterPhoneNumber();
-        }
-        
-        if (!masterPhone) {
-          logBot("⚠️  Master phone not configured", "error");
-          logBot("   💡 Use command: !set-master <account-id> to set master account", "info");
-          if (accountConfigManager) {
-            const accounts = accountConfigManager.getAllAccounts();
-            if (accounts.length > 0) {
-              logBot("   Available accounts:", "info");
-              accounts.forEach(acc => {
-                logBot(`     • ${acc.id}: ${acc.displayName} (${acc.phoneNumber})`, "info");
-              });
-            }
-          }
-          return;
-        }
-        
-        logBot(`Re-linking master account: ${masterPhone}`, "info");
-        if (deviceLinkedManager) {
-          deviceLinkedManager.resetDeviceStatus(masterPhone);
-        }
-        
-        // Trigger re-linking by recreating client
-        const client = accountClients.get(masterPhone);
-        if (client) {
-          try {
-            // Reset session and trigger new QR
-            deviceLinkedManager.startLinkingAttempt(masterPhone);
-            setupClientFlow(client, masterPhone, 'master', { isRestore: false }, getFlowDeps());
-            client.initialize();
-          } catch (error) {
-            logBot(`Failed to reset client: ${error.message}`, "error");
-          }
-        }
-      },
-      
-      onRelinkDevice: async (phoneNumber) => {
-        logBot(`Re-linking device: ${phoneNumber}`, "info");
-        if (deviceLinkedManager) {
-          deviceLinkedManager.resetDeviceStatus(phoneNumber);
-        }
-      },
-      
-      onSwitchTo6Digit: async (phoneNumber) => {
-        logBot(`6-digit auth requested for: ${phoneNumber}`, "info");
-        logBot("6-digit code feature coming soon", "warn");
-      },
-      
-      onShowDeviceDetails: (phoneNumber) => {
-        terminalHealthDashboard.displayDeviceDetails(phoneNumber);
-      },
-      
-      onListDevices: () => {
-        terminalHealthDashboard.listAllDevices();
-      },
-    };
-
-    // Start interactive monitoring
-    terminalHealthDashboard.startInteractiveMonitoring(callbacks);
-
-  } catch (error) {
-    logBot(`Terminal input setup warning: ${error.message}`, "warn");
-    // Continue without terminal input if setup fails
-  }
-}
+// setupTerminalInputListener — extracted to TerminalDashboardSetup.js (Phase 13)
 
 /**
  * MINIMAL BOT INITIALIZATION
@@ -531,138 +431,34 @@ async function initializeBot() {
     }
 
     // ============================================
-    // STEP 6.5A: Initialize Phase 7 Advanced Features
+    // STEP 6.5A: Initialize Phase 7 Advanced Features (Phase 13 — extracted)
     // ============================================
-    logBot("\n📊 Initializing Phase 7 Advanced Features...", "info");
-    
-    // Initialize Analytics Dashboard
-    if (!analyticsModule) {
-      try {
-        analyticsModule = new AnalyticsDashboard();
-        await analyticsModule.initialize();
-        services.register('analytics', analyticsModule);
-        logBot("  ✅ Analytics Dashboard (real-time metrics & monitoring)", "success");
-      } catch (error) {
-        logBot(`  ⚠️  Analytics Dashboard initialization failed: ${error?.message || error}`, "warn");
-        analyticsModule = null;
-      }
-    }
-
-    // Initialize Admin Config Interface
-    if (!adminConfigModule) {
-      try {
-        adminConfigModule = new AdminConfigInterface();
-        await adminConfigModule.initialize();
-        services.register('adminConfig', adminConfigModule);
-        logBot("  ✅ Admin Config Interface (dynamic configuration management)", "success");
-      } catch (error) {
-        logBot(`  ⚠️  Admin Config Interface initialization failed: ${error?.message || error}`, "warn");
-        adminConfigModule = null;
-      }
-    }
-
-    // Initialize Advanced Conversation Features
-    if (!conversationModule) {
-      try {
-        conversationModule = new AdvancedConversationFeatures();
-        await conversationModule.initialize();
-        services.register('conversationAI', conversationModule);
-        logBot("  ✅ Advanced Conversation Features (intent, sentiment, context)", "success");
-      } catch (error) {
-        logBot(`  ⚠️  Advanced Conversation Features initialization failed: ${error?.message || error}`, "warn");
-        conversationModule = null;
-      }
-    }
-
-    // Initialize Report Generator
-    if (!reportGeneratorModule) {
-      try {
-        reportGeneratorModule = new ReportGenerator();
-        await reportGeneratorModule.initialize();
-        services.register('reportGenerator', reportGeneratorModule);
-        logBot("  ✅ Report Generator (daily/weekly/monthly reports)", "success");
-      } catch (error) {
-        logBot(`  ⚠️  Report Generator initialization failed: ${error?.message || error}`, "warn");
-        reportGeneratorModule = null;
-      }
-    }
-
-    logBot("✅ Phase 7 modules initialization complete", "success");
+    const advancedFeatures = await initializeAdvancedFeatures(logBot);
+    analyticsModule = advancedFeatures.analyticsModule;
+    adminConfigModule = advancedFeatures.adminConfigModule;
+    conversationModule = advancedFeatures.conversationModule;
+    reportGeneratorModule = advancedFeatures.reportGeneratorModule;
 
     // ============================================
-    // STEP 6.5B: Initialize Phase 8 Auto-Recovery System
+    // STEP 6.5B: Initialize Phase 8 Auto-Recovery (Phase 13 — extracted)
     // ============================================
-    logBot("\n🔧 Initializing Phase 8 Auto-Recovery System...", "info");
-
-    if (!sessionCleanupStarted) {
-      sessionCleanupManager = new SessionCleanupManager(logBot);
-      sessionCleanupManager.startAutoCleanup();
-      sessionCleanupStarted = true;
-      logBot("  ✅ SessionCleanupManager (auto-clean sessions every 90s)", "success");
-      sharedContext.sessionCleanupManager = sessionCleanupManager;
-    }
-
-    if (!browserProcessMonitorStarted) {
-      browserProcessMonitor = new BrowserProcessMonitor(connectionManagers, logBot);
-      browserProcessMonitor.startMonitoring();
-      browserProcessMonitorStarted = true;
-      logBot("  ✅ BrowserProcessMonitor (detect process loss every 60s)", "success");
-    }
-
-    if (!lockFileDetectorStarted) {
-      lockFileDetector = new LockFileDetector(logBot);
-      lockFileDetector.startMonitoring();
-      lockFileDetectorStarted = true;
-      logBot("  ✅ LockFileDetector (remove stale locks every 45s)", "success");
-      sharedContext.lockFileDetector = lockFileDetector;
-    }
-
-    logBot("✅ Phase 8 Auto-Recovery System active", "success");
+    const recovery = initializeAutoRecovery({
+      logBot,
+      connectionManagers,
+      sharedContext,
+      guards: { sessionCleanupStarted, browserProcessMonitorStarted, lockFileDetectorStarted },
+    });
+    sessionCleanupManager = recovery.sessionCleanupManager;
+    browserProcessMonitor = recovery.browserProcessMonitor;
+    lockFileDetector = recovery.lockFileDetector;
+    sessionCleanupStarted = recovery.guards.sessionCleanupStarted;
+    browserProcessMonitorStarted = recovery.guards.browserProcessMonitorStarted;
+    lockFileDetectorStarted = recovery.guards.lockFileDetectorStarted;
 
     // ============================================
-    // STEP 6.6: Initialize Phase 1 Services (NEW)
+    // STEP 6.6: Initialize Phase 1 Services (Phase 13 — extracted)
     // ============================================
-    logBot("\n🔄 Initializing Phase 1 whatsapp-web.js Features...", "info");
-    
-    // Message Enhancement Service
-    const messageEnhancementService = getMessageEnhancementService();
-    services.register('messageEnhancementService', messageEnhancementService);
-    logBot("  ✅ Message Enhancement Service (edit, delete, react, forward)", "success");
-
-    // Reaction Tracker
-    const reactionTracker = getReactionTracker(null); // Will be integrated with MongoDB later
-    services.register('reactionTracker', reactionTracker);
-    logBot("  ✅ Reaction Tracker Service (sentiment analysis)", "success");
-
-    // Group Management Service (will get botManager reference)
-    const groupManagementService = getGroupManagementService(null);
-    services.register('groupManagementService', groupManagementService);
-    logBot("  ✅ Group Management Service (create, manage, invite)", "success");
-
-    // Chat Organization Service
-    const chatOrganizationService = getChatOrganizationService(null);
-    services.register('chatOrganizationService', chatOrganizationService);
-    logBot("  ✅ Chat Organization Service (pin, archive, mute, label)", "success");
-
-    // Advanced Contact Service
-    const advancedContactService = getAdvancedContactService(null, null);
-    services.register('advancedContactService', advancedContactService);
-    logBot("  ✅ Advanced Contact Service (block, status, profile, verify)", "success");
-
-    // Event Handlers
-    const reactionHandler = new ReactionHandler(null);
-    services.register('reactionHandler', reactionHandler);
-    logBot("  ✅ Reaction Event Handler (on message_reaction)", "success");
-
-    const groupEventHandler = new GroupEventHandler(null);
-    services.register('groupEventHandler', groupEventHandler);
-    logBot("  ✅ Group Event Handler (on group_join, group_leave, etc.)", "success");
-
-    logBot("📲 Phase 1 Services Ready: 40+ new WhatsApp commands available!", "success");
-    logBot("   - Message manipulation: edit, delete, react, forward, pin, star", "info");
-    logBot("   - Group operations: create groups, add/remove members, promote admins", "info");
-    logBot("   - Chat management: pin, archive, mute, label conversations", "info");
-    logBot("   - Contact features: block, status, profile, verify WhatsApp", "info");
+    initializePhase1Services(logBot);
 
     logBot("\n╔═══════════════════════════════════════════════════════════════╗", "info");
     logBot("║           🚀 INITIALIZATION COMPLETE - 24/7 ACTIVE            ║", "success");
@@ -685,9 +481,17 @@ async function initializeBot() {
     });
 
     // ============================================
-    // STEP 8: Setup Interactive Terminal Dashboard
+    // STEP 8: Setup Interactive Terminal Dashboard (Phase 13 — extracted)
     // ============================================
-    setupTerminalInputListener();
+    setupTerminalInputListener({
+      logBot,
+      terminalHealthDashboard,
+      accountConfigManager,
+      deviceLinkedManager,
+      accountClients,
+      setupClientFlow,
+      getFlowDeps,
+    });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit'", "info");
     logBot("   Chat commands: Type !help for full command list", "info");
