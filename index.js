@@ -71,6 +71,9 @@ import { execSync } from 'child_process';
 // CONNECTION MANAGER (Extracted - Phase 10)
 import ConnectionManager from "./code/utils/ConnectionManager.js";
 
+// SERVICE REGISTRY (Phase 11 - replaces global.XXX)
+import services from "./code/utils/ServiceRegistry.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -204,8 +207,8 @@ sharedContext.allInitializedAccounts = allInitializedAccounts;
 sharedContext.setupMessageListeners = setupMessageListeners;
 sharedContext.setMasterRef = (newClient) => {
   Lion0 = newClient;
-  global.Lion0 = Lion0;
-  global.Linda = Lion0;
+  services.register('Lion0', Lion0);
+  services.register('Linda', Lion0);
 };
 
 /**
@@ -378,7 +381,7 @@ async function initializeBot() {
       keepAliveManager = new SessionKeepAliveManager(accountClients, logBot);
       keepAliveManager.startStatusMonitoring();
       logBot("✅ SessionKeepAliveManager initialized", "success");
-      global.keepAliveManager = keepAliveManager;
+      services.register('keepAliveManager', keepAliveManager);
       sharedContext.keepAliveManager = keepAliveManager;
     }
 
@@ -389,7 +392,7 @@ async function initializeBot() {
       deviceLinkedManager = new DeviceLinkedManager(logBot);
       terminalHealthDashboard.setDeviceManager(deviceLinkedManager);
       logBot("✅ DeviceLinkedManager initialized", "success");
-      global.deviceLinkedManager = deviceLinkedManager;
+      services.register('deviceLinkedManager', deviceLinkedManager);
       sharedContext.deviceLinkedManager = deviceLinkedManager;
     }
 
@@ -399,7 +402,7 @@ async function initializeBot() {
     if (!accountConfigManager) {
       accountConfigManager = new AccountConfigManager(logBot);
       logBot("✅ AccountConfigManager initialized", "success");
-      global.accountConfigManager = accountConfigManager;
+      services.register('accountConfigManager', accountConfigManager);
       sharedContext.accountConfigManager = accountConfigManager;
       
       // Validate master account configuration
@@ -437,7 +440,7 @@ async function initializeBot() {
     if (!dynamicAccountManager) {
       dynamicAccountManager = new DynamicAccountManager(logBot);
       logBot("✅ DynamicAccountManager initialized", "success");
-      global.dynamicAccountManager = dynamicAccountManager;
+      services.register('dynamicAccountManager', dynamicAccountManager);
       
       // Register callbacks for account add/remove events
       dynamicAccountManager.onAccountAdded((account) => {
@@ -458,8 +461,8 @@ async function initializeBot() {
       bootstrapManager = new AccountBootstrapManager();
       recoveryManager = new DeviceRecoveryManager();
       logBot("✅ Phase 4 managers initialized (Bootstrap + Recovery)", "success");
-      global.bootstrapManager = bootstrapManager;
-      global.recoveryManager = recoveryManager;
+      services.register('bootstrapManager', bootstrapManager);
+      services.register('recoveryManager', recoveryManager);
     }
 
     // ============================================
@@ -497,8 +500,8 @@ async function initializeBot() {
         accountClients.set(config.phoneNumber, client);
         if (!Lion0) {
           Lion0 = client;
-          global.Lion0 = Lion0;
-          global.Linda = Lion0;
+          services.register('Lion0', Lion0);
+          services.register('Linda', Lion0);
         }
 
         logBot(`✅ Client created for ${config.displayName}`, "success");
@@ -563,7 +566,7 @@ async function initializeBot() {
       logBot("ℹ️  Account health monitoring already active", "info");
     }
     
-    global.healthMonitor = accountHealthMonitor;
+    services.register('healthMonitor', accountHealthMonitor);
 
     // ============================================
     // STEP 6.5: Initialize Linda AI Command System
@@ -571,7 +574,7 @@ async function initializeBot() {
     if (!commandHandler) {
       commandHandler = new LindaCommandHandler(logBot);
       logBot("✅ Linda Command Handler initialized (71 commands available)", "success");
-      global.commandHandler = commandHandler;
+      services.register('commandHandler', commandHandler);
       logBot(`   - Command Registry: ${LindaCommandRegistry.getCommandCount()} commands`, "info");
       logBot(`   - Categories: ${LindaCommandRegistry.getCategoryCount()} command types`, "info");
       logBot(`   - Type !help in chat to see all commands`, "info");
@@ -587,7 +590,7 @@ async function initializeBot() {
       try {
         analyticsModule = new AnalyticsDashboard();
         await analyticsModule.initialize();
-        global.analytics = analyticsModule;
+        services.register('analytics', analyticsModule);
         logBot("  ✅ Analytics Dashboard (real-time metrics & monitoring)", "success");
       } catch (error) {
         logBot(`  ⚠️  Analytics Dashboard initialization failed: ${error?.message || error}`, "warn");
@@ -600,7 +603,7 @@ async function initializeBot() {
       try {
         adminConfigModule = new AdminConfigInterface();
         await adminConfigModule.initialize();
-        global.adminConfig = adminConfigModule;
+        services.register('adminConfig', adminConfigModule);
         logBot("  ✅ Admin Config Interface (dynamic configuration management)", "success");
       } catch (error) {
         logBot(`  ⚠️  Admin Config Interface initialization failed: ${error?.message || error}`, "warn");
@@ -613,7 +616,7 @@ async function initializeBot() {
       try {
         conversationModule = new AdvancedConversationFeatures();
         await conversationModule.initialize();
-        global.conversationAI = conversationModule;
+        services.register('conversationAI', conversationModule);
         logBot("  ✅ Advanced Conversation Features (intent, sentiment, context)", "success");
       } catch (error) {
         logBot(`  ⚠️  Advanced Conversation Features initialization failed: ${error?.message || error}`, "warn");
@@ -626,7 +629,7 @@ async function initializeBot() {
       try {
         reportGeneratorModule = new ReportGenerator();
         await reportGeneratorModule.initialize();
-        global.reportGenerator = reportGeneratorModule;
+        services.register('reportGenerator', reportGeneratorModule);
         logBot("  ✅ Report Generator (daily/weekly/monthly reports)", "success");
       } catch (error) {
         logBot(`  ⚠️  Report Generator initialization failed: ${error?.message || error}`, "warn");
@@ -673,36 +676,36 @@ async function initializeBot() {
     
     // Message Enhancement Service
     const messageEnhancementService = getMessageEnhancementService();
-    global.messageEnhancementService = messageEnhancementService;
+    services.register('messageEnhancementService', messageEnhancementService);
     logBot("  ✅ Message Enhancement Service (edit, delete, react, forward)", "success");
 
     // Reaction Tracker
     const reactionTracker = getReactionTracker(null); // Will be integrated with MongoDB later
-    global.reactionTracker = reactionTracker;
+    services.register('reactionTracker', reactionTracker);
     logBot("  ✅ Reaction Tracker Service (sentiment analysis)", "success");
 
     // Group Management Service (will get botManager reference)
     const groupManagementService = getGroupManagementService(null);
-    global.groupManagementService = groupManagementService;
+    services.register('groupManagementService', groupManagementService);
     logBot("  ✅ Group Management Service (create, manage, invite)", "success");
 
     // Chat Organization Service
     const chatOrganizationService = getChatOrganizationService(null);
-    global.chatOrganizationService = chatOrganizationService;
+    services.register('chatOrganizationService', chatOrganizationService);
     logBot("  ✅ Chat Organization Service (pin, archive, mute, label)", "success");
 
     // Advanced Contact Service
     const advancedContactService = getAdvancedContactService(null, null);
-    global.advancedContactService = advancedContactService;
+    services.register('advancedContactService', advancedContactService);
     logBot("  ✅ Advanced Contact Service (block, status, profile, verify)", "success");
 
     // Event Handlers
     const reactionHandler = new ReactionHandler(null);
-    global.reactionHandler = reactionHandler;
+    services.register('reactionHandler', reactionHandler);
     logBot("  ✅ Reaction Event Handler (on message_reaction)", "success");
 
     const groupEventHandler = new GroupEventHandler(null);
-    global.groupEventHandler = groupEventHandler;
+    services.register('groupEventHandler', groupEventHandler);
     logBot("  ✅ Group Event Handler (on group_join, group_leave, etc.)", "success");
 
     logBot("📲 Phase 1 Services Ready: 40+ new WhatsApp commands available!", "success");
@@ -833,7 +836,7 @@ function getAllConnectionDiagnostics() {
 }
 
 // Expose diagnostics globally
-global.getConnectionDiagnostics = getAllConnectionDiagnostics;
+services.register('getConnectionDiagnostics', getAllConnectionDiagnostics);
 
 /**
  * Initialize database and analytics (Phase 2)
@@ -854,14 +857,14 @@ async function initializeDatabase() {
           try {
             await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
             logBot("Database context loaded into memory", "success");
-            global.databaseContext = contextIntegration;
+            services.register('databaseContext', contextIntegration);
           } catch (error) {
             logBot(`Context initialization failed: ${error.message}`, "warn");
           }
 
           try {
             const operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
-            global.operationalAnalytics = operationalAnalytics;
+            services.register('operationalAnalytics', operationalAnalytics);
             logBot("Operational Analytics service initialized", "success");
           } catch (error) {
             logBot(`Analytics initialization failed: ${error.message}`, "warn");
@@ -959,9 +962,10 @@ async function gracefulShutdown(signal = 'UNKNOWN') {
     
     // 4. Final cleanup
     logBot("Closing database connections", "info");
-    if (global.databaseContext && global.databaseContext.close) {
+    const dbCtx = services.get('databaseContext');
+    if (dbCtx && dbCtx.close) {
       try {
-        await global.databaseContext.close();
+        await dbCtx.close();
       } catch (e) {
         // Ignore database close errors
       }

@@ -173,7 +173,7 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
         contactHandlerRef.current = new ContactLookupHandler();
         await contactHandlerRef.current.initialize();
         logBot('✅ Contact lookup handler ready', 'success');
-        global.contactHandler = contactHandlerRef.current;
+        // contactHandler is available via contactHandlerRef.current (no global needed)
       } catch (error) {
         logBot(`⚠️  Contact handler error: ${error.message}`, 'warn');
       }

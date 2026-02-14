@@ -14,6 +14,7 @@
 import { ReactionHandler } from './Handlers/ReactionHandler.js';
 import { GroupEventHandler } from './Handlers/GroupEventHandler.js';
 import GorahaContactVerificationService from './GorahaContactVerificationService.js';
+import services from '../utils/ServiceRegistry.js';
 
 /**
  * @typedef {Object} MessageRouterDeps
@@ -68,8 +69,8 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
   }
 
   // ─── Phase 1 Event Handlers (singletons) ───────────────────────────
-  const reactionHandlerInstance = global.reactionHandler || new ReactionHandler(null);
-  const groupHandlerInstance = global.groupEventHandler || new GroupEventHandler(null);
+  const reactionHandlerInstance = services.get('reactionHandler') || new ReactionHandler(null);
+  const groupHandlerInstance = services.get('groupEventHandler') || new GroupEventHandler(null);
 
   client.on('message_reaction', async (reaction) => {
     try {
@@ -340,7 +341,7 @@ async function handleGorahaVerification(msg, client, gorahaRef, logBot) {
       gorahaRef.current = new GorahaContactVerificationService(client);
       await gorahaRef.current.initialize();
       logBot('✅ GorahaContactVerificationService initialized', 'success');
-      global.gorahaVerificationService = gorahaRef.current;
+      services.register('gorahaVerificationService', gorahaRef.current);
     }
 
     await msg.reply('🔍 Starting Goraha contact verification...\nThis may take a few minutes.\nI\'ll send results when complete.');

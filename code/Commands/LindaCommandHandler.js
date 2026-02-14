@@ -19,6 +19,7 @@
 
 import LindaCommandRegistry from './LindaCommandRegistry.js';
 import LindaConversationLearner from './LindaConversationLearner.js';
+import services from '../utils/ServiceRegistry.js';
 
 export class LindaCommandHandler {
   constructor(logBotFn) {
@@ -143,7 +144,7 @@ export class LindaCommandHandler {
     try {
       const messageBody = msg.body.trim();
       const isMasterAccount = context.isMasterAccount || false;
-      const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
+      const masterPhone = services.get('accountConfigManager')?.getMasterPhoneNumber();
 
       // Check if message is a command (starts with !)
       if (!messageBody.startsWith('!')) {
@@ -381,9 +382,9 @@ export class LindaCommandHandler {
 
   async handleStatus({ msg, context }) {
     const stats = this.getUsageStats();
-    const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
+    const masterPhone = services.get('accountConfigManager')?.getMasterPhoneNumber();
     const isMaster = context.phoneNumber === masterPhone;
-    const accountInfo = global.accountConfigManager?.getAccount(context.phoneNumber) || {};
+    const accountInfo = services.get('accountConfigManager')?.getAccount(context.phoneNumber) || {};
     
     let statusText = `\n📊 **LINDA STATUS**\n\n`;
     statusText += `✅ Status: Online\n`;
@@ -400,7 +401,7 @@ export class LindaCommandHandler {
   }
 
   async handleHelp({ msg, args, context }) {
-    const masterPhone = global.accountConfigManager?.getMasterPhoneNumber();
+    const masterPhone = services.get('accountConfigManager')?.getMasterPhoneNumber();
     const isMaster = context?.phoneNumber === masterPhone;
     
     if (args.length === 0) {
@@ -449,7 +450,7 @@ export class LindaCommandHandler {
   }
 
   async handleListDevices({ msg, context }) {
-    const deviceManager = global.deviceLinkedManager;
+    const deviceManager = services.get('deviceLinkedManager');
     if (!deviceManager) {
       await msg.reply(`⚠️ Device manager not initialized`);
       return;
@@ -479,7 +480,7 @@ export class LindaCommandHandler {
     }
 
     const phoneNumber = args[0];
-    const deviceManager = global.deviceLinkedManager;
+    const deviceManager = services.get('deviceLinkedManager');
     if (!deviceManager) {
       await msg.reply(`⚠️ Device manager not initialized`);
       return;
@@ -667,7 +668,7 @@ export class LindaCommandHandler {
    * Add a new WhatsApp account
    */
   async handleAddAccount({ msg, args, context }) {
-    const dynamicAccountManager = global.dynamicAccountManager;
+    const dynamicAccountManager = services.get('dynamicAccountManager');
     if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -713,7 +714,7 @@ export class LindaCommandHandler {
    * List all configured accounts
    */
   async handleListAccounts({ msg }) {
-    const dynamicAccountManager = global.dynamicAccountManager;
+    const dynamicAccountManager = services.get('dynamicAccountManager');
     if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -763,7 +764,7 @@ export class LindaCommandHandler {
    * Remove an account
    */
   async handleRemoveAccount({ msg, args }) {
-    const dynamicAccountManager = global.dynamicAccountManager;
+    const dynamicAccountManager = services.get('dynamicAccountManager');
     if (!dynamicAccountManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -799,7 +800,7 @@ export class LindaCommandHandler {
    * Set account as master (primary)
    */
   async handleSetMaster({ msg, args }) {
-    const accountConfigManager = global.accountConfigManager;
+    const accountConfigManager = services.get('accountConfigManager');
     if (!accountConfigManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -816,7 +817,7 @@ export class LindaCommandHandler {
     if (result.success) {
       // Update terminal dashboard
       const masterAccount = accountConfigManager.getMasterAccount();
-      const terminalDashboard = global.terminalHealthDashboard;
+      const terminalDashboard = services.get('terminalHealthDashboard');
       if (terminalDashboard && masterAccount) {
         terminalDashboard.setMasterPhoneNumber(masterAccount.phoneNumber);
       }
@@ -836,7 +837,7 @@ export class LindaCommandHandler {
    * Enable an account
    */
   async handleEnableAccount({ msg, args }) {
-    const accountConfigManager = global.accountConfigManager;
+    const accountConfigManager = services.get('accountConfigManager');
     if (!accountConfigManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -866,7 +867,7 @@ export class LindaCommandHandler {
    * Disable an account
    */
   async handleDisableAccount({ msg, args }) {
-    const accountConfigManager = global.accountConfigManager;
+    const accountConfigManager = services.get('accountConfigManager');
     if (!accountConfigManager) {
       await msg.reply(`❌ Account manager not initialized`);
       return;
@@ -899,7 +900,7 @@ export class LindaCommandHandler {
    * !edit-msg <messageId> <newContent>
    */
   async handleEditMessage({ msg, args }) {
-    const messageEnhancementService = global.messageEnhancementService;
+    const messageEnhancementService = services.get('messageEnhancementService');
     if (!messageEnhancementService) {
       await msg.reply(`❌ Message enhancement service not available`);
       return;
