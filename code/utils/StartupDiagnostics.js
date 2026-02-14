@@ -91,7 +91,7 @@ export function printStartupDiagnostics(opts) {
     console.log(`│    ${opts.bootstrapManager ? '✅' : '❌'} Bootstrap | ${opts.recoveryManager ? '✅' : '❌'} Recovery | ${opts.dynamicAccountManager ? '✅' : '❌'} DynamicAccount`);
 
     // Service Registry
-    const registeredCount = services.listNames().length;
+    const registeredCount = services.list().length;
     console.log('│');
     console.log(`│  📦 ServiceRegistry: ${registeredCount} services registered`);
 
