@@ -11,6 +11,8 @@
  * - Browser PID tracking for targeted process killing
  * - Full metrics & telemetry for diagnostics
  * - Memory-safe event listener management (Phase 10)
+ * - Error categorization with smart recovery (Phase 14)
+ * - Active health checking (Phase 14)
  *
  * Dependencies are injected via a shared `ctx` context object to avoid
  * tight coupling to the main application. The context is read at call-time
@@ -18,11 +20,13 @@
  *
  * @since Phase 9  - February 14, 2026 (initial)
  * @since Phase 10 - February 14, 2026 (extracted, DI, listener cleanup)
+ * @since Phase 14 - February 15, 2026 (error categorization, enhanced QR, active health)
  */
 
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { categorizeError, QRAutoRegenerator, ActiveHealthChecker } from './ConnectionEnhancements.js';
 
 export default class ConnectionManager {
   /**
@@ -98,6 +102,8 @@ export default class ConnectionManager {
       lastDisconnectedAt: null,
       lastErrorMessage: null,
       lastErrorTime: null,
+      lastErrorCategory: null,      // Phase 14: Error category for smart recovery
+      lastErrorStrategy: null,        // Phase 14: Recovery strategy applied
       averageSessionDuration: 0,
       sessionDurations: [],
       stateHistory: [],
@@ -179,23 +185,36 @@ export default class ConnectionManager {
   }
 
   handleInitializeError(errorMsg) {
-    const nonCritical = [
-      'Target closed', 'Session closed', 'browser is already running',
-      'Protocol error', 'Requesting main frame', 'Requesting main frame too early',
-      'Navigating frame was detached', 'page has been closed'
-    ];
-    const isCritical = !nonCritical.some(p => errorMsg.toLowerCase().includes(p.toLowerCase()));
-
+    // Phase 14: Use intelligent error categorization
+    const errorInfo = categorizeError(errorMsg);
+    
     this.metrics.totalErrors++;
     this.metrics.lastErrorMessage = errorMsg;
     this.metrics.lastErrorTime = Date.now();
+    this.metrics.lastErrorCategory = errorInfo.category;
+    this.metrics.lastErrorStrategy = errorInfo.strategy;
 
-    if (isCritical) {
+    // Critical errors increment counter; others just log
+    if (errorInfo.severity === 'CRITICAL') {
       this.errorCount++;
-      this.log(`[${this.phoneNumber}] ❌ Initialize error: ${errorMsg}`, 'error');
+    }
+
+    const logLevel = errorInfo.category === 'AUTH' ? 'error' : 'warn';
+    this.log(
+      `[${this.phoneNumber}] ${errorInfo.category === 'AUTH' ? '❌' : '⚠️'} Error (${errorInfo.category}): ${errorMsg}`,
+      logLevel
+    );
+    this.log(
+      `[${this.phoneNumber}]    Strategy: ${errorInfo.strategy} | Recoverable: ${errorInfo.recoverable}`,
+      'debug'
+    );
+
+    if (!errorInfo.recoverable) {
       this.connectionFailureReason = errorMsg;
-    } else {
-      this.log(`[${this.phoneNumber}] ⚠️  Non-critical error: ${errorMsg}`, 'warn');
+      this.log(
+        `[${this.phoneNumber}]    ⚠️  Manual intervention required: ${errorInfo.description}`,
+        'warn'
+      );
     }
 
     this.setState('ERROR');

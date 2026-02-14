@@ -4,6 +4,7 @@ import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceS
 import { fullCleanup, killBrowserProcesses, sleep } from "./code/utils/browserCleanup.js";
 import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
+import EnhancedQRCodeDisplay from "./code/utils/EnhancedQRCodeDisplay.js";  // Phase 14: Enhanced QR with terminal detection
 
 // PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
 // Multi-account orchestration, device recovery, health monitoring, keep-alive system
@@ -129,7 +130,7 @@ const sharedContext = {
   accountConfigManager: null,
   setMasterRef: null,              // Set after Lion0 declaration
   deviceLinkedManager: null,
-  QRCodeDisplay,
+  QRCodeDisplay: EnhancedQRCodeDisplay,  // Phase 14: Use enhanced version with terminal detection
   updateDeviceStatus,              // Imported from deviceStatus.js
   accountHealthMonitor,
   keepAliveManager: null,
