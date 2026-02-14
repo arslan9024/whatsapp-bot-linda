@@ -160,6 +160,14 @@ export class QRAutoRegenerator {
   }
 
   /**
+   * Alias for stopTracking() for consistency with ConnectionManager cleanup
+   * Phase 15: Called during destroy() to ensure clean shutdown
+   */
+  stop() {
+    this.stopTracking();
+  }
+
+  /**
    * Register callback for when QR regens fail
    */
   onFallback(callback) {
