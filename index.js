@@ -17,9 +17,8 @@ import DeviceLinkedManager from "./code/utils/DeviceLinkedManager.js";  // NEW: 
 import { AccountConfigManager } from "./code/utils/AccountConfigManager.js";  // NEW: Dynamic account management
 import { DynamicAccountManager } from "./code/utils/DynamicAccountManager.js";  // NEW: Runtime account manager
 
-// DATABASE & ANALYTICS (Phase 2)
-import { AIContextIntegration } from "./code/Services/AIContextIntegration.js";
-import { OperationalAnalytics } from "./code/Services/OperationalAnalytics.js";
+// DATABASE & ANALYTICS (Phase 2) — initialization extracted to DatabaseInitializer.js
+// AIContextIntegration and OperationalAnalytics are imported there.
 
 // CONVERSATION ANALYSIS (Session 18)
 import "./code/WhatsAppBot/AnalyzerGlobals.js";
@@ -64,15 +63,17 @@ import SessionCleanupManager from "./code/utils/SessionCleanupManager.js";
 import BrowserProcessMonitor from "./code/utils/BrowserProcessMonitor.js";
 import LockFileDetector from "./code/utils/LockFileDetector.js";
 
-import fs from "fs";
-import path from "path";
-import { execSync } from 'child_process';
-
 // CONNECTION MANAGER (Extracted - Phase 10)
 import ConnectionManager from "./code/utils/ConnectionManager.js";
 
 // SERVICE REGISTRY (Phase 11 - replaces global.XXX)
 import services from "./code/utils/ServiceRegistry.js";
+
+// PHASE 12: Extracted modules (Error Handlers, Shutdown, Diagnostics, Database)
+import { installProcessErrorHandlers } from "./code/utils/ProcessErrorHandlers.js";
+import { createGracefulShutdown, installShutdownHandlers } from "./code/utils/GracefulShutdown.js";
+import { printStartupDiagnostics } from "./code/utils/StartupDiagnostics.js";
+import { initializeDatabase } from "./code/utils/DatabaseInitializer.js";
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
@@ -212,59 +213,9 @@ sharedContext.setMasterRef = (newClient) => {
 };
 
 /**
- * Global Error Handlers for Graceful Recovery
- * Prevents Puppeteer protocol errors from crashing the bot
+ * Global Error Handlers (Phase 12 — extracted to ProcessErrorHandlers.js)
  */
-
-// Define patterns for non-critical protocol errors that should not crash the bot
-const NON_CRITICAL_ERROR_PATTERNS = [
-  'Target closed',
-  'Session closed',
-  'Target.setAutoAttach',
-  'Requesting main frame',
-  'Requesting main frame too early',
-  'Navigating frame was detached',
-  'DevTools',
-  'Protocol error',
-  'browser is already running',
-  'CHROME_EXECUTABLE_PATH',
-  'page has been closed'
-];
-
-function isNonCriticalError(errorMsg) {
-  return NON_CRITICAL_ERROR_PATTERNS.some(pattern => 
-    errorMsg.toLowerCase().includes(pattern.toLowerCase())
-  );
-}
-
-process.on('unhandledRejection', (reason, promise) => {
-  const errorMsg = reason?.message || String(reason);
-  
-  // Handle non-critical Puppeteer/Protocol errors silently
-  if (isNonCriticalError(errorMsg)) {
-    // Log once with warning prefix, don't crash
-    logBot(`⚠️  Protocol Warning: ${errorMsg}`, "warn");
-    return; // Don't crash - just log and continue
-  }
-  
-  // Critical error - log and handle
-  logBot(`❌ Unhandled Rejection: ${errorMsg}`, "error");
-  logBot("Bot will attempt to recover...", "info");
-});
-
-process.on('uncaughtException', (error) => {
-  const errorMsg = error?.message || String(error);
-  
-  // Handle non-critical protocol exceptions
-  if (isNonCriticalError(errorMsg)) {
-    logBot(`⚠️  Browser Protocol Exception: ${errorMsg}`, "warn");
-    return; // Continue running - don't exit
-  }
-  
-  // Critical exception - log it
-  logBot(`❌ Uncaught Exception: ${errorMsg}`, "error");
-  logBot("Attempting graceful recovery...", "info");
-});
+installProcessErrorHandlers(logBot);
 
 /**
  * Setup terminal input listener for interactive health dashboard & device management
@@ -548,9 +499,8 @@ async function initializeBot() {
     }
 
     // ============================================
-    // STEP 5: Initialize Database & Analytics
-    // ============================================
-    await initializeDatabase();
+    // STEP 5: Initialize Database & Analytics (Phase 12 — extracted)
+    await initializeDatabase(logBot);
 
     // ============================================
     // STEP 6: Initialize Health Monitoring (Phase 5)
@@ -721,9 +671,18 @@ async function initializeBot() {
     logBot("╚═══════════════════════════════════════════════════════════════╝\n", "info");
 
     // ============================================
-    // STEP 7: Startup Diagnostics Report
+    // STEP 7: Startup Diagnostics Report (Phase 12 — extracted)
     // ============================================
-    printStartupDiagnostics();
+    printStartupDiagnostics({
+      accountClients, connectionManagers,
+      sessionCleanupStarted, browserProcessMonitorStarted,
+      lockFileDetectorStarted, healthChecksStarted,
+      analyticsModule, adminConfigModule, conversationModule,
+      reportGeneratorModule, commandHandler,
+      keepAliveManager, deviceLinkedManager, accountConfigManager,
+      bootstrapManager, recoveryManager, dynamicAccountManager,
+      logBot,
+    });
 
     // ============================================
     // STEP 8: Setup Interactive Terminal Dashboard
@@ -756,75 +715,6 @@ async function initializeBot() {
 }
 
 /**
- * ====================================================================
- * STARTUP DIAGNOSTICS SYSTEM (Phase 9)
- * ====================================================================
- * Prints a comprehensive health dashboard after initialization.
- * Shows: account states, connection managers, Phase 8 monitors, system info.
- */
-function printStartupDiagnostics() {
-  try {
-    const now = new Date();
-    const memUsage = process.memoryUsage();
-    const heapMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-    const rssMB = Math.round(memUsage.rss / 1024 / 1024);
-    
-    console.log('\n┌──────────────────────────────────────────────────────────────┐');
-    console.log('│              📊 STARTUP DIAGNOSTICS REPORT                   │');
-    console.log(`│              ${now.toLocaleDateString()} ${now.toLocaleTimeString()}                       │`);
-    console.log('├──────────────────────────────────────────────────────────────┤');
-    
-    // System Resources
-    console.log(`│  💻 System: Node ${process.version} | ${process.platform} | PID: ${process.pid}`);
-    console.log(`│  🧠 Memory: Heap ${heapMB}MB | RSS ${rssMB}MB`);
-    console.log('│');
-    
-    // Account Status
-    console.log(`│  📱 Accounts Configured: ${accountClients.size}`);
-    console.log(`│  🔗 Connection Managers: ${connectionManagers.size}`);
-    
-    for (const [phone, manager] of connectionManagers) {
-      const status = manager.getStatus();
-      const stateIcon = {
-        'CONNECTED': '🟢', 'CONNECTING': '🟡', 'DISCONNECTED': '🔴',
-        'ERROR': '❌', 'SUSPENDED': '⛔', 'IDLE': '⚪'
-      }[status.state] || '❓';
-      console.log(`│    ${stateIcon} ${phone}: ${status.state} (errors: ${status.errorCount}, reconnects: ${status.reconnectAttempts})`);
-    }
-    console.log('│');
-    
-    // Phase 8 Monitors
-    console.log('│  🔧 Auto-Recovery Monitors:');
-    console.log(`│    ${sessionCleanupStarted ? '✅' : '❌'} SessionCleanupManager (every 90s)`);
-    console.log(`│    ${browserProcessMonitorStarted ? '✅' : '❌'} BrowserProcessMonitor (every 60s)`);
-    console.log(`│    ${lockFileDetectorStarted ? '✅' : '❌'} LockFileDetector (every 45s)`);
-    console.log(`│    ${healthChecksStarted ? '✅' : '❌'} AccountHealthMonitor (every 5min)`);
-    console.log('│');
-    
-    // Phase 7 Modules
-    console.log('│  🧩 Advanced Modules:');
-    console.log(`│    ${analyticsModule ? '✅' : '⚠️'}  Analytics Dashboard`);
-    console.log(`│    ${adminConfigModule ? '✅' : '⚠️'}  Admin Config Interface`);
-    console.log(`│    ${conversationModule ? '✅' : '⚠️'}  Conversation AI`);
-    console.log(`│    ${reportGeneratorModule ? '✅' : '⚠️'}  Report Generator`);
-    console.log(`│    ${commandHandler ? '✅' : '⚠️'}  Command System (71 commands)`);
-    console.log('│');
-    
-    // Managers
-    console.log('│  ⚙️  Core Managers:');
-    console.log(`│    ${keepAliveManager ? '✅' : '❌'} KeepAlive | ${deviceLinkedManager ? '✅' : '❌'} DeviceLinked | ${accountConfigManager ? '✅' : '❌'} AccountConfig`);
-    console.log(`│    ${bootstrapManager ? '✅' : '❌'} Bootstrap | ${recoveryManager ? '✅' : '❌'} Recovery | ${dynamicAccountManager ? '✅' : '❌'} DynamicAccount`);
-    
-    console.log('├──────────────────────────────────────────────────────────────┤');
-    console.log('│  🎯 Status: ALL SYSTEMS OPERATIONAL                         │');
-    console.log('│  📡 Chat: !help | Terminal: dashboard | Admin: /admin       │');
-    console.log('└──────────────────────────────────────────────────────────────┘\n');
-  } catch (error) {
-    logBot(`Diagnostics report error: ${error.message}`, 'warn');
-  }
-}
-
-/**
  * Get all connection manager diagnostics (for admin commands)
  */
 function getAllConnectionDiagnostics() {
@@ -839,157 +729,27 @@ function getAllConnectionDiagnostics() {
 services.register('getConnectionDiagnostics', getAllConnectionDiagnostics);
 
 /**
- * Initialize database and analytics (Phase 2)
- */
-async function initializeDatabase() {
-  logBot("Initializing database and analytics...", "info");
-
-  try {
-    const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID;
-
-    if (AKOYA_SHEET_ID) {
-      try {
-        const { quickValidateSheet } = await import("./code/utils/sheetValidation.js");
-        const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
-        
-        if (sheetValid) {
-          const contextIntegration = new AIContextIntegration();
-          try {
-            await contextIntegration.initialize(AKOYA_SHEET_ID, { cacheExpiry: 3600 });
-            logBot("Database context loaded into memory", "success");
-            services.register('databaseContext', contextIntegration);
-          } catch (error) {
-            logBot(`Context initialization failed: ${error.message}`, "warn");
-          }
-
-          try {
-            const operationalAnalytics = new OperationalAnalytics(AKOYA_SHEET_ID);
-            services.register('operationalAnalytics', operationalAnalytics);
-            logBot("Operational Analytics service initialized", "success");
-          } catch (error) {
-            logBot(`Analytics initialization failed: ${error.message}`, "warn");
-          }
-        } else {
-          logBot("Sheet validation failed - using legacy mode", "warn");
-        }
-      } catch (error) {
-        logBot(`Database initialization error: ${error.message}`, "warn");
-      }
-    }
-  } catch (error) {
-    logBot(`Database error: ${error.message}`, "warn");
-  }
-}
-
-/**
  * ═══════════════════════════════════════════════════════════════════════════════
- * GRACEFUL SHUTDOWN (Phase 10 - Production Hardening)
+ * GRACEFUL SHUTDOWN (Phase 12 — extracted to GracefulShutdown.js)
  * ═══════════════════════════════════════════════════════════════════════════════
- * - Handles both SIGINT (Ctrl+C) and SIGTERM (process managers, Docker, PM2)
- * - 15-second timeout guard prevents hanging shutdown
- * - Prevents double-shutdown from rapid signal delivery
- * - Cleans up ALL resources: listeners, connections, managers, intervals, database
  */
-let isShuttingDown = false;
-const SHUTDOWN_TIMEOUT_MS = 15000; // 15s max for graceful shutdown
+const gracefulShutdown = createGracefulShutdown({
+  logBot,
+  sessionStateManager,
+  accountHealthMonitor,
+  connectionManagers,
+  accountClients,
+  allInitializedAccounts,
+  sessionCleanupManager,
+  browserProcessMonitor,
+  lockFileDetector,
+  clearAccounts: () => { allInitializedAccounts = []; },
+});
 
-async function gracefulShutdown(signal = 'UNKNOWN') {
-  // Prevent double-shutdown from rapid signals
-  if (isShuttingDown) {
-    logBot(`Shutdown already in progress (${signal} ignored)`, "warn");
-    return;
-  }
-  isShuttingDown = true;
-  
-  console.log("\n");
-  logBot(`Received ${signal} - Initiating graceful shutdown...`, "warn");
-  
-  // Timeout guard: force-kill if shutdown takes too long
-  const forceExitTimer = setTimeout(() => {
-    logBot(`⚠️  Shutdown timeout (${SHUTDOWN_TIMEOUT_MS / 1000}s) exceeded. Force exiting...`, "error");
-    process.exit(1);
-  }, SHUTDOWN_TIMEOUT_MS);
-  // Don't let the timer prevent natural exit
-  forceExitTimer.unref();
-  
-  try {
-    // 0. Stop Phase 8 auto-recovery systems
-    logBot("Stopping auto-recovery systems...", "info");
-    if (sessionCleanupManager) sessionCleanupManager.stop();
-    if (browserProcessMonitor) browserProcessMonitor.stop();
-    if (lockFileDetector) lockFileDetector.stop();
+installShutdownHandlers(gracefulShutdown);
 
-    // 0A. Stop health monitoring (Phase 5) - only if available
-    if (typeof accountHealthMonitor !== 'undefined') {
-      logBot("Stopping health monitoring...", "info");
-      accountHealthMonitor.stopHealthChecks();
-    }
-    
-    // 0B. Destroy connection managers (incl. listener cleanup, browser kill)
-    logBot(`Destroying connection managers for ${connectionManagers.size} account(s)`, "info");
-    for (const [phoneNumber, manager] of connectionManagers.entries()) {
-      try {
-        logBot(`  Cleaning up ${phoneNumber}...`, "info");
-        await manager.destroy();
-      } catch (e) {
-        logBot(`  Warning: Error destroying manager for ${phoneNumber}`, "warn");
-      }
-    }
-    connectionManagers.clear();
-    
-    // 1. Save all account states
-    logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, "info");
-    for (const [accountId, state] of Object.entries(sessionStateManager.getAllAccountStates())) {
-      await sessionStateManager.saveAccountState(accountId, { ...state, isActive: false });
-    }
-    
-    // 2. Close all WhatsApp connections
-    logBot(`Closing ${allInitializedAccounts.length} WhatsApp connection(s)`, "info");
-    for (const [phoneNumber, client] of accountClients.entries()) {
-      try {
-        logBot(`  Disconnecting ${phoneNumber}...`, "info");
-        client.removeAllListeners(); // Prevent events during destroy
-        await client.destroy();
-      } catch (e) {
-        logBot(`  Warning: Error closing ${phoneNumber}`, "warn");
-      }
-    }
-    accountClients.clear();
-    
-    // 3. Write safe point file
-    logBot("Writing session checkpoint", "info");
-    await sessionStateManager.writeSafePointFile();
-    
-    // 4. Final cleanup
-    logBot("Closing database connections", "info");
-    const dbCtx = services.get('databaseContext');
-    if (dbCtx && dbCtx.close) {
-      try {
-        await dbCtx.close();
-      } catch (e) {
-        // Ignore database close errors
-      }
-    }
-    
-    // 5. Clear global references
-    allInitializedAccounts = [];
-    
-    logBot("✅ Graceful shutdown complete", "success");
-  } catch (error) {
-    logBot(`Error during shutdown: ${error.message}`, "error");
-  }
-  
-  clearTimeout(forceExitTimer);
-  logBot("Bot stopped. Nodemon will restart on code changes...", "info");
-  process.exit(0);
-}
-
-// Handle both SIGINT (Ctrl+C, dev) and SIGTERM (PM2, Docker, systemd, cloud)
-process.on("SIGINT", () => gracefulShutdown('SIGINT'));
-process.on("SIGTERM", () => gracefulShutdown('SIGTERM'));
-
-// NOTE: Global error handlers (unhandledRejection, uncaughtException) are defined above
-// with non-critical error pattern filtering. Do NOT duplicate them here.
+// NOTE: Global error handlers (unhandledRejection, uncaughtException) are
+// installed above via installProcessErrorHandlers(). Do NOT duplicate them.
 
 // Start the bot
 logBot("Starting Linda WhatsApp Bot...", "info");
