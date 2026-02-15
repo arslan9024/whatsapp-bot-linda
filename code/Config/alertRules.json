@@ -1,0 +1,156 @@
+{
+  "alerts": [
+    {
+      "id": "qr-regen-failed",
+      "name": "QR Regeneration Failed",
+      "event": "QR_REGENERATION_FAILED",
+      "severity": "HIGH",
+      "channels": ["sms", "slack"],
+      "cooldown": 3600,
+      "condition": {
+        "type": "event",
+        "trigger": "QR regeneration failed after 3 attempts"
+      },
+      "template": {
+        "sms": "Linda Bot Alert: QR regeneration failed for {phoneNumber}. Switched to 6-digit code. Action: {action}",
+        "slack": "🔴 QR Regeneration Failed\nAccount: {phoneNumber}\nAttempts: 3/3\nAction: Switch to 6-digit pairing code",
+        "email": "QR Regeneration Issue - {phoneNumber}"
+      }
+    },
+    {
+      "id": "connection-lost",
+      "name": "Connection Lost",
+      "event": "CONNECTION_LOST",
+      "severity": "CRITICAL",
+      "channels": ["email", "slack"],
+      "escalation": [
+        {
+          "after": 300,
+          "add": ["sms"]
+        },
+        {
+          "after": 900,
+          "add": ["push"]
+        }
+      ],
+      "template": {
+        "email": "Connection Lost - {phoneNumber}",
+        "slack": "🔴 CRITICAL: Connection lost for {phoneNumber}"
+      }
+    },
+    {
+      "id": "health-degraded",
+      "name": "Health Score Dropped",
+      "event": "HEALTH_SCORE_DROP",
+      "severity": "MEDIUM",
+      "channels": ["slack"],
+      "condition": {
+        "type": "metric",
+        "metric": "healthScore",
+        "change": -10,
+        "window": 3600
+      },
+      "template": {
+        "slack": "⚠️ Health Degradation\nAccount: {phoneNumber}\nScore: {prevScore} → {newScore}\nReason: {reason}"
+      }
+    },
+    {
+      "id": "slow-qr-scan",
+      "name": "Slow QR Scan Pattern Detected",
+      "event": "SLOW_QR_PATTERN",
+      "severity": "LOW",
+      "channels": ["slack"],
+      "condition": {
+        "type": "diagnostic",
+        "diagnostic": "slow_qr_scan"
+      },
+      "template": {
+        "slack": "📊 Pattern Detected: Slow QR Scans\nAccount: {phoneNumber}\nAverage Scan Time: {scanTime}s\nRecommendation: Increase timeout to {recommendedTimeout}s"
+      }
+    },
+    {
+      "id": "frequent-regen",
+      "name": "Frequent QR Regenerations",
+      "event": "FREQUENT_REGENERATION",
+      "severity": "MEDIUM",
+      "channels": ["slack", "email"],
+      "condition": {
+        "type": "diagnostic",
+        "diagnostic": "frequent_regen"
+      },
+      "template": {
+        "slack": "🔄 High Regeneration Rate\nAccount: {phoneNumber}\nAttempts: {attempts} in 1 hour\nSuggestion: {suggestion}",
+        "email": "QR Regeneration Optimization - {phoneNumber}"
+      }
+    },
+    {
+      "id": "network-issues",
+      "name": "Network Issues Detected",
+      "event": "NETWORK_ISSUES",
+      "severity": "HIGH",
+      "channels": ["slack"],
+      "condition": {
+        "type": "diagnostic",
+        "diagnostic": "network_issues"
+      },
+      "template": {
+        "slack": "🌐 Network Issues Detected\nAccount: {phoneNumber}\nError Rate: {errorRate}%\nType: {errorType}\nAction: {action}"
+      }
+    },
+    {
+      "id": "browser-lock",
+      "name": "Browser Lock Detected",
+      "event": "BROWSER_LOCK",
+      "severity": "HIGH",
+      "channels": ["sms", "slack"],
+      "template": {
+        "sms": "Linda Bot: Browser lock on {phoneNumber}. Attempting recovery...",
+        "slack": "🔒 Browser Lock Detected\nAccount: {phoneNumber}\nAction: Attempting auto-recovery"
+      }
+    },
+    {
+      "id": "stale-session",
+      "name": "Stale Session Detected",
+      "event": "STALE_SESSION",
+      "severity": "MEDIUM",
+      "channels": ["slack"],
+      "template": {
+        "slack": "⏰ Stale Session\nAccount: {phoneNumber}\nInactive for: {inactiveTime}s\nAction: {action}"
+      }
+    }
+  ],
+  
+  "escalationPolicies": [
+    {
+      "id": "default",
+      "steps": [
+        {
+          "order": 1,
+          "condition": "severity == CRITICAL",
+          "action": "notify_team_lead",
+          "delay": 0
+        },
+        {
+          "order": 2,
+          "condition": "severity == HIGH",
+          "action": "notify_on_call_engineer",
+          "delay": 300
+        }
+      ]
+    }
+  ],
+  
+  "quietHours": {
+    "enabled": false,
+    "start": "22:00",
+    "end": "08:00",
+    "timezone": "UTC",
+    "severityOverride": "CRITICAL"
+  },
+  
+  "doNotDisturb": {
+    "enabled": false,
+    "users": [],
+    "until": null
+  }
+}
