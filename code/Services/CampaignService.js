@@ -1,6 +1,8 @@
 import { Campaign, DailyLimit, CampaignMessageLog } from '../Database/CampaignSchema.js';
 import { v4 as uuidv4 } from 'uuid';
-import logger from '../utils/logger.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger('CampaignService');
 
 /**
  * CampaignService - Main orchestration for campaign management

@@ -1,4 +1,6 @@
-import logger from '../utils/logger.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger('CampaignMessageDelayer');
 
 /**
  * CampaignMessageDelayer - Smart delays between campaign messages

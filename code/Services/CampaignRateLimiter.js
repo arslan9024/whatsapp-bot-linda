@@ -1,6 +1,8 @@
 import CampaignService from './CampaignService.js';
 import { DailyLimit } from '../Database/CampaignSchema.js';
-import logger from '../utils/logger.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger('CampaignRateLimiter');
 
 /**
  * CampaignRateLimiter - Enforce rate limits for campaigns

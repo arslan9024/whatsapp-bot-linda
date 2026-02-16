@@ -1,12 +1,14 @@
-import CampaignService from './CampaignService.js';
-import ContactFilterService from './ContactFilterService.js';
-import CampaignRateLimiter from './CampaignRateLimiter.js';
-import CampaignMessageDelayer from './CampaignMessageDelayer.js';
+import campaignService from './CampaignService.js';
+import contactFilterService from './ContactFilterService.js';
+import campaignRateLimiter from './CampaignRateLimiter.js';
+import campaignMessageDelayer from './CampaignMessageDelayer.js';
 import { ContactLookupHandler } from '../WhatsAppBot/ContactLookupHandler.js';
 import { sendMessageWithReport } from '../Message/sendMessageWithReport.js';
 import { SelectingBotForCampaign } from '../Message/SelectingBotForCampaign.js';
-import logger from '../utils/logger.js';
+import { Logger } from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
+
+const logger = new Logger('CampaignExecutor');
 
 /**
  * CampaignExecutor - Orchestrates the full campaign send flow

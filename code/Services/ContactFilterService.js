@@ -1,6 +1,8 @@
-import ContactLookupHandler from '../WhatsAppBot/ContactLookupHandler.js';
+import { ContactLookupHandler } from '../WhatsAppBot/ContactLookupHandler.js';
 import { ContactReference } from '../Database/MessageSchema.js';
-import logger from '../utils/logger.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger('ContactFilterService');
 
 /**
  * ContactFilterService - Smart contact filtering and search

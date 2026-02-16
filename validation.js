@@ -3,7 +3,9 @@
  * Provides common validation functions for bot operations
  */
 
-import logger from './logger.js';
+import { Logger } from './logger.js';
+
+const logger = new Logger('Validation');
 
 /**
  * Validates phone number format

@@ -3,7 +3,9 @@
  * Provides centralized error handling with recovery strategies
  */
 
-import logger from './logger.js';
+import { Logger } from './logger.js';
+
+const logger = new Logger('ErrorHandler');
 
 /**
  * Custom Error Classes

@@ -2,7 +2,9 @@ import cron from 'node-cron';
 import CampaignService from '../Services/CampaignService.js';
 import CampaignRateLimiter from '../Services/CampaignRateLimiter.js';
 import CampaignExecutor from '../Services/CampaignExecutor.js';
-import logger from './logger.js';
+import { Logger } from './logger.js';
+
+const logger = new Logger('CampaignScheduler');
 
 /**
  * CampaignScheduler - Manages scheduled campaign execution
