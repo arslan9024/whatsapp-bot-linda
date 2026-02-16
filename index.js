@@ -62,6 +62,13 @@ import { phase17Orchestrator } from "./code/utils/Phase17Orchestrator.js";
 // CLIENT HEALTH MONITOR: Frame detachment & heartbeat fix (February 17, 2026)
 import clientHealthMonitor from "./code/utils/ClientHealthMonitor.js";
 
+// PHASE 19: CAMPAIGN MANAGER (Bulk Messaging - February 17, 2026)
+// Campaign scheduling, rate limiting, contact filtering, message personalization
+import CampaignScheduler from "./code/utils/CampaignScheduler.js";
+import CampaignService from "./code/Services/CampaignService.js";
+import ContactFilterService from "./code/Services/ContactFilterService.js";
+import CampaignCommands from "./code/Commands/CampaignCommands.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -104,6 +111,11 @@ let lockFileDetectorStarted = false;
 let sessionCleanupManager = null;
 let browserProcessMonitor = null;
 let lockFileDetector = null;
+
+// Phase 19: Campaign Manager instances
+let campaignService = null;
+let contactFilterService = null;
+let campaignScheduler = null;
 
 // Simple console logging without interactive prompts
 function logBot(msg, type = "info") {
@@ -484,6 +496,33 @@ async function initializeBot() {
     sessionCleanupStarted = recovery.guards.sessionCleanupStarted;
     browserProcessMonitorStarted = recovery.guards.browserProcessMonitorStarted;
     lockFileDetectorStarted = recovery.guards.lockFileDetectorStarted;
+
+    // ============================================
+    // STEP 6.5C: Initialize Phase 19 Campaign Manager (NEW - Feb 17, 2026)
+    // ============================================
+    if (!campaignService) {
+      campaignService = new CampaignService();
+      contactFilterService = new ContactFilterService();
+      campaignScheduler = CampaignScheduler;
+      
+      // Initialize campaign commands with services
+      CampaignCommands.initialize({
+        campaignService,
+        contactFilterService,
+        rateLimiter: null, // Will be created internally
+        scheduler: campaignScheduler
+      });
+      
+      // Register with service registry for admin access
+      services.register('campaignService', campaignService);
+      services.register('contactFilterService', contactFilterService);
+      services.register('campaignScheduler', campaignScheduler);
+      
+      logBot("✅ Phase 19: Campaign Manager initialized (bulk messaging ready)", "success");
+      logBot("   - Campaign commands: create, start, stop, list, stats, schedule", "info");
+      logBot("   - Rate limiting: 10 msgs/day/campaign, 45/day/account", "info");
+      logBot("   - Scheduling: 9:00 AM daily, midnight reset", "info");
+    }
 
     // ============================================
     // STEP 6.6: Initialize Phase 1 Services (Phase 13 — extracted)

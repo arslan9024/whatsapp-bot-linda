@@ -20,6 +20,7 @@
 import LindaCommandRegistry from './LindaCommandRegistry.js';
 import LindaConversationLearner from './LindaConversationLearner.js';
 import services from '../utils/ServiceRegistry.js';
+import CampaignCommands from './CampaignCommands.js';
 
 export class LindaCommandHandler {
   constructor(logBotFn) {
@@ -128,6 +129,16 @@ export class LindaCommandHandler {
     this.registerHandler('common-groups', this.handleCommonGroups.bind(this));
     this.registerHandler('verify-whatsapp', this.handleVerifyWhatsApp.bind(this));
     this.registerHandler('profile-picture', this.handleProfilePicture.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 19 CAMPAIGN MANAGER COMMANDS (NEW - February 17, 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this.registerHandler('create-campaign', this.handleCreateCampaign.bind(this));
+    this.registerHandler('start-campaign', this.handleStartCampaign.bind(this));
+    this.registerHandler('stop-campaign', this.handleStopCampaign.bind(this));
+    this.registerHandler('list-campaigns', this.handleListCampaigns.bind(this));
+    this.registerHandler('campaign-stats', this.handleCampaignStats.bind(this));
+    this.registerHandler('campaign-schedule', this.handleCampaignSchedule.bind(this));
   }
 
   /**
@@ -1297,6 +1308,106 @@ export class LindaCommandHandler {
       return;
     }
     await msg.reply(`🖼️  Profile picture retrieval coming soon!`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PHASE 19: CAMPAIGN MANAGER COMMAND HANDLERS (February 17, 2026)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !create-campaign <name> <filter>
+   * Create a new bulk messaging campaign
+   */
+  async handleCreateCampaign({ msg, phoneNumber, args, context }) {
+    const result = await CampaignCommands.processCommand(
+      'create-campaign',
+      args,
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
+  }
+
+  /**
+   * !start-campaign <campaign-id>
+   * Start executing a campaign
+   */
+  async handleStartCampaign({ msg, phoneNumber, args, context }) {
+    const result = await CampaignCommands.processCommand(
+      'start-campaign',
+      args,
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
+  }
+
+  /**
+   * !stop-campaign <campaign-id>
+   * Stop campaign execution
+   */
+  async handleStopCampaign({ msg, phoneNumber, args, context }) {
+    const result = await CampaignCommands.processCommand(
+      'stop-campaign',
+      args,
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
+  }
+
+  /**
+   * !list-campaigns
+   * List all campaigns with status
+   */
+  async handleListCampaigns({ msg, phoneNumber, context }) {
+    const result = await CampaignCommands.processCommand(
+      'list-campaigns',
+      [],
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
+  }
+
+  /**
+   * !campaign-stats <campaign-id>
+   * Get campaign statistics
+   */
+  async handleCampaignStats({ msg, phoneNumber, args, context }) {
+    const result = await CampaignCommands.processCommand(
+      'campaign-stats',
+      args,
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
+  }
+
+  /**
+   * !campaign-schedule <campaign-id>
+   * Check campaign schedule
+   */
+  async handleCampaignSchedule({ msg, phoneNumber, args, context }) {
+    const result = await CampaignCommands.processCommand(
+      'campaign-schedule',
+      args,
+      { ...context, phoneNumber }
+    );
+
+    if (result.reply) {
+      await msg.reply(result.reply);
+    }
   }
 }
 

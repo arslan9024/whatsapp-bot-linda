@@ -1,4 +1,9 @@
-import logger from './logger.js';
+const logger = {
+  info: (msg) => console.log(`[HealthMonitor] ℹ️  ${msg}`),
+  warn: (msg) => console.log(`[HealthMonitor] ⚠️  ${msg}`),
+  error: (msg) => console.error(`[HealthMonitor] ❌ ${msg}`),
+  debug: (msg) => console.log(`[HealthMonitor] 🐛 ${msg}`)
+};
 
 /**
  * ClientHealthMonitor - Detects and recovers from frame detachment and connection issues
