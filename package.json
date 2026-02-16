@@ -50,6 +50,7 @@
         "jsonwebtoken": "^9.0.3",
         "libphonenumber-js": "^1.12.36",
         "mongoose": "^9.1.6",
+        "node-cron": "^4.2.1",
         "qrcode": "^1.5.4",
         "qrcode-terminal": "^0.12.0",
         "whatsapp-web.js": "^1.22.1",

@@ -1,7 +1,7 @@
 import cron from 'node-cron';
-import CampaignService from '../Services/CampaignService.js';
-import CampaignRateLimiter from '../Services/CampaignRateLimiter.js';
-import CampaignExecutor from '../Services/CampaignExecutor.js';
+import campaignService from '../Services/CampaignService.js';
+import campaignRateLimiter from '../Services/CampaignRateLimiter.js';
+import campaignExecutor from '../Services/CampaignExecutor.js';
 import { Logger } from './logger.js';
 
 const logger = new Logger('CampaignScheduler');
@@ -34,7 +34,7 @@ class CampaignScheduler {
       this.scheduleDailyReset();
       
       // Load and schedule all active campaigns
-      const campaignResult = await CampaignService.listCampaigns({
+      const campaignResult = await campaignService.listCampaigns({
         status: 'active',
         enabled: true
       });
@@ -171,7 +171,7 @@ class CampaignScheduler {
       try {
         logger.info(`Executing scheduled campaign: "${name}" (${campaignId})`);
         
-        const results = await CampaignExecutor.executeCampaign(
+        const results = await campaignExecutor.executeCampaign(
           campaignId,
           agent.authStrategy?.clientId || 'unknown',
           limits?.messagesPerDay || 10,
@@ -181,7 +181,7 @@ class CampaignScheduler {
         logger.info(`Campaign execution completed: ${results.successCount} sent, ${results.failureCount} failed`);
         
         // Update campaign stats
-        await CampaignService.updateCampaign(campaignId, {
+        await campaignService.updateCampaign(campaignId, {
           'stats.lastExecutionAt': new Date(),
           'stats.nextExecutionAt': this._getNextExecutionTime(campaign)
         });
@@ -229,7 +229,7 @@ class CampaignScheduler {
       const resetTask = cron.schedule('0 0 * * *', async () => {
         try {
           logger.info('Running daily limit reset...');
-          const result = await CampaignRateLimiter.resetDaily();
+          const result = await campaignRateLimiter.resetDaily();
           
           if (result.success) {
             logger.info(`Daily reset completed: ${result.resetCount} records reset`);
@@ -260,7 +260,7 @@ class CampaignScheduler {
    */
   async executeCampaignNow(campaignId, agents = []) {
     try {
-      const campaignResult = await CampaignService.getCampaignById(campaignId);
+      const campaignResult = await campaignService.getCampaignById(campaignId);
       
       if (!campaignResult.success) {
         return { success: false, error: 'Campaign not found' };
@@ -281,7 +281,7 @@ class CampaignScheduler {
       
       logger.info(`Executing campaign immediately: ${campaign.name}`);
       
-      const results = await CampaignExecutor.executeCampaign(
+      const results = await campaignExecutor.executeCampaign(
         campaignId,
         agents[0].authStrategy?.clientId || 'unknown',
         campaign.limits?.messagesPerDay || 10,
