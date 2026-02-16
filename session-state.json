@@ -1,26 +1,5 @@
 {
-  "timestamp": "2026-02-16T10:11:29.462Z",
+  "timestamp": "2026-02-16T18:01:25.851Z",
   "version": "1.0",
-  "accounts": {
-    "+971505760056": {
-      "phoneNumber": "+971505760056",
-      "displayName": "Arslan Malik",
-      "deviceLinked": true,
-      "isActive": true,
-      "sessionPath": "sessions/session-arslan-malik",
-      "lastKnownState": "authenticated",
-      "lastPing": "2026-02-16T10:11:29.462Z",
-      "recoveryAttempts": 0,
-      "lastAuthenticated": "2026-02-16T10:11:29.462Z",
-      "lastError": null,
-      "deviceMetadata": {
-        "linkedAt": "2026-02-16T10:11:29.376Z",
-        "lastHeartbeat": null,
-        "authMethod": null,
-        "ipAddress": null,
-        "uptime": 0,
-        "heartbeatCount": 0
-      }
-    }
-  }
+  "accounts": {}
 }
