@@ -45,7 +45,11 @@ export async function initializeDatabase(logBot) {
             logBot(`Analytics initialization failed: ${error.message}`, 'warn');
           }
         } else {
-          logBot('Sheet validation failed - using legacy mode', 'warn');
+          console.log('\n✓ FALLBACK MODE ACTIVATED');
+          console.log('  → Google Sheets integration disabled');
+          console.log('  → Using legacy sheets storage (campaigns.json, contacts.json)');
+          console.log('  → To enable Google Sheets: run setup-serviceman11.js\n');
+          logBot('Using legacy sheets mode (google sheets credentials not configured)', 'info');
         }
       } catch (error) {
         logBot(`Database initialization error: ${error.message}`, 'warn');

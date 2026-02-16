@@ -54,6 +54,10 @@ export async function validateSheetAccess(sheetId, options = {}) {
   try {
     // Step 1: Load serviceman11 credentials
     if (!fs.existsSync(SERVICEMAN11_CREDS_PATH)) {
+      console.log('\n⚠️  serviceman11 credentials not configured');
+      console.log('   Expected: ' + SERVICEMAN11_CREDS_PATH);
+      console.log('   To set up Google Sheets integration, run:');
+      console.log('   → node setup-serviceman11.js path/to/keys.json sheet-id\n');
       result.errors.push(`serviceman11 credentials not found at ${SERVICEMAN11_CREDS_PATH}`);
       result.errors.push('Run: node setup-serviceman11.js path/to/keys.json sheet-id');
       return result;
