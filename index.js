@@ -56,6 +56,9 @@ import { initializeDatabase } from "./code/utils/DatabaseInitializer.js";
 import { initializeAdvancedFeatures, initializeAutoRecovery, initializePhase1Services } from "./code/utils/FeatureInitializer.js";
 import { setupTerminalInputListener } from "./code/utils/TerminalDashboardSetup.js";
 
+// PHASE 17: Comprehensive Conversation Handling (February 16, 2026)
+import { phase17Orchestrator } from "./code/utils/Phase17Orchestrator.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -304,6 +307,21 @@ async function initializeBot() {
       dynamicAccountManager.onAccountRemoved((account) => {
         logBot(`📱 Account removed: ${account.displayName}`, "success");
       });
+    }
+
+    // ============================================
+    // STEP 1E: Initialize Phase 17 (NEW - Feb 16, 2026)
+    // ============================================
+    // Comprehensive WhatsApp Conversation Handling:
+    // - Message persistence & deduplication
+    // - Unicode/emoji normalization
+    // - Advanced entity extraction
+    // - Message action tracking (reactions, edits, deletes, etc)
+    // - Context-aware response generation
+    if (!phase17Orchestrator.persistence.isConnected && !phase17Orchestrator.deduplicator) {
+      const p17Initialized = await phase17Orchestrator.initialize();
+      logBot(p17Initialized ? "✅ Phase 17: Conversation Handling initialized" : "⚠️ Phase 17: Degraded mode (using fallback cache)", "success");
+      services.register('phase17', phase17Orchestrator);
     }
 
     // ============================================
