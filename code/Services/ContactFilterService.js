@@ -1,5 +1,5 @@
-import { ContactLookupHandler } from '../WhatsAppBot/ContactLookupHandler.js';
-import { ContactReference } from '../Database/MessageSchema.js';
+import contactLookupHandler from '../WhatsAppBot/ContactLookupHandler.js';
+import { ContactReference } from '../Database/schemas.js';
 import { Logger } from '../utils/logger.js';
 
 const logger = new Logger('ContactFilterService');
@@ -88,7 +88,7 @@ class ContactFilterService {
           
           // If no name in metadata, fetch from Google
           if (!name && contact.googleContactId) {
-            const googleContact = await ContactLookupHandler.getContact(contact.googleContactId);
+            const googleContact = await contactLookupHandler.getContact(contact.googleContactId);
             name = googleContact?.name || '';
           }
           

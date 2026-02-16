@@ -2,9 +2,9 @@ import campaignService from './CampaignService.js';
 import contactFilterService from './ContactFilterService.js';
 import campaignRateLimiter from './CampaignRateLimiter.js';
 import campaignMessageDelayer from './CampaignMessageDelayer.js';
-import { ContactLookupHandler } from '../WhatsAppBot/ContactLookupHandler.js';
+import contactLookupHandler from '../WhatsAppBot/ContactLookupHandler.js';
 import { sendMessageWithReport } from '../Message/sendMessageWithReport.js';
-import { SelectingBotForCampaign } from '../Message/SelectingBotForCampaign.js';
+import { SelectingBotForCampaign } from '../WhatsAppBot/SelectingBotForCampaign.js';
 import { Logger } from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -164,7 +164,7 @@ class CampaignExecutor {
           // Get contact details from Google
           let contactName = contact.name;
           try {
-            const contactDetails = await ContactLookupHandler.getContact(contact.googleId);
+            const contactDetails = await contactLookupHandler.getContact(contact.googleId);
             if (contactDetails?.name) {
               contactName = contactDetails.name;
             }

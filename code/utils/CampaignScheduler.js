@@ -158,7 +158,7 @@ class CampaignScheduler {
       }
       
       // Get first agent (TODO: make configurable)
-      const { SelectingBotForCampaign } = await import('../Message/SelectingBotForCampaign.js');
+      const { SelectingBotForCampaign } = await import('../WhatsAppBot/SelectingBotForCampaign.js');
       const agent = await SelectingBotForCampaign(0);
       
       if (!agent) {
@@ -269,7 +269,7 @@ class CampaignScheduler {
       const campaign = campaignResult.campaign;
       
       if (!agents || agents.length === 0) {
-        const { SelectingBotForCampaign } = await import('../Message/SelectingBotForCampaign.js');
+        const { SelectingBotForCampaign } = await import('../WhatsAppBot/SelectingBotForCampaign.js');
         const agent = await SelectingBotForCampaign(0);
         
         if (!agent) {

@@ -1,7 +1,6 @@
-import { Lion, 
-} from "../../index.js";
+// Lion0 client is available as global.Lion0 after bot initialization
+// This function selects the appropriate WhatsApp client based on iteration number
 
-// const  = pack;
 export async function SelectingBotForCampaign(Iteration) {
   let RegisteredAgentWAClient;
 
@@ -11,39 +10,39 @@ export async function SelectingBotForCampaign(Iteration) {
     console.log("The switch is finding client bot.");
     switch (Iteration) {
       case 0:
-        RegisteredAgentWAClient =  Lion;
+        RegisteredAgentWAClient = global.Lion0;
         break;
       case 1:
-        // RegisteredAgentWAClient = Lion2;
+        // RegisteredAgentWAClient = global.Lion1;
         break;
       // case 2:
-      //   RegisteredAgentWAClient =Goraha;
+      //   RegisteredAgentWAClient = global.Lion2;
       //   break;
       // case 3:
-      //   RegisteredAgentWAClient = Umair2;
+      //   RegisteredAgentWAClient = global.Lion3;
       //   break;
 
       // case 4:
-      //   RegisteredAgentWAClient = Kalba;
+      //   RegisteredAgentWAClient = global.Lion4;
       //   break;
       // case 5:
-      //   RegisteredAgentWAClient = Nawal;
+      //   RegisteredAgentWAClient = global.Lion5;
       //   break;
       // case 6:
-      //   RegisteredAgentWAClient = Nounou;
+      //   RegisteredAgentWAClient = global.Lion6;
       //   break;
       // case 7:
-      //   RegisteredAgentWAClient = Nana;
+      //   RegisteredAgentWAClient = global.Lion7;
       //   break;
       // case 8:
-      //   RegisteredAgentWAClient = QMQ;
+      //   RegisteredAgentWAClient = global.Lion8;
       //   break;
       // case 9:
-      //   RegisteredAgentWAClient = Samy;
+      //   RegisteredAgentWAClient = global.Lion9;
       //   break;
 
       default:
-        RegisteredAgentWAClient = Lion;
+        RegisteredAgentWAClient = global.Lion0;
     }
     return RegisteredAgentWAClient;
   } catch (error) {
