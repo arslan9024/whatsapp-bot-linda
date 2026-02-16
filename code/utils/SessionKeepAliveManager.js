@@ -17,9 +17,10 @@
  */
 
 export default class SessionKeepAliveManager {
-  constructor(clientsMap, logFunction) {
+  constructor(clientsMap, logFunction, clientHealthMonitor = null) {
     this.clientsMap = clientsMap; // Map of phoneNumber → client
     this.logFunction = logFunction || console.log; // Logging function
+    this.clientHealthMonitor = clientHealthMonitor; // NEW: Reference to health monitor for frame detachment recovery
     
     // Track heartbeat state per account
     this.heartbeatIntervals = new Map();
@@ -91,6 +92,24 @@ export default class SessionKeepAliveManager {
         return true;
       } catch (err) {
         this.logFunction(`⚠️  Heartbeat error (${phoneNumber}): ${err.message}`, "warn");
+        
+        // NEW: Detect frame detachment errors and trigger recovery
+        if (err.message && err.message.includes('detached')) {
+          this.logFunction(`🚨 Frame detachment detected during heartbeat on ${phoneNumber}`, "error");
+          
+          // Notify health monitor to trigger recovery
+          if (this.clientHealthMonitor) {
+            try {
+              await this.clientHealthMonitor.recordFrameDetachment(phoneNumber, err);
+              this.logFunction(`✅ Recovery initiated for ${phoneNumber}`, "info");
+            } catch (recoveryErr) {
+              this.logFunction(`❌ Failed to trigger recovery for ${phoneNumber}: ${recoveryErr.message}`, "error");
+            }
+          } else {
+            this.logFunction(`⚠️  ClientHealthMonitor not available for ${phoneNumber} frame recovery`, "warn");
+          }
+        }
+        
         return false;
       }
     } catch (error) {

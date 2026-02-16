@@ -250,7 +250,7 @@ async function initializeBot() {
     // STEP 1: Initialize Keep-Alive Manager
     // ============================================
     if (!keepAliveManager) {
-      keepAliveManager = new SessionKeepAliveManager(accountClients, logBot);
+      keepAliveManager = new SessionKeepAliveManager(accountClients, logBot, clientHealthMonitor);
       keepAliveManager.startStatusMonitoring();
       logBot("✅ SessionKeepAliveManager initialized", "success");
       services.register('keepAliveManager', keepAliveManager);
