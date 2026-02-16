@@ -59,6 +59,9 @@ import { setupTerminalInputListener } from "./code/utils/TerminalDashboardSetup.
 // PHASE 17: Comprehensive Conversation Handling (February 16, 2026)
 import { phase17Orchestrator } from "./code/utils/Phase17Orchestrator.js";
 
+// CLIENT HEALTH MONITOR: Frame detachment & heartbeat fix (February 17, 2026)
+import clientHealthMonitor from "./code/utils/ClientHealthMonitor.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -136,6 +139,7 @@ const sharedContext = {
   QRCodeDisplay: EnhancedQRCodeDisplay,  // Phase 14: Use enhanced version with terminal detection
   updateDeviceStatus,              // Imported from deviceStatus.js
   accountHealthMonitor,
+  clientHealthMonitor,             // NEW: Frame detachment & heartbeat monitor
   keepAliveManager: null,
   setupMessageListeners: null,     // Set below (wrapper around messageRouter)
   allInitializedAccounts: null,    // Set after array creation
@@ -155,6 +159,7 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     accountConfigManager,
     deviceLinkedManager,
     keepAliveManager,
+    clientHealthMonitor,             // NEW: Frame detachment & heartbeat monitor
     contactHandlerRef,
     gorahaRef,
     accountClients,
@@ -376,6 +381,10 @@ async function initializeBot() {
 
         logBot(`✅ Client created for ${config.displayName}`, "success");
 
+        // NEW: Register client with health monitor (Frame detachment + heartbeat monitoring)
+        clientHealthMonitor.registerClient(config.phoneNumber, client);
+        logBot(`✅ Health monitoring registered for ${config.displayName}`, "success");
+
         // NEW: Add device to tracking system
         if (deviceLinkedManager) {
           deviceLinkedManager.addDevice(config.phoneNumber, {
@@ -436,6 +445,8 @@ async function initializeBot() {
     }
     
     services.register('healthMonitor', accountHealthMonitor);
+    services.register('clientHealthMonitor', clientHealthMonitor);
+    logBot("✅ Client health monitor registered (Frame detachment & heartbeat recovery)", "success");
 
     // ============================================
     // STEP 6.5: Initialize Linda AI Command System

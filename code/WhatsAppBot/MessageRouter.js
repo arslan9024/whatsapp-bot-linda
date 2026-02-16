@@ -26,6 +26,7 @@ import services from '../utils/ServiceRegistry.js';
  * @property {object|null}    accountConfigManager     - AccountConfigManager or null
  * @property {object|null}    deviceLinkedManager      - DeviceLinkedManager or null
  * @property {object|null}    keepAliveManager         - SessionKeepAliveManager or null
+ * @property {object|null}    clientHealthMonitor      - ClientHealthMonitor for frame/heartbeat recovery
  * @property {object|null}    contactHandlerRef        - { current: ContactLookupHandler|null }
  * @property {object|null}    gorahaRef                - { current: GorahaService|null }
  * @property {Map}            accountClients           - phone → client
@@ -50,6 +51,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     accountConfigManager,
     deviceLinkedManager,
     keepAliveManager,
+    clientHealthMonitor,             // NEW: Frame detachment & heartbeat monitor
     contactHandlerRef,
     gorahaRef,
     accountClients,
@@ -212,6 +214,12 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       }
     } catch (error) {
       logBot(`Error processing message: ${error.message}`, 'error');
+      
+      // NEW: Detect and report frame detachment errors to health monitor
+      if (clientHealthMonitor && error.message.includes('detached')) {
+        logBot(`🚨 Frame detachment detected on ${phoneNumber}`, 'warn');
+        clientHealthMonitor.recordFrameDetachment(phoneNumber, error);
+      }
     }
   });
 
