@@ -108,6 +108,9 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         "--disable-popup-blocking",
         "--no-default-browser-check",
         "--disable-translations",
+        // PAGE LOAD STABILITY (prevents premature page closure):
+        "--disable-backgrounding-occluded-windows",
+        "--renderer-process-limit=1",  // Single renderer for stability
         // Memory & performance:
         "--memory-pressure-off",  // Disable memory pressure checks
         "--disable-default-apps",
@@ -157,11 +160,15 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         type: "local",
         path: ".wwebjs_cache"
       },
-      // FIX: Add connection timeout and retry settings for stability
-      qrTimeoutMs: 120000,  // 120 seconds for QR scan
-      connectionTimeoutMs: 60000,  // 60 seconds to establish connection
+      // FIX: Increased timeouts and page load patience for stability
+      qrTimeoutMs: 240000,  // 240 seconds (4 min) for QR scan - gives more time for WhatsApp Web load
+      connectionTimeoutMs: 120000,  // 120 seconds to establish connection (doubled)
       takeoverOnConflict: true,  // Take over if another instance detected
-      bypassOnPrem: true  // Bypass on-premise restrictions
+      bypassOnPrem: true,  // Bypass on-premise restrictions
+      // NEW: Page load wait settings to prevent premature closure
+      waitForNavigation: { waitUntil: 'networkidle2', timeout: 60000 },  // Wait for network to be mostly idle
+      defaultNavigationTimeout: 60000,  // 60 second timeout for page navigation
+      defaultTimeout: 30000  // 30 second timeout for general operations
     });
 
     // Add comprehensive error handlers to catch Puppeteer/Protocol errors
