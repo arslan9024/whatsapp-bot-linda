@@ -173,11 +173,30 @@ export default class ConnectionManager {
 
     try {
       this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
-      await this.client.initialize();
+      
+      // Wrap in timeout to catch hung initialization
+      const initPromise = this.client.initialize();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Client initialization timeout after 45 seconds')), 45000)
+      );
+      
+      // Race the init against timeout
+      await Promise.race([initPromise, timeoutPromise]);
+      
       this.reconnectAttempts = 0;
       return true;
     } catch (error) {
       const msg = error?.message || String(error);
+      
+      // PROTOCOL ERROR HANDLING: Log detailed protocol errors for diagnosis
+      if (msg.includes('Target closed') || msg.includes('Protocol error') || msg.includes('PROTOCOL')) {
+        console.error(`[PROTOCOL_ERROR_DEBUG] Full error: ${JSON.stringify({
+          message: error?.message,
+          code: error?.code,
+          stack: error?.stack?.substring(0, 500)
+        })}`);
+      }
+      
       const recoveryAttempted = this.attemptSmartRecovery(msg);
       if (!recoveryAttempted) {
         this.handleInitializeError(msg);
@@ -498,26 +517,34 @@ export default class ConnectionManager {
   }
 
   attemptSmartRecovery(errorMsg) {
+    // ENHANCED: Treat PROTOCOL errors as browser lock errors (they're related to Chrome crashes)
     const isBrowserLockError = errorMsg.includes('browser is already running') ||
                                errorMsg.includes('userDataDir') ||
-                               errorMsg.includes('CHROME_EXECUTABLE_PATH');
+                               errorMsg.includes('CHROME_EXECUTABLE_PATH') ||
+                               errorMsg.includes('Target closed') ||  // FIX: Protocol error from Chrome crash
+                               errorMsg.includes('PROTOCOL error') ||  // FIX: Generic protocol errors
+                               errorMsg.includes('Protocol error') ||  // FIX: Protocol error variant
+                               errorMsg.includes('WebSocket is closed') ||  // FIX: WebSocket protocol error
+                               errorMsg.includes('callFunctionOn') ||  // FIX: DevTools Protocol error
+                               errorMsg.includes('initialization timeout');  // FIX: Timeout during initialization
+                               
     if (!isBrowserLockError) return false;
 
-    this.log(`[${this.phoneNumber}] 🔧 Browser lock detected. Executing recovery sequence...`, 'info');
-    this.executeBrowserLockRecovery();
+    this.log(`[${this.phoneNumber}] 🔧 Browser lock/protocol error detected. Executing advanced recovery sequence...`, 'info');
+    this.executeProtocolErrorRecovery();
     return true;
   }
 
-  async executeBrowserLockRecovery() {
+  async executeProtocolErrorRecovery() {
     this.metrics.lockRecoveries++;
     try {
-      // Step 1: Clean lock files
-      this.log(`[${this.phoneNumber}] [Recovery 1/5] Cleaning lock files...`, 'info');
+      // Step 1: Enhanced lock file cleaning
+      this.log(`[${this.phoneNumber}] [Recovery 1/6] Cleaning lock files extensively...`, 'info');
       const { lockFileDetector, sessionCleanupManager } = this._ctx;
       if (lockFileDetector) lockFileDetector.forceCleanLocks(this.phoneNumber);
 
-      // Step 2: Clean session folder
-      this.log(`[${this.phoneNumber}] [Recovery 2/5] Cleaning session folder...`, 'info');
+      // Step 2: Aggressive session cleaning
+      this.log(`[${this.phoneNumber}] [Recovery 2/6] Cleaning session folder...`, 'info');
       if (sessionCleanupManager) {
         sessionCleanupManager.forceCleanSession(this.phoneNumber);
       } else {
@@ -527,30 +554,37 @@ export default class ConnectionManager {
         }
       }
 
-      // Step 3: Kill orphaned browser processes
-      this.log(`[${this.phoneNumber}] [Recovery 3/5] Killing browser processes...`, 'info');
-      this._killBrowserProcesses();
+      // Step 3: Kill ALL orphaned browser processes (including system-wide)
+      this.log(`[${this.phoneNumber}] [Recovery 3/6] Killing ALL browser processes...`, 'info');
+      this._killBrowserProcessesAggressive();
 
-      // Step 4: Wait for cleanup
-      this.log(`[${this.phoneNumber}] [Recovery 4/5] Waiting for cleanup...`, 'info');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 4: Extended wait for Chrome to fully release resources
+      this.log(`[${this.phoneNumber}] [Recovery 4/6] Waiting for system cleanup (5s)...`, 'info');
+      await new Promise(resolve => setTimeout(resolve, 5000));
 
-      // Step 5: Re-initialize
-      this.log(`[${this.phoneNumber}] [Recovery 5/5] Re-initializing...`, 'info');
+      // Step 5: Clear Puppeteer cache
+      this.log(`[${this.phoneNumber}] [Recovery 5/6] Clearing browser cache...`, 'info');
+      const cacheDir = path.join(process.cwd(), '.wwebjs_cache');
+      if (fs.existsSync(cacheDir)) {
+        try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch (_) {}
+      }
+
+      // Step 6: Re-initialize with fresh client
+      this.log(`[${this.phoneNumber}] [Recovery 6/6] Re-initializing fresh client...`, 'info');
       this.state = 'IDLE';
       this.isInitializing = false;
       this.reconnectAttempts = 0;
-      this.errorCount = 0;
+      this.errorCount = Math.max(0, this.errorCount - 2); // Decrement error count for recovery attempt
 
       const success = await this.initialize();
       if (success) {
-        this.log(`[${this.phoneNumber}] ✅ Browser lock recovery successful!`, 'success');
+        this.log(`[${this.phoneNumber}] ✅ Protocol error recovery successful!`, 'success');
       } else {
         this.log(`[${this.phoneNumber}] ⚠️  Recovery initialize returned false, scheduling reconnect`, 'warn');
         this.scheduleReconnect();
       }
     } catch (err) {
-      this.log(`[${this.phoneNumber}] ❌ Recovery failed: ${err.message}. Activating circuit breaker.`, 'error');
+      this.log(`[${this.phoneNumber}] ❌ Advanced recovery failed: ${err.message}. Activating circuit breaker.`, 'error');
       this.activateCircuitBreaker();
     }
   }
@@ -596,6 +630,60 @@ export default class ConnectionManager {
         execSync(cmd, { stdio: 'pipe', windowsHide: true });
       } catch (_) { /* processes may already be gone */ }
     }
+  }
+
+  _killBrowserProcessesAggressive() {
+    this.metrics.browserProcessKills++;
+    this.log(`[${this.phoneNumber}] 🔫 AGGRESSIVE: Force killing ALL browser processes...`, 'warn');
+
+    // AGGRESSIVE Strategy 1: Kill specific tracked PID with tasktree on Windows
+    if (this._browserPid && process.platform === 'win32') {
+      try {
+        execSync(`taskkill /F /PID ${this._browserPid} /T 2>nul`, { stdio: 'pipe', windowsHide: true });
+        this.log(`[${this.phoneNumber}] Killed tracked browser PID tree: ${this._browserPid}`, 'info');
+        this._browserPid = null;
+        // Wait longer after aggressive kill
+        const { execSync: ex } = require('child_process');
+        ex('timeout /t 2 /nobreak 2>nul', { stdio: 'pipe', windowsHide: true }).catch(() => {});
+        return;
+      } catch (_) {
+        this._browserPid = null;
+      }
+    }
+
+    // AGGRESSIVE Strategy 2: Multiple kill attempts on all browser processes
+    const killCommands = process.platform === 'win32'
+      ? [
+          'taskkill /F /IM chrome.exe 2>nul',
+          'taskkill /F /IM chromium.exe 2>nul',
+          'taskkill /F /IM msedge.exe 2>nul',
+          'wmic process where name="chrome.exe" delete /nointeractive 2>nul',
+          'wmic process where name="chromium.exe" delete /nointeractive 2>nul'
+        ]
+      : [
+          'pkill -9 chrome 2>/dev/null',
+          'pkill -9 chromium 2>/dev/null',
+          'pkill -9 -f "Google Chrome" 2>/dev/null',
+          'killall -9 chrome 2>/dev/null',
+          'killall -9 chromium 2>/dev/null'
+        ];
+
+    // Execute all kill commands
+    for (const cmd of killCommands) {
+      try {
+        execSync(cmd, { stdio: 'pipe', windowsHide: true, shell: true });
+      } catch (_) { /* processes may already be gone */ }
+    }
+
+    // On Windows, also try to clear locks via registry/system cleanup
+    if (process.platform === 'win32') {
+      try {
+        execSync('del /F /S /Q "%LocalAppData%\\Google\\Chrome\\User Data\\*.lock" 2>nul', { stdio: 'pipe', windowsHide: true, shell: 'cmd.exe' });
+        execSync('del /F /S /Q "%temp%\\*.lock" 2>nul', { stdio: 'pipe', windowsHide: true, shell: 'cmd.exe' });
+      } catch (_) {}
+    }
+
+    this.log(`[${this.phoneNumber}] ✅ Aggressive browser cleanup complete`, 'info');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

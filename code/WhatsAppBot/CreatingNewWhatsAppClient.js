@@ -67,15 +67,19 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
     // Configure Puppeteer to use system Chrome or Chromium
     const puppeteerArgs = {
       headless: 'new',  // FIX: Use new headless mode (Chrome 112+) instead of boolean
+      timeout: 30000,  // 30 second timeout for browser launch
+      protocolTimeout: 180000,  // 180 second timeout for protocol commands
+      dumpio: process.env.DEBUG_CHROME === 'true',  // Optional: Show Chrome stderr/stdout if DEBUG_CHROME=true
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--single-process",  // Run Chrome in single process if not already isolated
         "--disable-gpu",
-        "--disable-dev-shm-usage",
+        "--disable-dev-shm-usage",  // Disable /dev/shm usage (critical for stability)
         "--disable-extensions",
         "--disable-plugins",
         "--disable-sync",
-        "--disable-features=IsolateOrigins,site-per-process",
+        "--disable-features=IsolateOrigins,site-per-process,TranslateUI",
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-background-networking",
@@ -89,11 +93,27 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         "--disable-popup-blocking",
         "--disable-prompt-on-repost",
         "--disable-zero-suggest",
+        "--disable-web-resources",
         "--metrics-recording-only",
         "--mute-audio",
         "--no-service-autorun",
         "--password-store=basic",
-        "--use-mock-keychain"
+        "--use-mock-keychain",
+        // STABILITY FIXES for "Target closed" errors:
+        "--disable-background-timer-throttling",  // Prevent timer throttling
+        "--disable-renderer-backgrounding",  // Keep rendering active
+        "--enable-automation",  // Explicit automation flag
+        "--disable-hang-monitor",
+        "--disable-ipc-flooding-protection",  // Allow high IPC message rates
+        "--disable-popup-blocking",
+        "--no-default-browser-check",
+        "--disable-translations",
+        // Memory & performance:
+        "--memory-pressure-off",  // Disable memory pressure checks
+        "--disable-default-apps",
+        "--disable-extensions-file-access-check",
+        "--disable-print-preview",
+        "--disable-save-password-bubble"
       ]
     };
 
