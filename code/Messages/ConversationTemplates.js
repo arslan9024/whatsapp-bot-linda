@@ -242,4 +242,4 @@ class ConversationTemplates {
   }
 }
 
-module.exports = ConversationTemplates;
+export default ConversationTemplates;

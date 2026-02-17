@@ -6,7 +6,7 @@
  * - User confirmation
  */
 
-import { WriteBackService } from '../Services/WriteBackService.js';
+import WriteBackService from '../Services/WriteBackService.js';
 import { logger } from '../Integration/Google/utils/logger.js';
 
 export class CodeGenerator {

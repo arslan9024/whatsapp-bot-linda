@@ -551,4 +551,4 @@ class OpportunityIntelligence {
   }
 }
 
-module.exports = OpportunityIntelligence;
+export default OpportunityIntelligence;

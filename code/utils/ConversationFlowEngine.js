@@ -548,4 +548,4 @@ class SecurityConversationFlow {
   }
 }
 
-module.exports = ConversationFlowEngine;
+export default ConversationFlowEngine;
