@@ -314,4 +314,4 @@ class CampaignRateLimiter {
   }
 }
 
-export default new CampaignRateLimiter();
+export default CampaignRateLimiter;

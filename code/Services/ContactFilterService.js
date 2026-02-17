@@ -285,4 +285,4 @@ class ContactFilterService {
   }
 }
 
-export default new ContactFilterService();
+export default ContactFilterService;

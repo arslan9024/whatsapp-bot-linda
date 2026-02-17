@@ -455,4 +455,4 @@ class CampaignService {
   }
 }
 
-export default new CampaignService();
+export default CampaignService;
