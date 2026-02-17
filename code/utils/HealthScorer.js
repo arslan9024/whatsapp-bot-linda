@@ -149,6 +149,209 @@ export default class HealthScorer {
   }
 
   /**
+   * Get proactive health status with dynamic recovery triggers
+   * @param {string} phoneNumber - Account phone number
+   * @param {Array} recentScores - Recent health scores
+   * @returns {Object} - Proactive health status and recovery recommendations
+   */
+  getProactiveHealthStatus(phoneNumber, recentScores = []) {
+    try {
+      if (recentScores.length === 0) {
+        return {
+          phoneNumber,
+          status: "unknown",
+          needsRecovery: false,
+          confidenceLevel: 0
+        };
+      }
+
+      // Analyze recent trend (last 5 scores)
+      const recent = recentScores.slice(-5);
+      const currentScore = recent[recent.length - 1];
+      const previousScore = recent[recent.length - 2] || currentScore;
+      const trend = currentScore - previousScore;
+
+      // Calculate rolling average
+      const avgScore = Math.round(
+        recent.reduce((sum, score) => sum + score, 0) / recent.length
+      );
+
+      // Detect status
+      let status = "healthy";
+      let needsRecovery = false;
+      let confidenceLevel = 100;
+      const alerts = [];
+
+      // Alert thresholds (dynamic based on trend)
+      const criticalThreshold = 40;
+      const warningThreshold = 60;
+      const improvingThreshold = 70;
+
+      // Check current status
+      if (currentScore < criticalThreshold) {
+        status = "critical";
+        needsRecovery = true;
+        alerts.push("🚨 Health critical - immediate recovery needed");
+      } else if (currentScore < warningThreshold) {
+        status = "degraded";
+        needsRecovery = trend < 0; // Only if worsening
+        alerts.push("⚠️ Health degraded - monitor closely");
+      } else if (currentScore >= improvingThreshold && trend > 0) {
+        status = "improving";
+        confidenceLevel = 95;
+      } else if (currentScore >= warningThreshold) {
+        status = "healthy";
+        confidenceLevel = 90;
+      }
+
+      // Check trend (if declining, more urgent)
+      if (trend < -10) {
+        alerts.push("📉 Health declining rapidly");
+        needsRecovery = true;
+      } else if (trend < -5) {
+        alerts.push("📊 Health declining slowly");
+      }
+
+      // Predict if will drop below threshold
+      if (trend < 0 && recent.length >= 3) {
+        const decline = (recent[recent.length - 2] - recent[0]) / Math.max(1, recent.length - 1);
+        const projectedScore = currentScore + decline; // Next score projection
+
+        if (projectedScore < criticalThreshold) {
+          alerts.push("📈 Projected to reach critical state soon");
+          needsRecovery = true;
+        }
+      }
+
+      return {
+        phoneNumber,
+        status,
+        currentScore,
+        averageScore: avgScore,
+        trend: {
+          direction: trend > 0 ? "improving" : trend < 0 ? "declining" : "stable",
+          change: trend
+        },
+        needsRecovery,
+        confidenceLevel,
+        alerts,
+        recommendedAction: needsRecovery ? "triggerRecovery" : "monitor"
+      };
+    } catch (error) {
+      this.log(`Error getting proactive health status: ${error.message}`, "error");
+      return {
+        phoneNumber,
+        status: "unknown",
+        needsRecovery: false,
+        confidenceLevel: 0,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get health alerts based on thresholds and trends
+   * @param {string} phoneNumber - Account phone number
+   * @param {number} currentScore - Current health score
+   * @param {number} previousScore - Previous health score
+   * @returns {Array} - List of health alerts
+   */
+  getHealthAlerts(phoneNumber, currentScore, previousScore = currentScore) {
+    const alerts = [];
+
+    // Score-based alerts
+    if (currentScore < 40) {
+      alerts.push({
+        severity: "critical",
+        message: `Health score critically low (${currentScore}/100)`,
+        code: "HEALTH_CRITICAL"
+      });
+    } else if (currentScore < 60) {
+      alerts.push({
+        severity: "warning",
+        message: `Health score degraded (${currentScore}/100)`,
+        code: "HEALTH_DEGRADED"
+      });
+    }
+
+    // Trend-based alerts
+    const scoreDelta = currentScore - previousScore;
+    if (scoreDelta < -15) {
+      alerts.push({
+        severity: "warning",
+        message: `Health declining rapidly (${scoreDelta}/100 per check)`,
+        code: "HEALTH_DECLINING_RAPID"
+      });
+    } else if (scoreDelta < -5) {
+      alerts.push({
+        severity: "info",
+        message: `Health declining slowly (${scoreDelta}/100 per check)`,
+        code: "HEALTH_DECLINING_SLOW"
+      });
+    }
+
+    if (scoreDelta > 10) {
+      alerts.push({
+        severity: "info",
+        message: `Health improving (${scoreDelta}/100 per check)`,
+        code: "HEALTH_IMPROVING"
+      });
+    }
+
+    return alerts;
+  }
+
+  /**
+   * Predict health trend based on recent history
+   * Uses simple linear regression to project next score
+   * @param {Array<number>} recentScores - Recent health scores (ascending time)
+   * @returns {Object} - Prediction data
+   */
+  predictHealthTrend(recentScores = []) {
+    if (recentScores.length < 2) {
+      return {
+        hasPrediction: false,
+        reason: "Insufficient data"
+      };
+    }
+
+    try {
+      // Simple linear regression
+      const n = recentScores.length;
+      const x = Array.from({ length: n }, (_, i) => i);
+      const y = recentScores;
+
+      // Calculate slope and intercept
+      const xMean = x.reduce((a, b) => a + b) / n;
+      const yMean = y.reduce((a, b) => a + b) / n;
+
+      const numerator = x.reduce((sum, xi, i) => sum + (xi - xMean) * (y[i] - yMean), 0);
+      const denominator = x.reduce((sum, xi) => sum + Math.pow(xi - xMean, 2), 0);
+
+      const slope = denominator !== 0 ? numerator / denominator : 0;
+
+      // Predict next score
+      const nextScore = Math.round(yMean + slope * (n - xMean));
+      const boundedScore = Math.max(0, Math.min(100, nextScore));
+
+      return {
+        hasPrediction: true,
+        currentScore: y[y.length - 1],
+        predictedNextScore: boundedScore,
+        trend: slope > 0 ? "improving" : slope < 0 ? "declining" : "stable",
+        slope: Math.round(slope * 100) / 100,
+        confidence: Math.min(99, Math.round(90 + recentScores.length * 5)) // Increases with more data
+      };
+    } catch (error) {
+      this.log(`Error predicting health trend: ${error.message}`, "error");
+      return {
+        hasPrediction: false,
+        reason: error.message
+      };
+    }
+  }
+
+  /**
    * Score uptime component
    * @private
    */
