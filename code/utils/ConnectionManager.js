@@ -171,39 +171,74 @@ export default class ConnectionManager {
     this.isInitializing = true;
     this.setState('CONNECTING');
 
+    // PAGE INJECTION FIX: Retry logic for page injection timeout errors
+    const maxPageInjectionRetries = 5;
+    let pageInjectionAttempt = 0;
+
+    const attemptInitialize = async () => {
+      try {
+        this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
+        pageInjectionAttempt++;
+        
+        // Wrap in timeout to catch hung initialization
+        const initPromise = this.client.initialize();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Client initialization timeout after 45 seconds')), 45000)
+        );
+        
+        // Race the init against timeout
+        await Promise.race([initPromise, timeoutPromise]);
+        
+        this.reconnectAttempts = 0;
+        return true;
+      } catch (error) {
+        const msg = error?.message || String(error);
+        const isPageInjectionError = msg.includes('addScriptToEvaluateOnNewDocument') ||
+                                     msg.includes('Requesting main frame') ||
+                                     msg.includes('Session closed');
+        
+        // PROTOCOL ERROR HANDLING: Log detailed protocol errors for diagnosis
+        if (msg.includes('Target closed') || msg.includes('Protocol error') || msg.includes('PROTOCOL')) {
+          console.error(`[PROTOCOL_ERROR_DEBUG] Full error: ${JSON.stringify({
+            message: error?.message,
+            code: error?.code,
+            stack: error?.stack?.substring(0, 500)
+          })}`);
+        }
+
+        // Retry only for page injection errors
+        if (isPageInjectionError && pageInjectionAttempt < maxPageInjectionRetries) {
+          const backoffDelay = Math.min(1000 * Math.pow(2, pageInjectionAttempt - 1), 8000);
+          this.log(
+            `[${this.phoneNumber}] 🔧 Page Injection Retry ${pageInjectionAttempt}/${maxPageInjectionRetries - 1}: ${msg.substring(0, 60)}...`,
+            'warn'
+          );
+          this.log(
+            `[${this.phoneNumber}] ⏳ Waiting ${backoffDelay}ms before retry...`,
+            'info'
+          );
+          
+          // Wait with exponential backoff, then retry
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          return attemptInitialize(); // Recursive retry
+        }
+
+        // Non-injection error or max retries reached
+        const recoveryAttempted = this.attemptSmartRecovery(msg);
+        if (!recoveryAttempted) {
+          this.handleInitializeError(msg);
+        }
+        this.isInitializing = false;
+        return false;
+      }
+    };
+
     try {
-      this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
-      
-      // Wrap in timeout to catch hung initialization
-      const initPromise = this.client.initialize();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Client initialization timeout after 45 seconds')), 45000)
-      );
-      
-      // Race the init against timeout
-      await Promise.race([initPromise, timeoutPromise]);
-      
-      this.reconnectAttempts = 0;
-      return true;
-    } catch (error) {
-      const msg = error?.message || String(error);
-      
-      // PROTOCOL ERROR HANDLING: Log detailed protocol errors for diagnosis
-      if (msg.includes('Target closed') || msg.includes('Protocol error') || msg.includes('PROTOCOL')) {
-        console.error(`[PROTOCOL_ERROR_DEBUG] Full error: ${JSON.stringify({
-          message: error?.message,
-          code: error?.code,
-          stack: error?.stack?.substring(0, 500)
-        })}`);
+      const success = await attemptInitialize();
+      if (!success) {
+        this.isInitializing = false;
       }
-      
-      const recoveryAttempted = this.attemptSmartRecovery(msg);
-      if (!recoveryAttempted) {
-        this.handleInitializeError(msg);
-      }
-      this.isInitializing = false;
-      return false;
-    }
+      return success;
   }
 
   handleInitializeError(errorMsg) {
