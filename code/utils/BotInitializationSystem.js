@@ -9,6 +9,10 @@
 
 import OrganizedSheetAccessFixer from '../Integration/Google/FixOrganizedSheetAccess.js';
 import CodeGenerator from './CodeGenerator.js';
+import ConversationFlowEngine from './ConversationFlowEngine.js';
+import OpportunityIntelligence from '../AI/OpportunityIntelligence.js';
+import ConversationTemplates from '../Messages/ConversationTemplates.js';
+import RealEstateCommands from '../Commands/RealEstateCommands.js';
 import { logger } from '../Integration/Google/utils/logger.js';
 
 export class BotInitializationSystem {
@@ -45,9 +49,33 @@ export class BotInitializationSystem {
         return false;
       }
 
-      // STEP 3-6: Would initialize other systems
-      // (Conversation Engine, Opportunity Intelligence, etc.)
-      logger.info(`\n STEP 3-6: Other systems (queued for implementation)...`);
+      // STEP 3: Initialize Conversation Flow Engine
+      logger.info(`\n STEP 3: Initializing Conversation Flow Engine...`);
+      if (!await this.initializeConversationEngine()) {
+        logger.error(` Conversation Flow Engine failed to initialize`);
+        return false;
+      }
+
+      // STEP 4: Initialize AI Opportunity Intelligence
+      logger.info(`\n STEP 4: Initializing AI Opportunity Intelligence...`);
+      if (!await this.initializeOpportunityIntelligence()) {
+        logger.error(` Opportunity Intelligence failed to initialize`);
+        return false;
+      }
+
+      // STEP 5: Initialize Conversation Templates
+      logger.info(`\n STEP 5: Initializing Conversation Templates...`);
+      if (!await this.initializeTemplates()) {
+        logger.error(` Templates failed to initialize`);
+        return false;
+      }
+
+      // STEP 6: Initialize Real Estate Commands
+      logger.info(`\n STEP 6: Initializing Real Estate Commands...`);
+      if (!await this.initializeCommands()) {
+        logger.error(` Commands failed to initialize`);
+        return false;
+      }
 
       this.initialized = true;
       logger.info(`\n BOT INITIALIZATION COMPLETE!\n`);
@@ -101,6 +129,74 @@ export class BotInitializationSystem {
       return true;
     } catch (error) {
       logger.error(`Code Generator initialization failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Initialize Conversation Flow Engine
+   */
+  async initializeConversationEngine() {
+    try {
+      const engine = new ConversationFlowEngine();
+      this.systems.conversationEngine = engine;
+      
+      logger.info(` Conversation Flow Engine Ready`);
+      logger.info(`  ✅ 6 persona flows loaded (Agent, Buyer, Seller, Tenant, Landlord, Security)`);
+      return true;
+    } catch (error) {
+      logger.error(`Conversation Flow Engine initialization failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Initialize AI Opportunity Intelligence
+   */
+  async initializeOpportunityIntelligence() {
+    try {
+      const aiEngine = new OpportunityIntelligence();
+      this.systems.opportunityIntelligence = aiEngine;
+      
+      logger.info(` AI Opportunity Intelligence Ready`);
+      logger.info(`  ✅ Scoring algorithm loaded`);
+      return true;
+    } catch (error) {
+      logger.error(`Opportunity Intelligence initialization failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Initialize Conversation Templates
+   */
+  async initializeTemplates() {
+    try {
+      const templates = new ConversationTemplates();
+      this.systems.templates = templates;
+      
+      logger.info(` Conversation Templates Ready`);
+      logger.info(`  ✅ Message templates loaded`);
+      return true;
+    } catch (error) {
+      logger.error(`Templates initialization failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Initialize Real Estate Commands
+   */
+  async initializeCommands() {
+    try {
+      const commands = new RealEstateCommands();
+      this.systems.commands = commands;
+      
+      logger.info(` Real Estate Commands Ready`);
+      logger.info(`  ✅ 26 commands loaded`);
+      return true;
+    } catch (error) {
+      logger.error(`Commands initialization failed: ${error.message}`);
       return false;
     }
   }
