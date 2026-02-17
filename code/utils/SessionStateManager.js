@@ -23,8 +23,40 @@ const SESSION_STATE_FILE = path.join(PROJECT_ROOT, "session-state.json");
 const SESSIONS_DIR = path.join(PROJECT_ROOT, "sessions");
 
 class SessionStateManager {
+  /**
+   * State Machine for Session Lifecycle
+   * INITIALIZING → AUTHENTICATING → AUTHENTICATED → HEARTBEATING → HEALTHY
+   * 
+   * Allowed transitions:
+   * - INITIALIZING → AUTHENTICATING
+   * - AUTHENTICATING → AUTHENTICATED (success) or back to AUTHENTICATING (retry)
+   * - AUTHENTICATED → HEARTBEATING
+   * - HEARTBEATING → HEALTHY (success) or AUTHENTICATING (reconnect needed)
+   * - Any → ERROR (failure)
+   * - ERROR → INITIALIZING (recovery)
+   * - HEALTHY → HEARTBEATING (continuous cycle)
+   */
+  static STATES = {
+    INITIALIZING: "INITIALIZING",
+    AUTHENTICATING: "AUTHENTICATING",
+    AUTHENTICATED: "AUTHENTICATED",
+    HEARTBEATING: "HEARTBEATING",
+    HEALTHY: "HEALTHY",
+    ERROR: "ERROR",
+  };
+
+  static ALLOWED_TRANSITIONS = {
+    INITIALIZING: ["AUTHENTICATING", "ERROR"],
+    AUTHENTICATING: ["AUTHENTICATED", "AUTHENTICATING", "ERROR"],
+    AUTHENTICATED: ["HEARTBEATING", "ERROR", "INITIALIZING"],
+    HEARTBEATING: ["HEALTHY", "AUTHENTICATING", "ERROR"],
+    HEALTHY: ["HEARTBEATING", "ERROR"],
+    ERROR: ["INITIALIZING", "AUTHENTICATING"],
+  };
+
   constructor() {
     this.accountStates = new Map();
+    this.stateTransitionLocks = new Map(); // Prevents concurrent state changes
     this.initialized = false;
   }
 
@@ -58,6 +90,137 @@ class SessionStateManager {
   }
 
   /**
+   * Atomically transition account to new state
+   * @param {string} accountId - Account identifier
+   * @param {string} newState - New state (must be valid STATES value)
+   * @param {object} metadata - Additional metadata to associate with transition
+   * @returns {Promise<boolean>} - true if transition successful, false if invalid
+   */
+  async transitionState(accountId, newState, metadata = {}) {
+    try {
+      // Validate new state
+      if (!Object.values(SessionStateManager.STATES).includes(newState)) {
+        console.error(`❌ Invalid state: ${newState}`);
+        return false;
+      }
+
+      // Get current state
+      const state = this.getAccountState(accountId);
+      if (!state) {
+        console.warn(`⚠️ Account ${accountId} not found for state transition`);
+        return false;
+      }
+
+      const currentState = state.currentSessionState || SessionStateManager.STATES.INITIALIZING;
+
+      // Check if transition is allowed
+      const allowedNext = SessionStateManager.ALLOWED_TRANSITIONS[currentState] || [];
+      if (!allowedNext.includes(newState)) {
+        console.error(
+          `❌ Invalid state transition: ${currentState} → ${newState} (allowed: ${allowedNext.join(", ")})`
+        );
+        return false;
+      }
+
+      // Acquire lock to prevent concurrent transitions on same account
+      await this._acquireStateLock(accountId);
+
+      try {
+        // Update state atomically
+        state.currentSessionState = newState;
+        state.lastStateChange = new Date().toISOString();
+        state.stateHistory = state.stateHistory || [];
+        state.stateHistory.push({
+          from: currentState,
+          to: newState,
+          timestamp: new Date().toISOString(),
+          metadata,
+        });
+
+        // Keep only last 50 state changes
+        if (state.stateHistory.length > 50) {
+          state.stateHistory = state.stateHistory.slice(-50);
+        }
+
+        // Persist
+        await this.saveAccountState(accountId, state);
+
+        console.log(
+          `🔄 State transition: ${accountId} ${currentState} → ${newState} ${
+            metadata.reason ? `(${metadata.reason})` : ""
+          }`
+        );
+
+        return true;
+      } finally {
+        // Always release lock
+        this._releaseStateLock(accountId);
+      }
+    } catch (error) {
+      console.error(`❌ State transition failed for ${accountId}: ${error.message}`);
+      this._releaseStateLock(accountId);
+      return false;
+    }
+  }
+
+  /**
+   * Get current state of account
+   * @param {string} accountId - Account identifier
+   * @returns {string} - Current state
+   */
+  getCurrentState(accountId) {
+    const state = this.getAccountState(accountId);
+    return state?.currentSessionState || SessionStateManager.STATES.INITIALIZING;
+  }
+
+  /**
+   * Get state history for account
+   * @param {string} accountId - Account identifier
+   * @returns {array} - Array of state transitions
+   */
+  getStateHistory(accountId) {
+    const state = this.getAccountState(accountId);
+    return state?.stateHistory || [];
+  }
+
+  /**
+   * Check if account is in healthy state
+   * @param {string} accountId - Account identifier
+   * @returns {boolean} - true if in HEALTHY state
+   */
+  isHealthy(accountId) {
+    return this.getCurrentState(accountId) === SessionStateManager.STATES.HEALTHY;
+  }
+
+  /**
+   * Check if account is in error state
+   * @param {string} accountId - Account identifier
+   * @returns {boolean} - true if in ERROR state
+   */
+  isInErrorState(accountId) {
+    return this.getCurrentState(accountId) === SessionStateManager.STATES.ERROR;
+  }
+
+  /**
+   * PRIVATE: Acquire state transition lock for account
+   */
+  async _acquireStateLock(accountId) {
+    // Simple in-memory lock for atomic transitions
+    while (this.stateTransitionLocks.has(accountId)) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    this.stateTransitionLocks.set(accountId, Date.now());
+  }
+
+  /**
+   * PRIVATE: Release state transition lock for account
+   */
+  _releaseStateLock(accountId) {
+    this.stateTransitionLocks.delete(accountId);
+  }
+
+  /**
+
    * Save individual account state
    * Called after successful account initialization or at intervals
    */

@@ -195,9 +195,80 @@ class ClientHealthMonitor {
       return { healthy: false, reason: 'check_failed' };
     }
   }
-  
+
+  /**
+   * Pre-flight health check before critical operations (message send, command)
+   * Faster than full health check - detects frame detachment early
+   * @param {string} clientId - Client identifier
+   * @returns {Promise<{healthy: boolean, frameDetached: boolean}>}
+   */
+  async preflightHealthCheck(clientId) {
+    try {
+      const healthData = this.clients.get(clientId);
+      
+      if (!healthData) {
+        logger.warn(`Preflight: Client ${clientId} not found`);
+        return { healthy: false, frameDetached: false };
+      }
+
+      const client = healthData.client;
+
+      // Quick checks (no async operations if possible)
+      if (!client || !client.pupPage || !client.pupBrowser) {
+        logger.warn(`Preflight ${clientId}: Missing resources`);
+        return { healthy: false, frameDetached: true };
+      }
+
+      // Check browser validity
+      try {
+        const processes = await client.pupBrowser.process();
+        if (!processes) {
+          logger.warn(`Preflight ${clientId}: Browser process dead`);
+          return { healthy: false, frameDetached: true };
+        }
+      } catch (error) {
+        logger.warn(`Preflight ${clientId}: Browser check failed - ${error.message}`);
+        return { healthy: false, frameDetached: true };
+      }
+
+      // Check page validity with tight timeout
+      try {
+        const isValid = await Promise.race([
+          (async () => {
+            try {
+              // Minimal check - just see if page is responsive
+              const isPageValid = !client.pupPage.isClosed?.() === true;
+              return isPageValid;
+            } catch {
+              return false;
+            }
+          })(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 1000)
+          )
+        ]);
+
+        if (!isValid) {
+          logger.warn(`Preflight ${clientId}: Page is detached`);
+          healthData.frameDetachmentCount++;
+          return { healthy: false, frameDetached: true };
+        }
+      } catch (error) {
+        logger.warn(`Preflight ${clientId}: Page validity check failed`);
+        return { healthy: false, frameDetached: true };
+      }
+
+      // All checks passed
+      return { healthy: true, frameDetached: false };
+    } catch (error) {
+      logger.error(`Preflight check error for ${clientId}: ${error.message}`);
+      return { healthy: false, frameDetached: false };
+    }
+  }
+
   /**
    * Handle unhealthy client (frame detachment, timeout, etc.)
+
    * @private
    */
   async handleUnhealthyClient(clientId, reason) {
