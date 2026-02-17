@@ -9,6 +9,14 @@ yarn-error.log
 .env.local
 .env.*.local
 
+# Google API & Credentials (SENSITIVE)
+code/GoogleAPI/keys*.json
+code/GoogleAPI/*-keys.json
+code/Integration/Google/accounts/*/keys.json
+*.key
+*.pem
+credentials*.json
+
 # Browser Sessions (WhatsApp)
 sessions/
 session-*/
