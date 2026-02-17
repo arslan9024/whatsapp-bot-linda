@@ -239,6 +239,12 @@ export default class ConnectionManager {
         this.isInitializing = false;
       }
       return success;
+    } catch (outerError) {
+      // Fallback for any uncaught errors from attemptInitialize
+      this.log(`[${this.phoneNumber}] ❌ Unexpected error in initialize: ${outerError?.message}`, 'error');
+      this.isInitializing = false;
+      return false;
+    }
   }
 
   handleInitializeError(errorMsg) {
