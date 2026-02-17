@@ -66,7 +66,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
   try {
     // Configure Puppeteer to use system Chrome or Chromium
     const puppeteerArgs = {
-      headless: true,
+      headless: 'new',  // FIX: Use new headless mode (Chrome 112+) instead of boolean
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -80,27 +80,49 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         "--no-default-browser-check",
         "--disable-background-networking",
         "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding"
+        "--disable-renderer-backgrounding",
+        "--disable-breakpad",
+        "--disable-client-side-phishing-detection",
+        "--disable-component-extensions-with-background-pages",
+        "--disable-default-apps",
+        "--disable-hang-monitor",
+        "--disable-popup-blocking",
+        "--disable-prompt-on-repost",
+        "--disable-zero-suggest",
+        "--metrics-recording-only",
+        "--mute-audio",
+        "--no-service-autorun",
+        "--password-store=basic",
+        "--use-mock-keychain"
       ]
     };
 
     // Try to use system Chrome if available
     if (process.env.PUPPETEER_EXECUTABLE_PATH) {
       puppeteerArgs.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    } else if (process.env.CHROME_BIN) {
+      puppeteerArgs.executablePath = process.env.CHROME_BIN;
     } else if (process.platform === 'win32') {
-      // Try common Chrome installation paths on Windows
+      // Try common Chrome installation paths on Windows (check most likely first)
       const possibleChromePaths = [
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        process.env.CHROME_BIN
-      ].filter(Boolean);
+        path.join(process.env.ProgramFiles || '', 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(process.env['ProgramFiles(x86)'] || '', 'Google\\Chrome\\Application\\chrome.exe')
+      ].filter((p) => p && p.length > 0);
       
+      // Check each path and use the first one that exists
       for (const chromePath of possibleChromePaths) {
         if (chromePath && fs.existsSync(chromePath)) {
           puppeteerArgs.executablePath = chromePath;
           console.log(`🌐 Using Chrome from: ${chromePath}`);
           break;
         }
+      }
+      
+      // If Chrome not found, Puppeteer will try to use bundled Chromium
+      if (!puppeteerArgs.executablePath) {
+        console.log('🌐 Chrome not found in standard paths, using bundled Chromium (or system PATH)');
       }
     }
 
@@ -110,12 +132,16 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         dataPath: "sessions"
       }),
       restartOnAuthFail: true,
-      // Puppeteer configuration for proper browser handling
       puppeteer: puppeteerArgs,
       webVersionCache: {
         type: "local",
         path: ".wwebjs_cache"
-      }
+      },
+      // FIX: Add connection timeout and retry settings for stability
+      qrTimeoutMs: 120000,  // 120 seconds for QR scan
+      connectionTimeoutMs: 60000,  // 60 seconds to establish connection
+      takeoverOnConflict: true,  // Take over if another instance detected
+      bypassOnPrem: true  // Bypass on-premise restrictions
     });
 
     // Add comprehensive error handlers to catch Puppeteer/Protocol errors
@@ -150,16 +176,22 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
 
     return RegisteredAgentWAClient;
   } catch (error) {
-    // Check if this is a browser lock error
-    const isBrowserLockError = error.message.includes('browser is already running') || 
-                               error.message.includes('userDataDir') ||
-                               error.message.includes('CHROME_EXECUTABLE_PATH');
+    const errorMsg = error.message || String(error);
+    
+    // Check if this is a browser lock or connection error
+    const isBrowserLockError = errorMsg.includes('browser is already running') || 
+                               errorMsg.includes('userDataDir') ||
+                               errorMsg.includes('CHROME_EXECUTABLE_PATH') ||
+                               errorMsg.includes('Failed to connect') ||
+                               errorMsg.includes('PROTOCOL error') ||
+                               errorMsg.includes('Target closed') ||
+                               errorMsg.includes('WebSocket');
 
     if (isBrowserLockError && retryCount < MAX_RETRIES) {
-      console.warn(`⚠️  Browser lock detected: ${error.message}`);
-      console.log(`🔄 Cleaning up and retrying in ${RETRY_DELAY}ms...`);
+      console.warn(`⚠️  Chrome connection error detected: ${errorMsg.substring(0, 80)}`);
+      console.log(`🔄 Cleaning up and retrying in ${RETRY_DELAY}ms (Attempt ${retryCount + 2}/${MAX_RETRIES + 1})`);
       
-      // Clean up any locks
+      // Clean up any locks and processes
       await cleanupBrowserLocks();
       
       // Wait before retry
@@ -169,7 +201,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       return CreatingNewWhatsAppClient(ClientID, retryCount + 1);
     }
 
-    console.error(`❌ Error creating WhatsApp client: ${error.message}`);
+    console.error(`❌ Error creating WhatsApp client: ${errorMsg}`);
     throw error;
   }
 }
