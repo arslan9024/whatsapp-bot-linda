@@ -109,8 +109,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         "--no-default-browser-check",
         "--disable-translations",
         // PAGE LOAD STABILITY (prevents premature page closure):
-        "--disable-backgrounding-occluded-windows",
-        "--renderer-process-limit=1",  // Single renderer for stability
+        "--disable-backgrounding-occluded-windows"
         // Memory & performance:
         "--memory-pressure-off",  // Disable memory pressure checks
         "--disable-default-apps",
