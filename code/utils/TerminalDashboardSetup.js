@@ -435,6 +435,40 @@ export function setupTerminalInputListener(opts) {
           console.log(`\n❌ Error filtering GorahaBot contacts: ${error.message}\n`);
         }
       },
+
+      // NEW: Restore all sessions callback (Phase 28)
+      onRestoreAllSessions: async () => {
+        try {
+          console.log(`📱 Scanning saved sessions...\n`);
+          
+          // Get all saved sessions from SessionManager
+          const { SessionManager } = await import('./SessionManager.js');
+          const allSessions = SessionManager.getAllSavedSessions();
+
+          if (!allSessions || allSessions.length === 0) {
+            console.log(`  ⚠️  No saved sessions found\n`);
+            console.log(`  💡 Tip: Link accounts first using 'link-master' command\n`);
+            return;
+          }
+
+          console.log(`  ✅ Found ${allSessions.length} saved session(s):\n`);
+          allSessions.forEach(phone => console.log(`    • ${phone}`));
+
+          console.log(`\n📊 RESTORE OPTIONS:\n`);
+          console.log(`  1️⃣  Auto-restore: Restart the server (node index.js)`);
+          console.log(`     → Automatically restores all ${allSessions.length} session(s)\n`);
+          console.log(`  2️⃣  Manual restore: Relink specific accounts`);
+          console.log(`     • recover <+phone>     → Attempt restore for one account`);
+          console.log(`     • relink <+phone>      → Re-link with fresh QR code\n`);
+          console.log(`  3️⃣  Check status: Monitor restore progress`);
+          console.log(`     • health               → View all accounts`);
+          console.log(`     • accounts             → List accounts & details\n`);
+
+        } catch (error) {
+          logBot(`Error restoring all sessions: ${error.message}`, 'error');
+          console.log(`  ❌ Error scanning sessions: ${error.message}\n`);
+        }
+      },
     };
 
     terminalHealthDashboard.startInteractiveMonitoring(callbacks);

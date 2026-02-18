@@ -379,6 +379,7 @@ class TerminalHealthDashboard {
       onSwitchTo6Digit,
       onShowDeviceDetails,
       onListDevices,
+      onRestoreAllSessions,  // NEW: Restore all previous sessions (Phase 28)
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
       onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
     } = callbacks;
@@ -757,6 +758,26 @@ class TerminalHealthDashboard {
           }
           break;
 
+        case 'restore-sessions':
+        case 'restore':
+          // Restore all previous WhatsApp sessions
+          console.clear();
+          console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+          console.log(`║       🔄 RESTORING ALL PREVIOUS WHATSAPP SESSIONS            ║`);
+          console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+          console.log(`⏳ Loading all saved sessions...\n`);
+          
+          if (onRestoreAllSessions) {
+            try {
+              await onRestoreAllSessions();
+            } catch (error) {
+              console.log(`  ❌ Error during restore: ${error.message}\n`);
+            }
+          } else {
+            console.log(`  ⚠️  Restore function not available\n`);
+          }
+          break;
+
         // NEW: GorahaBot status (Phase 26 & 28)
         case 'goraha':
           if (parts[1] === 'verify' || parts[1] === 'v') {
@@ -861,7 +882,8 @@ class TerminalHealthDashboard {
           console.log(`\n  ACCOUNT HEALTH & MONITORING:`);
           console.log(`    health <+phone>           → Show detailed health for specific account`);
           console.log(`    stats <+phone>            → Show metrics (uptime, messages, errors)`);
-          console.log(`    recover <+phone>          → Attempt session restoration`);
+          console.log(`    recover <+phone>          → Attempt session restoration for one account`);
+          console.log(`    restore-sessions / restore → Restore ALL previous WhatsApp sessions`);
           console.log(`\n  GORAHA BOT (Phase 28):`);
           console.log(`    goraha (or 'goraha status')  → Display contact stats (cached)`);
           console.log(`    goraha verify                → Force verification and recount`);

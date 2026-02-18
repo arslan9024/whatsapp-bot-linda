@@ -299,6 +299,41 @@ export class SessionManager {
   }
 
   /**
+   * Get all phone numbers that have valid saved sessions
+   * Used by dashboard for restore-all-sessions command
+   * @returns {Array<string>} - Array of phone numbers with valid sessions
+   */
+  static getAllSavedSessions() {
+    try {
+      if (!existsSync(SESSIONS_DIR)) {
+        return [];
+      }
+
+      const entries = readdirSync(SESSIONS_DIR, { withFileTypes: true });
+      const validSessions = [];
+
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('session-')) {
+          const phoneNumber = entry.name.replace('session-', '');
+          
+          // Verify session is actually valid (can be restored)
+          const defaultDir = path.join(SESSIONS_DIR, entry.name, 'Default');
+          const sessionFile = path.join(defaultDir, 'Session');
+          
+          if (existsSync(sessionFile)) {
+            validSessions.push(phoneNumber);
+          }
+        }
+      }
+
+      return validSessions;
+    } catch (error) {
+      console.error(`⚠️  Error reading saved sessions: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Create backup of current session before potential loss (on shutdown)
    */
   static backupSession(masterNumber) {
