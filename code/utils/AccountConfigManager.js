@@ -469,13 +469,11 @@ export class AccountConfigManager {
     if (!phone) throw new Error('Phone number required');
     
     const accountData = {
-      id: `master_${Date.now()}`,
-      phoneNumber: phone,
+      accountId: `master_${Date.now()}`,
+      phone: phone,
       displayName: displayName || `Master - ${phone}`,
       role: 'primary',
-      status: 'pending',
-      enabled: true,
-      createdAt: new Date().toISOString()
+      description: `Master Account - ${displayName || phone}`
     };
 
     return await this.addAccount(accountData);
@@ -488,13 +486,11 @@ export class AccountConfigManager {
     if (!phone) throw new Error('Phone number required');
     
     const accountData = {
-      id: `servant_${Date.now()}`,
-      phoneNumber: phone,
+      accountId: `servant_${Date.now()}`,
+      phone: phone,
       displayName: displayName || `Servant - ${phone}`,
       role: 'secondary',
-      status: 'pending',
-      enabled: true,
-      createdAt: new Date().toISOString()
+      description: `Servant Account - ${displayName || phone}`
     };
 
     return await this.addAccount(accountData);
