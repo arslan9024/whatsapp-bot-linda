@@ -11,7 +11,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../utils/Logger.js';
+import { Logger } from '../utils/logger.js';
 
 class HighAvailabilityMonitor extends EventEmitter {
   constructor(

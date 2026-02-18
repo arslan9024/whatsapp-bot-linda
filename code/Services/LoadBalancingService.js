@@ -9,7 +9,7 @@
  * - Performance optimization
  */
 
-import { Logger } from '../utils/Logger.js';
+import { Logger } from '../utils/logger.js';
 
 class LoadBalancingService {
   constructor(

@@ -662,6 +662,7 @@ async function initializeBot() {
       setupClientFlow,
       getFlowDeps,
       manualLinkingHandler,  // NEW: Support manual linking command
+      createClient: CreatingNewWhatsAppClient,  // NEW: For fresh client creation on relink
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");

@@ -6,7 +6,7 @@
  */
 
 import { DataContextService } from './DataContextService.js';
-import { Logger } from '../Utils/Logger.js';
+import { Logger } from '../utils/logger.js';
 
 const logger = new Logger('AIContextIntegration');
 

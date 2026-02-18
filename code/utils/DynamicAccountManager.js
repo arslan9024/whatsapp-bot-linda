@@ -375,5 +375,3 @@ export class DynamicAccountManager {
     return output;
   }
 }
-
-export default new DynamicAccountManager(console.log);

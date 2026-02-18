@@ -29,6 +29,7 @@ export function setupTerminalInputListener(opts) {
     setupClientFlow,
     getFlowDeps,
     manualLinkingHandler,  // NEW: Manual linking handler
+    createClient,          // NEW: For fresh client creation on relink
   } = opts;
 
   try {
@@ -78,14 +79,39 @@ export function setupTerminalInputListener(opts) {
           deviceLinkedManager.resetDeviceStatus(masterPhone);
         }
 
-        const client = accountClients.get(masterPhone);
-        if (client) {
+        // CRITICAL FIX: Destroy old client and create a fresh one to guarantee QR code display
+        const oldClient = accountClients.get(masterPhone);
+        if (oldClient) {
           try {
+            logBot(`  Clearing old session...`, 'info');
+            await oldClient.destroy();
+          } catch (destroyError) {
+            logBot(`  Warning: Could not cleanly destroy old session: ${destroyError.message}`, 'warn');
+          }
+        }
+
+        try {
+          // Create a fresh new client
+          logBot(`  Creating new client for fresh QR code...`, 'info');
+          const newClient = createClient(masterPhone);
+          accountClients.set(masterPhone, newClient);
+
+          // Set up the flow (this registers QR event listener)
+          setupClientFlow(newClient, masterPhone, 'master', { isRestore: false }, getFlowDeps());
+
+          // Mark as linking
+          if (deviceLinkedManager) {
             deviceLinkedManager.startLinkingAttempt(masterPhone);
-            setupClientFlow(client, masterPhone, 'master', { isRestore: false }, getFlowDeps());
-            client.initialize();
-          } catch (error) {
-            logBot(`Failed to reset client: ${error.message}`, 'error');
+          }
+
+          // Initialize fresh client to display new QR code
+          logBot(`  Initializing fresh client - QR code will display below:\n`, 'info');
+          await newClient.initialize();
+
+        } catch (error) {
+          logBot(`Failed to relink master account: ${error.message}`, 'error');
+          if (deviceLinkedManager) {
+            deviceLinkedManager.failLinkingAttempt(masterPhone, error.message);
           }
         }
       },

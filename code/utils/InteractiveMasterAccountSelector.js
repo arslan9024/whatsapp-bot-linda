@@ -17,12 +17,15 @@
 
 import readline from 'readline';
 import chalk from 'chalk';
+import { SessionStateManager } from './SessionStateManager.js';
 
 class InteractiveMasterAccountSelector {
-  constructor() {
+  constructor(sessionStateManager = null, logBotFn = null) {
     this.rl = null;
     this.selectedMasterNumber = null;
     this.isSelecting = false;
+    this.sessionStateManager = sessionStateManager || new SessionStateManager(logBotFn);
+    this.logBot = logBotFn || console.log;
   }
 
   /**
@@ -84,21 +87,47 @@ class InteractiveMasterAccountSelector {
   }
 
   /**
-   * Get the master WhatsApp number from user
+   * Get the master WhatsApp number from user (with session state recovery)
    */
   async getMasterPhoneNumber() {
+    // STEP 1: Load session state
+    await this.sessionStateManager.loadState();
+    
+    // STEP 2: Check if master number is already set in session
+    const savedMasterNumber = this.sessionStateManager.getMasterPhoneNumber();
+    if (savedMasterNumber) {
+      console.log(`\n✅ Master account recovered from session: ${savedMasterNumber}`);
+      this.selectedMasterNumber = savedMasterNumber;
+      return savedMasterNumber;
+    }
+
+    // STEP 3: Check environment variable
+    const envMasterNumber = process.env.BOT_MASTER_NUMBER;
+    if (envMasterNumber) {
+      console.log(`\n✅ Using master number from environment: ${envMasterNumber}`);
+      this.selectedMasterNumber = envMasterNumber;
+      await this.sessionStateManager.setMasterPhoneNumber(envMasterNumber);
+      return envMasterNumber;
+    }
+
+    // STEP 4: If no saved/env number, prompt user
     this.initializeInput();
     
     const choice = await this.displayMainMenu();
 
     switch (choice) {
       case '1':
-        return await this.enterPhoneNumber();
+        const number = await this.enterPhoneNumber();
+        if (number) {
+          await this.sessionStateManager.setMasterPhoneNumber(number);
+        }
+        return number;
       
       case '2':
-        const defaultNumber = process.env.BOT_MASTER_NUMBER || '+971505760056';
+        const defaultNumber = '+971505760056';
         console.log(`\n✅ Using default master number: ${defaultNumber}\n`);
         this.selectedMasterNumber = defaultNumber;
+        await this.sessionStateManager.setMasterPhoneNumber(defaultNumber);
         return defaultNumber;
       
       case '3':
@@ -303,4 +332,5 @@ class InteractiveMasterAccountSelector {
   }
 }
 
+export { InteractiveMasterAccountSelector };
 export default InteractiveMasterAccountSelector;

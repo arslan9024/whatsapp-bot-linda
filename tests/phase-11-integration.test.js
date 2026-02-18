@@ -11,7 +11,7 @@ import FailoverDetectionService from '../code/services/FailoverDetectionService.
 import FailoverOrchestrator from '../code/services/FailoverOrchestrator.js';
 import LoadBalancingService from '../code/services/LoadBalancingService.js';
 import HighAvailabilityMonitor from '../code/services/HighAvailabilityMonitor.js';
-import { Logger } from '../code/utils/Logger.js';
+import { Logger } from '../code/utils/logger.js';
 
 // Test utilities
 const logger = new Logger('Phase11Tests');

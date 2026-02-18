@@ -1,5 +1,7 @@
 {
-  "timestamp": "2026-02-18T09:05:28.149Z",
+  "timestamp": "2026-02-18T10:41:05.891Z",
   "version": "1.0",
+  "masterPhoneNumber": null,
+  "lastMasterSelection": null,
   "accounts": {}
 }

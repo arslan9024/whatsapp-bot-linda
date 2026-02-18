@@ -431,5 +431,3 @@ export class AccountConfigManager {
     console.log('');
   }
 }
-
-export default new AccountConfigManager();

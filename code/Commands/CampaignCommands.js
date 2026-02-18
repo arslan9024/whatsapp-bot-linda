@@ -372,4 +372,6 @@ ${schedule ? `✅ Next run: ${schedule.nextRun || 'Today 9:00 AM'}` : '⏸️ No
   }
 }
 
+// Export both the class and a default instance for backwards compatibility
+export { CampaignManager };
 export default new CampaignManager();
