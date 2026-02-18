@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceStatus.js";
 import { fullCleanup, killBrowserProcesses, sleep } from "./code/utils/browserCleanup.js";
-import sessionStateManager from "./code/utils/SessionStateManager.js";
+import { SessionStateManager } from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 import EnhancedQRCodeDisplay from "./code/utils/EnhancedQRCodeDisplay.js";  // Phase 14: Enhanced QR with terminal detection
 
@@ -11,10 +11,16 @@ import EnhancedQRCodeDisplay from "./code/utils/EnhancedQRCodeDisplay.js";  // P
 // - InteractiveMasterAccountSelector: user-friendly account selection with QR guidance
 // - EnhancedQRCodeDisplayV2: professional QR rendering with timeouts and recovery
 // - ProtocolErrorRecoveryManager: intelligent recovery from Puppeteer/WhatsApp-web.js errors
+// - EnhancedWhatsAppDeviceLinkingSystem: 400% better linking UX with real-time progress tracking
+// - DeviceLinkingQueue: multi-device parallel linking with queue management
+// - DeviceLinkingDiagnostics: intelligent error recovery with auto-healing strategies
 import GoogleServiceAccountManager from "./code/utils/GoogleServiceAccountManager.js";
-import InteractiveMasterAccountSelector from "./code/utils/InteractiveMasterAccountSelector.js";
+import { InteractiveMasterAccountSelector } from "./code/utils/InteractiveMasterAccountSelector.js";
 import EnhancedQRCodeDisplayV2 from "./code/utils/EnhancedQRCodeDisplayV2.js";
 import ProtocolErrorRecoveryManager from "./code/utils/ProtocolErrorRecoveryManager.js";
+import EnhancedWhatsAppDeviceLinkingSystem from "./code/utils/EnhancedWhatsAppDeviceLinkingSystem.js";
+import DeviceLinkingQueue from "./code/utils/DeviceLinkingQueue.js";
+import DeviceLinkingDiagnostics from "./code/utils/DeviceLinkingDiagnostics.js";
 
 // PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
 // Multi-account orchestration, device recovery, health monitoring, keep-alive system
@@ -77,7 +83,12 @@ import clientHealthMonitor from "./code/utils/ClientHealthMonitor.js";
 import CampaignScheduler from "./code/utils/CampaignScheduler.js";
 import CampaignService from "./code/Services/CampaignService.js";
 import ContactFilterService from "./code/Services/ContactFilterService.js";
-import CampaignCommands from "./code/Commands/CampaignCommands.js";
+import CampaignCommandsDefault from "./code/Commands/CampaignCommands.js";
+
+// PHASE 21: MANUAL LINKING HANDLER (February 18, 2026)
+// Disable auto-linking on startup, require user command instead
+// Includes pre-linking health check and graceful error handling
+import { ManualLinkingHandler } from "./code/utils/ManualLinkingHandler.js";
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
@@ -88,6 +99,7 @@ let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 3;
 
 // Phase 4-5 Managers (24/7 Operation)
+let sessionStateManager = null;  // NEW: Persistent session state management (device metadata, master phone)
 let bootstrapManager = null;
 let recoveryManager = null;
 let keepAliveManager = null;  // NEW: Session keep-alive heartbeat manager
@@ -101,6 +113,13 @@ let googleServiceAccountManager = null;  // Secure, base64-encoded credential ma
 let interactiveMasterAccountSelector = null;  // User-friendly master account selection
 let enhancedQRCodeDisplayV2 = null;  // Professional QR code rendering with recovery
 let protocolErrorRecoveryManager = null;  // Intelligent error recovery from browser/protocol errors
+let enhancedDeviceLinkingSystem = null;  // 400% enhanced linking UX (NEW - Phase 3+)
+let deviceLinkingQueue = null;  // Multi-device linking queue manager (NEW - Phase 3+)
+let deviceLinkingDiagnostics = null;  // Intelligent error recovery & diagnostics (NEW - Phase 4+)
+
+// PHASE 21: Manual Linking Handler (February 18, 2026)
+// Disable auto-linking, require user command instead
+let manualLinkingHandler = null;  // Manual linking with health checks (NEW - Phase 21)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -263,6 +282,20 @@ async function initializeBot() {
     logBot(`Initialization Attempt: ${initAttempts}/${MAX_INIT_ATTEMPTS}`, "info");
 
     // ============================================
+    // STEP 0: Initialize Session State Manager (NEW - Phase 2+)
+    // ============================================
+    if (!sessionStateManager) {
+      sessionStateManager = new SessionStateManager(logBot);
+      await sessionStateManager.loadState();
+      const summary = sessionStateManager.getSummary();
+      logBot(`✅ SessionStateManager initialized`, "success");
+      logBot(`   - Master Account: ${summary.masterPhone}`, "info");
+      logBot(`   - Linked Devices: ${summary.linkedDevices}/${summary.totalDevices}`, "info");
+      services.register('sessionStateManager', sessionStateManager);
+      sharedContext.sessionStateManager = sessionStateManager;
+    }
+
+    // ============================================
     // STEP 1: Initialize Keep-Alive Manager
     // ============================================
     if (!keepAliveManager) {
@@ -384,9 +417,38 @@ async function initializeBot() {
     }
 
     if (!interactiveMasterAccountSelector) {
-      interactiveMasterAccountSelector = new InteractiveMasterAccountSelector();
-      logBot("✅ InteractiveMasterAccountSelector initialized", "success");
+      interactiveMasterAccountSelector = new InteractiveMasterAccountSelector(sessionStateManager, logBot);
+      logBot("✅ InteractiveMasterAccountSelector initialized (with session recovery)", "success");
       services.register('interactiveMasterAccountSelector', interactiveMasterAccountSelector);
+    }
+
+    if (!enhancedDeviceLinkingSystem) {
+      enhancedDeviceLinkingSystem = new EnhancedWhatsAppDeviceLinkingSystem(logBot, sessionStateManager);
+      logBot("✅ EnhancedWhatsAppDeviceLinkingSystem initialized (400% better linking UX)", "success");
+      logBot("   - Real-time QR progress tracking with visual indicators", "info");
+      logBot("   - Device IP detection and multi-stage error recovery", "info");
+      logBot("   - Session state persistence for recovery without re-scanning", "info");
+      services.register('enhancedDeviceLinkingSystem', enhancedDeviceLinkingSystem);
+      sharedContext.enhancedDeviceLinkingSystem = enhancedDeviceLinkingSystem;
+    }
+
+    if (!deviceLinkingQueue) {
+      deviceLinkingQueue = new DeviceLinkingQueue(logBot, sessionStateManager);
+      logBot("✅ DeviceLinkingQueue initialized (multi-device parallel linking)", "success");
+      logBot("   - Queue management with priority scheduling", "info");
+      logBot("   - Parallel linking support (up to 2 devices simultaneously)", "info");
+      services.register('deviceLinkingQueue', deviceLinkingQueue);
+      sharedContext.deviceLinkingQueue = deviceLinkingQueue;
+    }
+
+    if (!deviceLinkingDiagnostics) {
+      deviceLinkingDiagnostics = new DeviceLinkingDiagnostics(logBot);
+      logBot("✅ DeviceLinkingDiagnostics initialized (intelligent error recovery)", "success");
+      logBot("   - Smart error categorization and auto-recovery strategies", "info");
+      logBot("   - Network, browser, protocol, and API error detection", "info");
+      logBot("   - Diagnostic reports with recovery recommendations", "info");
+      services.register('deviceLinkingDiagnostics', deviceLinkingDiagnostics);
+      sharedContext.deviceLinkingDiagnostics = deviceLinkingDiagnostics;
     }
 
     // ============================================
@@ -414,76 +476,66 @@ async function initializeBot() {
     });
 
     // ============================================
-    // STEP 4: Sequential Multi-Account Initialization
+    // STEP 4: Initialize Manual Linking Handler (Phase 21 - Feb 18, 2026)
     // ============================================
-    logBot("\n🔄 Starting sequential account initialization...", "info");
-    const sequentialDelay = parseInt(process.env.ACCOUNT_SEQUENTIAL_DELAY) || 5000;
-
-    for (const config of orderedAccounts) {
-      // All accounts in orderedAccounts should be enabled, but double-check
-      logBot(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, "info");
-      logBot(`[Account ${orderedAccounts.indexOf(config) + 1}/${orderedAccounts.length}] Initializing: ${config.displayName}...`, "info");
-
-      try {
-        // Create WhatsApp client
-        logBot(`Creating WhatsApp client for: ${config.displayName}`, "info");
-        const client = await CreatingNewWhatsAppClient(config.id);
-        if (!client) {
-          throw new Error("Failed to create WhatsApp client");
-        }
-
-        accountClients.set(config.phoneNumber, client);
-        if (!Lion0) {
-          Lion0 = client;
-          services.register('Lion0', Lion0);
-          services.register('Linda', Lion0);
-        }
-
-        logBot(`✅ Client created for ${config.displayName}`, "success");
-
-        // NEW: Register client with health monitor (Frame detachment + heartbeat monitoring)
-        clientHealthMonitor.registerClient(config.phoneNumber, client);
-        logBot(`✅ Health monitoring registered for ${config.displayName}`, "success");
-
-        // NEW: Add device to tracking system
-        if (deviceLinkedManager) {
-          deviceLinkedManager.addDevice(config.phoneNumber, {
-            name: config.displayName,
-            role: config.role || 'secondary',
-          });
-          // Use AccountConfigManager for master phone (more reliable)
-          const masterPhone = accountConfigManager?.getMasterPhoneNumber() || orderedAccounts[0]?.phoneNumber;
-          terminalHealthDashboard.setMasterPhoneNumber(masterPhone);
-        }
-
-        // Check for device recovery (Phase 3)
-        logBot(`Checking for linked devices (${config.phoneNumber})...`, "info");
-        const wasLinked = await recoveryManager.wasDevicePreviouslyLinked(config.phoneNumber);
-        const savedState = sessionStateManager.getAccountState(config.phoneNumber);
-
-        // SAFETY: Only attempt restore if BOTH conditions are true
-        if (wasLinked === true && savedState?.deviceLinked === true) {
-          logBot(`Found previous device session - attempting restore...`, "success");
-          setupClientFlow(client, config.phoneNumber, config.id, { isRestore: true, displayName: config.displayName }, getFlowDeps());
-        } else {
-          logBot(`New device linking required (wasLinked: ${wasLinked}, savedState: ${savedState?.deviceLinked}) - showing QR code...`, "info");
-          createDeviceStatusFile(config.phoneNumber);
-          setupClientFlow(client, config.phoneNumber, config.id, { isRestore: false, displayName: config.displayName }, getFlowDeps());
-        }
-
-        await bootstrapManager.recordInitialization(config.id, true);
-        
-        // Delay before next account to prevent race conditions
-        if (config !== orderedAccounts[orderedAccounts.length - 1]) {
-          logBot(`Waiting ${sequentialDelay}ms before next account...`, "info");
-          await new Promise(resolve => setTimeout(resolve, sequentialDelay));
-        }
-
-      } catch (error) {
-        logBot(`Failed to initialize ${config.displayName}: ${error.message}`, "error");
-        await bootstrapManager.recordInitialization(config.id, false);
-        continue;
-      }
+    // IMPORTANT: Accounts are NO LONGER automatically linked!
+    // Instead, user must explicitly request linking via command
+    logBot("\n═══════════════════════════════════════════════════════════", "info");
+    logBot("🔗 PHASE 21: MANUAL LINKING MODE ENABLED", "info");
+    logBot("═══════════════════════════════════════════════════════════\n", "info");
+    
+    logBot("⚠️  Auto-linking DISABLED - accounts will NOT link automatically", "warn");
+    logBot("✅ Manual linking enabled - user must request to link accounts", "success");
+    
+    // Pre-register all devices in tracking system (without linking)
+    if (deviceLinkedManager && orderedAccounts.length > 0) {
+      orderedAccounts.forEach((config, idx) => {
+        deviceLinkedManager.addDevice(config.phoneNumber, {
+          name: config.displayName,
+          role: config.role || (idx === 0 ? 'master' : 'secondary'),
+        });
+      });
+      
+      // Set master phone for dashboard
+      const masterPhone = accountConfigManager?.getMasterPhoneNumber() || orderedAccounts[0]?.phoneNumber;
+      terminalHealthDashboard.setMasterPhoneNumber(masterPhone);
+      
+      logBot(`✅ Registered ${orderedAccounts.length} account(s) for manual linking`, "success");
+      orderedAccounts.forEach((config, idx) => {
+        const role = config.role || (idx === 0 ? 'master' : 'secondary');
+        logBot(`   [${idx + 1}] ${config.displayName} (${config.phoneNumber}) - ${role}`, "info");
+      });
+    }
+    
+    logBot("", "info");
+    logBot("📋 HOW TO LINK MASTER ACCOUNT:", "info");
+    logBot("   Option 1 (Terminal): Type 'link master'", "info");
+    logBot("   Option 2 (WhatsApp): Send '!link-master' to bot", "info");
+    logBot("", "info");
+    logBot("⏳ Waiting for user command to initiate linking...", "info");
+    logBot("", "info");
+    
+    // Initialize Manual Linking Handler
+    if (!manualLinkingHandler) {
+      manualLinkingHandler = new ManualLinkingHandler({
+        logBot,
+        bootstrapManager,
+        recoveryManager,
+        sessionStateManager,
+        deviceLinkedManager,
+        accountConfigManager,
+        connectionManagers,
+        accountClients,
+        clientHealthMonitor,
+        terminalHealthDashboard,
+        createDeviceStatusFile,
+        sharedContext,
+        getFlowDeps,
+      });
+      
+      logBot("✅ ManualLinkingHandler initialized", "success");
+      services.register('manualLinkingHandler', manualLinkingHandler);
+      sharedContext.manualLinkingHandler = manualLinkingHandler;
     }
 
     // ============================================
@@ -553,8 +605,9 @@ async function initializeBot() {
       contactFilterService = new ContactFilterService();
       campaignScheduler = CampaignScheduler;
       
-      // Initialize campaign commands with services
-      CampaignCommands.initialize({
+      // Set logBot on campaign manager singleton and initialize with services
+      CampaignCommandsDefault.logBot = logBot;
+      CampaignCommandsDefault.initialize({
         campaignService,
         contactFilterService,
         rateLimiter: null, // Will be created internally
@@ -608,10 +661,15 @@ async function initializeBot() {
       accountClients,
       setupClientFlow,
       getFlowDeps,
+      manualLinkingHandler,  // NEW: Support manual linking command
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
-    logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit'", "info");
+    logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");
     logBot("   Chat commands: Type !help for full command list", "info");
+    logBot("", "info");
+    logBot("🔗 TO LINK MASTER WHATSAPP ACCOUNT:", "info");
+    logBot("   Type: link master", "info");
+    logBot("", "info");
 
     isInitializing = false;
 

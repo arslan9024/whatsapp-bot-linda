@@ -17,6 +17,7 @@
  * @param {Map}        opts.accountClients
  * @param {Function}   opts.setupClientFlow
  * @param {Function}   opts.getFlowDeps
+ * @param {object|null} opts.manualLinkingHandler - NEW: Manual linking with health checks (Phase 21)
  */
 export function setupTerminalInputListener(opts) {
   const {
@@ -27,10 +28,31 @@ export function setupTerminalInputListener(opts) {
     accountClients,
     setupClientFlow,
     getFlowDeps,
+    manualLinkingHandler,  // NEW: Manual linking handler
   } = opts;
 
   try {
     const callbacks = {
+      // NEW: Manual linking command (Phase 21)
+      onLinkMaster: async () => {
+        if (!manualLinkingHandler) {
+          logBot('❌ Manual linking handler not initialized', 'error');
+          return;
+        }
+        
+        logBot('', 'info');
+        logBot('🔗 Initiating master account linking...', 'info');
+        logBot('', 'info');
+        
+        const success = await manualLinkingHandler.initiateMasterAccountLinking();
+        
+        if (!success) {
+          logBot('', 'info');
+          logBot('❌ Linking failed. Please try again.', 'error');
+          logBot('', 'info');
+        }
+      },
+
       onRelinkMaster: async (masterPhone) => {
         if (!masterPhone && accountConfigManager) {
           masterPhone = accountConfigManager.getMasterPhoneNumber();

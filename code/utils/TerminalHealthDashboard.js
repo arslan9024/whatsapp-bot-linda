@@ -225,6 +225,7 @@ class TerminalHealthDashboard {
     this.isMonitoring = true;
 
     const {
+      onLinkMaster,  // NEW: Manual linking with health check (Phase 21)
       onRelinkMaster,
       onRelinkDevice,
       onSwitchTo6Digit,
@@ -253,6 +254,20 @@ class TerminalHealthDashboard {
       const command = parts[0];
 
       switch (command) {
+        // NEW: Link master account with health check (Phase 21)
+        case 'link':
+          if (parts[1] === 'master') {
+            console.log(`\n⏳ Initiating master account linking...`);
+            if (onLinkMaster) {
+              await onLinkMaster();
+            } else {
+              console.log(`❌ Linking handler not available\n`);
+            }
+          } else {
+            console.log(`\n⚠️  Usage: 'link master'\n`);
+          }
+          break;
+
         case 'health':
         case 'status':
           console.clear();
@@ -307,6 +322,7 @@ class TerminalHealthDashboard {
 
         case 'help':
           console.log(`\n📚 Available Commands:`);
+          console.log(`  link master             → Link master WhatsApp account (with health check)`);
           console.log(`  status / health         → Display full dashboard`);
           console.log(`  relink master           → Re-link master WhatsApp account`);
           console.log(`  relink <phone>          → Re-link specific device`);
