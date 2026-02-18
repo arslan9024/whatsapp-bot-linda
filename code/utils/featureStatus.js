@@ -1,24 +1,27 @@
 import fs from "fs";
 import path from "path";
+import GoogleServiceAccountManager from "./GoogleServiceAccountManager.js";
 
 export const checkSessionExists = (number) => {
   const sessionPath = path.join(process.cwd(), "sessions", `session-${number}`);
   return fs.existsSync(sessionPath);
 };
 
-export const checkGoogleAccountConnected = () => {
+export const checkGoogleAccountConnected = async () => {
   try {
-    const keysPath = path.join(process.cwd(), "code", "GoogleAPI", "keys.json");
-    if (fs.existsSync(keysPath)) {
-      const keys = JSON.parse(fs.readFileSync(keysPath, "utf8"));
-      if (keys.installed && keys.installed.client_id) {
-        return {
-          connected: true,
-          email: keys.installed.client_email || "Google Cloud Project",
-          type: "Service Account"
-        };
-      }
+    // Phase 22: Use GoogleServiceAccountManager to check all configured accounts
+    const credManager = new GoogleServiceAccountManager();
+    const accounts = credManager.listAvailableAccounts();
+    
+    if (accounts.length > 0) {
+      return {
+        connected: true,
+        accounts: accounts,
+        email: `${accounts.length} account(s) configured`,
+        type: "Service Account (via .env or legacy)"
+      };
     }
+    
     return { connected: false };
   } catch (error) {
     return { connected: false };

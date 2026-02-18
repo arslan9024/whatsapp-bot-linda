@@ -1,8 +1,11 @@
 /**
- * Sheet Validation Service (Session 16 - Phase 2)
+ * Sheet Validation Service (Session 16 - Phase 2, Updated Phase 22)
  * 
  * Validates that serviceman11 account has proper read/write access
  * to the organized Akoya sheet before bot starts processing messages
+ * 
+ * Phase 22: Updated to use GoogleServiceAccountManager for secure
+ * credential loading from .env (base64) instead of hardcoded file paths
  * 
  * Usage:
  *   import { validateSheetAccess } from './sheetValidation.js';
@@ -13,15 +16,7 @@
  */
 
 import { google } from 'googleapis';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Paths to credential files
-const SERVICEMAN11_CREDS_PATH = path.join(__dirname, '../Integration/Google/accounts/serviceman11/keys.json');
-const POWER_AGENT_CREDS_PATH = path.join(__dirname, '../Integration/Google/keys.json');
+import GoogleServiceAccountManager from './GoogleServiceAccountManager.js';
 
 /**
  * Validate sheet access for serviceman11 account
@@ -52,18 +47,20 @@ export async function validateSheetAccess(sheetId, options = {}) {
   };
 
   try {
-    // Step 1: Load serviceman11 credentials
-    if (!fs.existsSync(SERVICEMAN11_CREDS_PATH)) {
+    // Step 1: Load serviceman11 credentials from GoogleServiceAccountManager
+    const credManager = new GoogleServiceAccountManager();
+    const credentials = await credManager.getCredentials('serviceman11');
+    
+    if (!credentials) {
       console.log('\n⚠️  serviceman11 credentials not configured');
-      console.log('   Expected: ' + SERVICEMAN11_CREDS_PATH);
-      console.log('   To set up Google Sheets integration, run:');
+      console.log('   Phase 22: Credentials should be in .env as:');
+      console.log('   → GOOGLE_ACCOUNT_SERVICEMAN11_KEYS_BASE64=<base64_json>');
+      console.log('\n   Or set up via setup script:');
       console.log('   → node setup-serviceman11.js path/to/keys.json sheet-id\n');
-      result.errors.push(`serviceman11 credentials not found at ${SERVICEMAN11_CREDS_PATH}`);
-      result.errors.push('Run: node setup-serviceman11.js path/to/keys.json sheet-id');
+      result.errors.push(`serviceman11 credentials not found in .env or legacy paths`);
+      result.errors.push('Set GOOGLE_ACCOUNT_SERVICEMAN11_KEYS_BASE64 in .env or run setup-serviceman11.js');
       return result;
     }
-
-    const credentials = JSON.parse(fs.readFileSync(SERVICEMAN11_CREDS_PATH, 'utf8'));
     
     // Step 2: Test read access
     console.log('🔍 Testing read access (get metadata)...');
