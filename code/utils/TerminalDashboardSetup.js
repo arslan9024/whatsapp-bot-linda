@@ -100,7 +100,7 @@ export function setupTerminalInputListener(opts) {
         try {
           // Create a fresh new client
           logBot(`  Creating new client for fresh QR code...`, 'info');
-          const newClient = createClient(masterPhone);
+          const newClient = await createClient(masterPhone);
           accountClients.set(masterPhone, newClient);
 
           // Set up the flow (this registers QR event listener)
@@ -161,7 +161,7 @@ export function setupTerminalInputListener(opts) {
 
         try {
           logBot(`  Creating new client for fresh QR code...`, 'info');
-          const newClient = createClient(servantPhone);
+          const newClient = await createClient(servantPhone);
           accountClients.set(servantPhone, newClient);
 
           setupClientFlow(newClient, servantPhone, 'servant', { isRestore: false }, getFlowDeps());
