@@ -1,0 +1,42 @@
+﻿#!/usr/bin/env pwsh
+# Pre-commit hook to prevent committing secrets
+
+# Check if .env is being committed
+$stagedFiles = & { git diff --cached --name-only 2>&1 }
+
+if ($stagedFiles -match '\.env') {
+    Write-Host "[ERROR] Cannot commit .env file (contains secrets)" -ForegroundColor Red
+    Write-Host "  Add to .gitignore: .env" -ForegroundColor Yellow
+    exit 1
+}
+
+# Check for secret patterns
+$secretPatterns = @(
+    'MONGODB_URI',
+    'DB_PASSWORD',
+    'GOOGLE_API_KEY',
+    'password\s*[:=]',
+    'secret\s*[:=]'
+)
+
+$stagedChanges = & { git diff --cached 2>&1 }
+$foundSecret = $false
+
+foreach ($pattern in $secretPatterns) {
+    if ($stagedChanges -match $pattern) {
+        Write-Host "[WARN] Potential secret detected: $pattern" -ForegroundColor Yellow
+        $foundSecret = $true
+        break
+    }
+}
+
+if ($foundSecret) {
+    Write-Host "[WARN] Continue with commit? (y/n): " -ForegroundColor Yellow -NoNewline
+    $response = Read-Host
+    if ($response -notmatch '^[yY]$') {
+        exit 1
+    }
+}
+
+Write-Host "[OK] Pre-commit checks passed" -ForegroundColor Green
+exit 0
