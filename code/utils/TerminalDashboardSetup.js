@@ -415,6 +415,26 @@ export function setupTerminalInputListener(opts) {
           console.log(`\n❌ Error fetching GorahaBot status: ${error.message}\n`);
         }
       },
+
+      // NEW: GorahaBot filter callback (Phase 28)
+      onGorahaFilterRequested: async (filterString) => {
+        try {
+          if (!gorahaServicesBridge) {
+            logBot('❌ Goraha bridge not initialized', 'error');
+            console.log('\n❌ GorahaBot service is not available\n');
+            return;
+          }
+
+          // Fetch filtered contacts
+          const filteredResult = await gorahaServicesBridge.getFilteredContacts(filterString);
+
+          // Display the results
+          terminalHealthDashboard.displayGorahaFilterResults(filteredResult);
+        } catch (error) {
+          logBot(`Error filtering GorahaBot contacts: ${error.message}`, 'error');
+          console.log(`\n❌ Error filtering GorahaBot contacts: ${error.message}\n`);
+        }
+      },
     };
 
     terminalHealthDashboard.startInteractiveMonitoring(callbacks);

@@ -193,17 +193,83 @@ class TerminalHealthDashboard {
         console.log(`  Google Cloud Project:    ${validation.details.project}`);
       }
       
-      console.log(`  Last Checked:            ${timestamp}`);
+      console.log(`  Last Checked:            ${new Date().toLocaleTimeString()}`);
       console.log();
 
       // Section 3: Next Steps
       console.log(`💡 COMMANDS:`);
       console.log(`  goraha status            → Refresh contact stats (uses cache if recent)`);
       console.log(`  goraha verify            → Force full verification and recount`);
+      console.log(`  goraha filter <string>   → Search for specific contacts`);
       console.log();
 
     } catch (error) {
       console.log(`\n❌ Error displaying GorahaBot status: ${error.message}\n`);
+    }
+  }
+
+  /**
+   * Display GorahaBot filter results
+   * Called when user types 'goraha filter <search_string>'
+   */
+  displayGorahaFilterResults(result) {
+    try {
+      const timestamp = new Date().toLocaleTimeString();
+      
+      console.log(`\n🔍 GORAHA BOT - FILTERED CONTACT SEARCH`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Search Filter:           "${result.filterString}"`);
+      console.log();
+      
+      if (result.error) {
+        console.log(`  ⚠️  ERROR: ${result.error}`);
+        console.log();
+      } else {
+        console.log(`  📱 RESULTS`);
+        console.log(`  ────────────────────────────────────────────────────`);
+        console.log(`  Total Matches Found:     ${result.totalMatched}`);
+        console.log();
+
+        if (result.totalMatched > 0 && result.contacts && result.contacts.length > 0) {
+          console.log(`  📋 MATCHING CONTACTS:`);
+          console.log(`  ────────────────────────────────────────────────────`);
+          
+          result.contacts.slice(0, 50).forEach((contact, index) => {
+            // Extract contact name/email
+            let displayName = contact.names?.[0]?.displayName || 'Unknown';
+            let emails = contact.emailAddresses?.map(e => e.value).join(', ') || 'No email';
+            let phones = contact.phoneNumbers?.map(p => p.value).join(', ') || 'No phone';
+            
+            console.log(`  ${index + 1}. ${displayName}`);
+            if (emails !== 'No email') {
+              console.log(`     📧 ${emails}`);
+            }
+            if (phones !== 'No phone') {
+              console.log(`     ☎️  ${phones}`);
+            }
+          });
+
+          if (result.totalMatched > 50) {
+            console.log(`  ... and ${result.totalMatched - 50} more contacts`);
+          }
+        } else {
+          console.log(`  ❌ No contacts found matching "${result.filterString}"`);
+        }
+        
+        console.log();
+        console.log(`  Fetched:                 ${new Date(result.lastFetched).toLocaleString()}`);
+      }
+      console.log();
+
+      // Section 2: Commands
+      console.log(`💡 NEXT STEPS:`);
+      console.log(`  goraha filter <string>   → Search with different filter`);
+      console.log(`  goraha status            → View overview statistics`);
+      console.log(`  goraha verify            → Force full verification`);
+      console.log();
+
+    } catch (error) {
+      console.log(`\n❌ Error displaying filtered results: ${error.message}\n`);
     }
   }
 
@@ -314,6 +380,7 @@ class TerminalHealthDashboard {
       onShowDeviceDetails,
       onListDevices,
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
+      onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
     } = callbacks;
 
     console.log(`\n${'═'.repeat(60)}`);
@@ -690,7 +757,7 @@ class TerminalHealthDashboard {
           }
           break;
 
-        // NEW: GorahaBot status (Phase 26)
+        // NEW: GorahaBot status (Phase 26 & 28)
         case 'goraha':
           if (parts[1] === 'verify' || parts[1] === 'v') {
             // Force verification
@@ -708,6 +775,52 @@ class TerminalHealthDashboard {
               }
             } else {
               console.log(`  ⚠️  Goraha bridge not available\n`);
+            }
+          } else if (parts[1] === 'contacts' || parts[1] === 'count') {
+            // Show total contacts count
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║          📱 GORAHA BOT - TOTAL CONTACTS COUNT               ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Fetching total contacts count...\n`);
+            
+            if (onGorahaStatusRequested) {
+              try {
+                await onGorahaStatusRequested(false); // Get stats with total count
+                console.log(`\n💡 Use 'goraha filter <string>' to find specific contacts`);
+                console.log(`   Example: 'goraha filter D2 Security'\n`);
+              } catch (error) {
+                console.log(`  ❌ Error fetching contacts: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Goraha bridge not available\n`);
+            }
+          } else if (parts[1] === 'filter' || parts[1] === 'search') {
+            // Filter contacts by string
+            const filterString = parts.slice(2).join(' ');
+            
+            if (!filterString || filterString.trim().length === 0) {
+              console.log(`\n⚠️  Usage: 'goraha filter <search_string>'`);
+              console.log(`   Example: 'goraha filter D2 Security'`);
+              console.log(`   Example: 'goraha filter Broker'\n`);
+              break;
+            }
+
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║       📱 GORAHA BOT - FILTERED CONTACT SEARCH               ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`🔍 Searching for contacts matching: "${filterString}"\n`);
+            console.log(`⏳ Loading...\n`);
+
+            if (onGorahaFilterRequested) {
+              try {
+                await onGorahaFilterRequested(filterString);
+              } catch (error) {
+                console.log(`  ❌ Error during search: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Goraha filter not available\n`);
             }
           } else if (!parts[1] || parts[1] === 'status') {
             // Display status (default command)
@@ -728,8 +841,14 @@ class TerminalHealthDashboard {
             }
           } else {
             console.log(`\n⚠️  Usage:`);
-            console.log(`  'goraha status'           → Display contact stats (on-demand, cached)`);
-            console.log(`  'goraha verify'           → Force verification and recount\n`);
+            console.log(`  'goraha' or 'goraha status'     → Display contact stats (cached)`);
+            console.log(`  'goraha verify'                 → Force verification and recount`);
+            console.log(`  'goraha contacts' or 'count'    → Show total contacts count`);
+            console.log(`  'goraha filter <string>'        → Search for specific contacts`);
+            console.log(`\n  Examples:`);
+            console.log(`    goraha filter D2 Security`);
+            console.log(`    goraha filter Broker`);
+            console.log(`    goraha filter Developer\n`);
           }
           break;
 
@@ -743,9 +862,11 @@ class TerminalHealthDashboard {
           console.log(`    health <+phone>           → Show detailed health for specific account`);
           console.log(`    stats <+phone>            → Show metrics (uptime, messages, errors)`);
           console.log(`    recover <+phone>          → Attempt session restoration`);
-          console.log(`\n  GORAHA BOT:`);
-          console.log(`    goraha status (or 'goraha') → Display contact stats (on-demand, cached)`);
-          console.log(`    goraha verify             → Force verification and recount`);
+          console.log(`\n  GORAHA BOT (Phase 28):`);
+          console.log(`    goraha (or 'goraha status')  → Display contact stats (cached)`);
+          console.log(`    goraha verify                → Force verification and recount`);
+          console.log(`    goraha contacts (count)      → Show total contacts count`);
+          console.log(`    goraha filter <string>       → Search contacts by name`);
           console.log(`\n  DEVICE MANAGEMENT:`);
           console.log(`    status / health           → Display full dashboard`);
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);

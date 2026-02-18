@@ -368,6 +368,111 @@ class GorahaServicesBridge {
     this.cacheTimestamp = null;
     this.logger.debug('Contact stats cache cleared');
   }
+
+  /**
+   * Get total number of contacts
+   * @param {boolean} forceRefresh - Force API call
+   * @returns {Promise<number>} - Total contact count
+   */
+  async getTotalContactCount(forceRefresh = false) {
+    try {
+      const stats = await this.getContactStats(forceRefresh);
+      return stats.total || 0;
+    } catch (error) {
+      this.logger.error(`Error getting total contact count: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Get filtered contacts matching a specific string in name
+   * @param {string} filterString - String to search for in contact names
+   * @param {boolean} forceRefresh - Force API call
+   * @returns {Promise<Object>} - {contacts: Array, totalMatched: number, filterString: string, lastFetched: timestamp, error?: string}
+   */
+  async getFilteredContacts(filterString, forceRefresh = false) {
+    try {
+      if (!filterString || filterString.trim().length === 0) {
+        return {
+          contacts: [],
+          totalMatched: 0,
+          filterString: '',
+          lastFetched: new Date(),
+          error: 'Filter string cannot be empty',
+        };
+      }
+
+      this.logger.debug(`Fetching contacts matching filter: "${filterString}"...`);
+
+      if (this.googleContactsBridge) {
+        try {
+          // Search for contacts matching the filter string
+          const filteredContacts = await this.googleContactsBridge.searchContacts(filterString);
+          
+          return {
+            contacts: filteredContacts || [],
+            totalMatched: (filteredContacts || []).length,
+            filterString: filterString,
+            lastFetched: new Date(),
+            fetchedAt: new Date().toISOString(),
+            cached: false,
+          };
+        } catch (bridgeError) {
+          this.logger.warn(`GoogleContactsBridge filter search failed: ${bridgeError.message}`);
+          // Fall through to direct API approach
+        }
+      }
+
+      // Direct API approach (fallback)
+      this.logger.debug('Using direct Google People API for filtered search...');
+      const filteredContacts = await this._searchContactsViaDirectAPI(filterString);
+
+      return {
+        contacts: filteredContacts || [],
+        totalMatched: (filteredContacts || []).length,
+        filterString: filterString,
+        lastFetched: new Date(),
+        fetchedAt: new Date().toISOString(),
+        cached: false,
+      };
+    } catch (error) {
+      this.logger.error(`Error fetching filtered contacts: ${error.message}`);
+
+      return {
+        contacts: [],
+        totalMatched: 0,
+        filterString: filterString,
+        lastFetched: null,
+        cached: false,
+        error: `Unable to fetch filtered contacts: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Search contacts via direct Google People API
+   * @private
+   * @param {string} searchString - String to search for
+   * @returns {Promise<Array>} - Array of matching contacts
+   */
+  async _searchContactsViaDirectAPI(searchString) {
+    try {
+      const credentials = await this.googleServiceAccountManager.getCredentials('goraha');
+      
+      if (!credentials) {
+        this.logger.error('GorahaBot credentials not found for API search');
+        return [];
+      }
+
+      // Would need to implement JWT token generation and People API call here
+      // For now, return empty (this is fallback that requires full Google API implementation)
+      this.logger.warn('Direct API search not fully implemented, returning empty results');
+      return [];
+    } catch (error) {
+      this.logger.error(`Direct API search error: ${error.message}`);
+      return [];
+    }
+  }
 }
 
 export default GorahaServicesBridge;
