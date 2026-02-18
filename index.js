@@ -92,6 +92,11 @@ import { ManualLinkingHandler } from "./code/utils/ManualLinkingHandler.js";
 // Contact statistics and Google service account validation
 import GorahaServicesBridge from "./code/utils/GorahaServicesBridge.js";
 
+// PHASE 27: AUTO-SESSION RESTORE (February 19, 2026)
+// Automatically restores WhatsApp sessions on server restart (nodemon)
+// Prevents need for manual re-linking after every server restart
+import AutoSessionRestoreManager from "./code/utils/AutoSessionRestoreManager.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -126,6 +131,10 @@ let manualLinkingHandler = null;  // Manual linking with health checks (NEW - Ph
 // PHASE 26: GorahaBot Integration (February 19, 2026)
 // Contact statistics and Google service account validation
 let gorahaServicesBridge = null;  // GorahaBot contact stats + account validation (NEW - Phase 26)
+
+// PHASE 27: Auto-Session Restore Manager (February 19, 2026)
+// Automatically restores WhatsApp sessions on server restart
+let autoSessionRestoreManager = null;  // Auto-restore manager (NEW - Phase 27)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -540,6 +549,45 @@ async function initializeBot() {
     logBot("   Option 1 (Terminal): Type 'link master'", "info");
     logBot("   Option 2 (WhatsApp): Send '!link-master' to bot", "info");
     logBot("", "info");
+    
+    // ============================================
+    // STEP 4A: Auto-Restore Previous Sessions (Phase 27 - NEW)
+    // ============================================
+    // On server restart (nodemon), restore all previously linked accounts
+    if (!autoSessionRestoreManager) {
+      autoSessionRestoreManager = new AutoSessionRestoreManager(logBot);
+      
+      const restoreResult = await autoSessionRestoreManager.autoRestoreAllSessions(
+        sessionStateManager,
+        accountClients,
+        deviceLinkedManager,
+        setupClientFlow,
+        getFlowDeps,
+        CreatingNewWhatsAppClient
+      );
+      
+      if (restoreResult.success && restoreResult.restored > 0) {
+        logBot("✅ Auto-restore completed successfully!", "success");
+        logBot(`   ${restoreResult.restored} account(s) restored from previous sessions`, "info");
+        logBot("   Dashboard shows current online status", "info");
+        logBot("", "info");
+        
+        // If all accounts were restored, skip the "waiting for user command" message
+        if (restoreResult.failed === 0) {
+          logBot("✅ All accounts are now online and ready to use", "success");
+          logBot("   No manual linking required on this restart", "info");
+        } else {
+          logBot(`⚠️  ${restoreResult.failed} account(s) need manual re-linking`, "warn");
+          logBot("   Use: link master <+phone> or relink <+phone>", "info");
+        }
+      } else {
+        logBot("ℹ️  No previous sessions to restore - manual linking required", "info");
+      }
+      
+      logBot("", "info");
+      services.register('autoSessionRestoreManager', autoSessionRestoreManager);
+    }
+
     logBot("⏳ Waiting for user command to initiate linking...", "info");
     logBot("", "info");
     
