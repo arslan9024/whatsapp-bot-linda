@@ -55,8 +55,15 @@ export function setupTerminalInputListener(opts) {
       },
 
       onRelinkMaster: async (masterPhone) => {
+        // NEW: Support phone number parameter for dynamic master account relinking
         if (!masterPhone && accountConfigManager) {
           masterPhone = accountConfigManager.getMasterPhoneNumber();
+        }
+        
+        // NEW: Sanitize phone number (remove + if provided dynamically)
+        if (masterPhone && typeof masterPhone === 'string') {
+          masterPhone = masterPhone.trim();
+          // Keep + for display, but validation happens in client creation
         }
 
         if (!masterPhone) {
@@ -111,7 +118,65 @@ export function setupTerminalInputListener(opts) {
         } catch (error) {
           logBot(`Failed to relink master account: ${error.message}`, 'error');
           if (deviceLinkedManager) {
-            deviceLinkedManager.failLinkingAttempt(masterPhone, error.message);
+            deviceLinkedManager.recordLinkFailure(masterPhone, error);
+          }
+        }
+      },
+
+      onRelinkServant: async (servantPhone) => {
+        // Support: relink servant +971553633595
+        if (!servantPhone) {
+          logBot('⚠️  No servant account specified', 'error');
+          if (accountConfigManager) {
+            const servants = accountConfigManager.getAllServantAccounts();
+            if (servants.length > 0) {
+              logBot('', 'info');
+              logBot('📱 Available Servant Accounts:', 'info');
+              servants.forEach((acc) => {
+                const status = acc.status === 'active' ? '✅' : '⏳';
+                logBot(`     • ${acc.phoneNumber} (${acc.displayName}) [${status}]`, 'info');
+              });
+              logBot('', 'info');
+              logBot('💡 Usage: relink servant +<phone-number>', 'info');
+            }
+          }
+          return;
+        }
+
+        servantPhone = servantPhone.trim();
+        logBot(`Re-linking servant account: ${servantPhone}`, 'info');
+        if (deviceLinkedManager) {
+          deviceLinkedManager.resetDeviceStatus(servantPhone);
+        }
+
+        const oldClient = accountClients.get(servantPhone);
+        if (oldClient) {
+          try {
+            logBot(`  Clearing old session...`, 'info');
+            await oldClient.destroy();
+          } catch (destroyError) {
+            logBot(`  Warning: Could not cleanly destroy old session: ${destroyError.message}`, 'warn');
+          }
+        }
+
+        try {
+          logBot(`  Creating new client for fresh QR code...`, 'info');
+          const newClient = createClient(servantPhone);
+          accountClients.set(servantPhone, newClient);
+
+          setupClientFlow(newClient, servantPhone, 'servant', { isRestore: false }, getFlowDeps());
+
+          if (deviceLinkedManager) {
+            deviceLinkedManager.startLinkingAttempt(servantPhone);
+          }
+
+          logBot(`  Initializing fresh client - QR code will display below:\n`, 'info');
+          await newClient.initialize();
+
+        } catch (error) {
+          logBot(`Failed to relink servant account: ${error.message}`, 'error');
+          if (deviceLinkedManager) {
+            deviceLinkedManager.recordLinkFailure(servantPhone, error);
           }
         }
       },

@@ -61,6 +61,11 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
     throw new Error("Client ID is not defined - cannot register agent");
   }
 
+  // CRITICAL FIX: Sanitize ClientID to remove invalid characters (+, spaces, etc.)
+  // WhatsApp Web.js only allows: alphanumeric, underscores, hyphens
+  // Phone numbers like "+971505760056" need to become "971505760056"
+  const sanitizedClientID = String(ClientID).replace(/^\+/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+
   console.log(`🔧 Creating WhatsApp client for: ${ClientID}${retryCount > 0 ? ` (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})` : ''}`);
 
   try {
@@ -150,7 +155,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
 
     const RegisteredAgentWAClient = new Client({
       authStrategy: new LocalAuth({
-        clientId: `${ClientID}`,
+        clientId: sanitizedClientID,  // Use sanitized ID without + or special chars
         dataPath: "sessions"
       }),
       restartOnAuthFail: true,

@@ -326,6 +326,9 @@ async function initializeBot() {
       services.register('accountConfigManager', accountConfigManager);
       sharedContext.accountConfigManager = accountConfigManager;
       
+      // NEW: Pass accountConfigManager to terminalHealthDashboard
+      terminalHealthDashboard.setAccountConfigManager(accountConfigManager);
+      
       // Validate master account configuration
       const masterPhone = accountConfigManager.getMasterPhoneNumber();
       const masterAccount = accountConfigManager.getMasterAccount();

@@ -21,6 +21,7 @@ class TerminalHealthDashboard {
     this.rl = null;
     this.isMonitoring = false;
     this.deviceManager = null; // Will be set by index.js
+    this.accountConfigManager = null; // NEW: Will be set by index.js
     this.autoRefreshInterval = null;
     this.autoRefreshDelay = 60000; // 60 seconds
     this.masterPhoneNumber = null; // Set by index.js
@@ -31,6 +32,13 @@ class TerminalHealthDashboard {
    */
   setDeviceManager(deviceManager) {
     this.deviceManager = deviceManager;
+  }
+
+  /**
+   * NEW: Set account config manager reference
+   */
+  setAccountConfigManager(accountConfigManager) {
+    this.accountConfigManager = accountConfigManager;
   }
 
   /**
@@ -119,7 +127,8 @@ class TerminalHealthDashboard {
     console.log(`⚙️  AVAILABLE COMMANDS`);
     console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log(`  'status' / 'health'         → Show this dashboard`);
-    console.log(`  'relink master'             → Re-link master account`);
+    console.log(`  'relink master'             → Re-link default master account`);
+    console.log(`  'relink master <phone>'     → Re-link specific master account`);
     console.log(`  'relink <phone>'            → Re-link specific device`);
     console.log(`  'device <phone>'            → Show device details`);
     console.log(`  'code <phone>'              → Switch to 6-digit auth`);
@@ -276,9 +285,17 @@ class TerminalHealthDashboard {
 
         case 'relink':
           if (parts[1] === 'master') {
-            console.log(`\n⏳ Re-linking master account...`);
-            if (onRelinkMaster) {
-              await onRelinkMaster(this.masterPhoneNumber);
+            // NEW: Support "relink master <phone>" for specific master account
+            const masterPhone = parts[2] || this.masterPhoneNumber;
+            if (masterPhone) {
+              console.log(`\n⏳ Re-linking master account: ${masterPhone}...`);
+              if (onRelinkMaster) {
+                await onRelinkMaster(masterPhone);
+              }
+            } else {
+              console.log(`\n⚠️  No master account specified.`);
+              console.log(`   Usage: 'relink master [+phone-number]'`);
+              console.log(`   Example: 'relink master +971505760056'\n`);
             }
           } else if (parts[1]) {
             const phoneNumber = parts[1];
@@ -287,7 +304,9 @@ class TerminalHealthDashboard {
               await onRelinkDevice(phoneNumber);
             }
           } else {
-            console.log(`\n⚠️  Usage: 'relink master' or 'relink <phone>'\n`);
+            console.log(`\n⚠️  Usage:`);
+            console.log(`   'relink master [+phone]'          → Re-link master account`);
+            console.log(`   'relink <phone>'                  → Re-link specific device\n`);
           }
           break;
 
@@ -320,17 +339,38 @@ class TerminalHealthDashboard {
           }
           break;
 
+        case 'masters':
+          // NEW: Show all master accounts
+          if (this.accountConfigManager) {
+            this.accountConfigManager.listAllAccountsWithRoles();
+          } else {
+            console.log(`\n⚠️  Account manager not available\n`);
+          }
+          break;
+
+        case 'servants':
+          // NEW: Show all servant accounts
+          if (this.accountConfigManager) {
+            this.accountConfigManager.listAllAccountsWithRoles();
+          } else {
+            console.log(`\n⚠️  Account manager not available\n`);
+          }
+          break;
+
         case 'help':
           console.log(`\n📚 Available Commands:`);
-          console.log(`  link master             → Link master WhatsApp account (with health check)`);
-          console.log(`  status / health         → Display full dashboard`);
-          console.log(`  relink master           → Re-link master WhatsApp account`);
-          console.log(`  relink <phone>          → Re-link specific device`);
-          console.log(`  code <phone>            → Switch to 6-digit authentication`);
-          console.log(`  device <phone>          → Show detailed device information`);
-          console.log(`  list                    → List all devices`);
-          console.log(`  help                    → Show this help message`);
-          console.log(`  quit / exit             → Exit monitoring\n`);
+          console.log(`  link master               → Link master WhatsApp account (with health check)`);
+          console.log(`  status / health           → Display full dashboard`);
+          console.log(`  relink master [+phone]    → Re-link master account (optional: specify phone)`);
+          console.log(`  relink servant [+phone]   → Re-link servant account`);
+          console.log(`  relink <phone>            → Re-link specific device`);
+          console.log(`  code <phone>              → Switch to 6-digit authentication`);
+          console.log(`  device <phone>            → Show detailed device information`);
+          console.log(`  list                      → List all devices`);
+          console.log(`  masters                   → Show all master accounts`);
+          console.log(`  servants                  → Show all servant accounts`);
+          console.log(`  help                      → Show this help message`);
+          console.log(`  quit / exit               → Exit monitoring\n`);
           break;
 
         case 'quit':

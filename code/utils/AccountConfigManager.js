@@ -430,4 +430,151 @@ export class AccountConfigManager {
     });
     console.log('');
   }
+
+  /**
+   * NEW FEATURE: Get all master accounts (primary role)
+   */
+  getAllMasterAccounts() {
+    const accounts = this.getAllAccounts();
+    return accounts.filter(acc => acc.role === 'primary' || acc.role === 'master');
+  }
+
+  /**
+   * NEW FEATURE: Get all servant accounts (secondary role)
+   */
+  getAllServantAccounts() {
+    const accounts = this.getAllAccounts();
+    return accounts.filter(acc => acc.role === 'secondary' || acc.role === 'servant');
+  }
+
+  /**
+   * NEW FEATURE: Find account by phone number
+   */
+  getAccountByPhone(phoneNumber) {
+    const accounts = this.getAllAccounts();
+    if (!phoneNumber) return null;
+    
+    // Normalize phone number for comparison (remove + if present)
+    const normalizedPhone = String(phoneNumber).replace(/^\+/, '');
+    return accounts.find(acc => {
+      const accPhone = String(acc.phoneNumber).replace(/^\+/, '');
+      return accPhone === normalizedPhone;
+    });
+  }
+
+  /**
+   * NEW FEATURE: Add a master account
+   */
+  async addMasterAccount(phone, displayName) {
+    if (!phone) throw new Error('Phone number required');
+    
+    const accountData = {
+      id: `master_${Date.now()}`,
+      phoneNumber: phone,
+      displayName: displayName || `Master - ${phone}`,
+      role: 'primary',
+      status: 'pending',
+      enabled: true,
+      createdAt: new Date().toISOString()
+    };
+
+    return await this.addAccount(accountData);
+  }
+
+  /**
+   * NEW FEATURE: Add a servant account
+   */
+  async addServantAccount(phone, displayName) {
+    if (!phone) throw new Error('Phone number required');
+    
+    const accountData = {
+      id: `servant_${Date.now()}`,
+      phoneNumber: phone,
+      displayName: displayName || `Servant - ${phone}`,
+      role: 'secondary',
+      status: 'pending',
+      enabled: true,
+      createdAt: new Date().toISOString()
+    };
+
+    return await this.addAccount(accountData);
+  }
+
+  /**
+   * NEW FEATURE: Switch to a different master account by phone
+   */
+  async switchMasterAccount(phoneNumber) {
+    const account = this.getAccountByPhone(phoneNumber);
+    if (!account) {
+      this.logBot(`Account not found: ${phoneNumber}`, 'error');
+      return false;
+    }
+
+    if (account.role !== 'primary' && account.role !== 'master') {
+      this.logBot(`Account is not a master account: ${phoneNumber}`, 'error');
+      return false;
+    }
+
+    // Update all accounts: remove primary from others, set on target
+    for (const bot of Object.values(this.config.whatsappBots || {})) {
+      if (bot.id === account.id) {
+        bot.role = 'primary';
+      } else if (bot.role === 'primary') {
+        bot.role = 'secondary';
+      }
+    }
+
+    this.masterAccountId = account.id;
+    await this.saveConfig();
+    this.logBot(`✅ Switched to master account: ${phoneNumber}`, 'success');
+    return true;
+  }
+
+  /**
+   * NEW FEATURE: List all accounts with their roles
+   */
+  listAllAccountsWithRoles() {
+    const masters = this.getAllMasterAccounts();
+    const servants = this.getAllServantAccounts();
+
+    console.log('\n👑 MASTER ACCOUNTS:');
+    if (masters.length === 0) {
+      console.log('  (none)');
+    } else {
+      masters.forEach((acc, idx) => {
+        const status = acc.status === 'active' ? '✅' : '⏳';
+        console.log(`  ${idx + 1}. ${acc.displayName} - ${acc.phoneNumber} [${status}]`);
+      });
+    }
+
+    console.log('\n📱 SERVANT ACCOUNTS:');
+    if (servants.length === 0) {
+      console.log('  (none)');
+    } else {
+      servants.forEach((acc, idx) => {
+        const status = acc.status === 'active' ? '✅' : '⏳';
+        console.log(`  ${idx + 1}. ${acc.displayName} - ${acc.phoneNumber} [${status}]`);
+      });
+    }
+    console.log('');
+  }
+
+  /**
+   * NEW FEATURE: Validate and update master account by phone
+   */
+  validateMasterPhone(phoneNumber) {
+    if (!phoneNumber) return null;
+    const account = this.getAccountByPhone(phoneNumber);
+    
+    if (!account) {
+      this.logBot(`❌ Master account not found: ${phoneNumber}`, 'error');
+      this.logBot(`   Available masters:`, 'info');
+      this.getAllMasterAccounts().forEach(m => {
+        this.logBot(`   • ${m.phoneNumber}`, 'info');
+      });
+      return null;
+    }
+
+    return account.phoneNumber;
+  }
 }
