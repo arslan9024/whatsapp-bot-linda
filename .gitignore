@@ -1,53 +1,110 @@
-# Dependencies and Build
-node_modules/
-package-lock.json
-npm-debug.log
-yarn-error.log
-
-# Environment Variables
+# ================================================================= 
+# ENVIRONMENT & SECRETS (CRITICAL - NEVER COMMIT)
+# =================================================================
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+.env.development
+.env.test
 
-# Google API & Credentials (SENSITIVE)
+# ================================================================= 
+# CREDENTIALS & KEYS (CRITICAL - NEVER COMMIT)
+# =================================================================
+# Google API Keys
 code/GoogleAPI/keys*.json
 code/GoogleAPI/*-keys.json
-code/Integration/Google/accounts/*/keys.json
+code/GoogleAPI/*.json
+code/Integration/Google/keys.json
+code/Integration/Google/*/keys.json
+config/google-credentials.json
+config/*-credentials.json
+config/*-keys.json
+
+# OAuth Tokens
+.tokens/
+.token/
+*-token.json
+*-tokens.json
+
+# Firebase Credentials
+firebase-*.json
+firebase-credentials.json
+*-firebase-*.json
+
+# AWS Credentials
+.aws/
+aws-credentials.json
+
+# Database Credentials
+db-config.json
+database-credentials.json
+
+# All files that might contain secrets
+config/*credentials*.json
+config/*keys*.json
+config/*secret*.json
 *.key
 *.pem
 credentials*.json
+keys*.json
+secrets*.json
 
-# Browser Sessions (WhatsApp)
+# ================================================================= 
+# SESSION & STATE FILES
+# =================================================================
 sessions/
 session-*/
+.wwebjs_auth/
+.wwebjs_cache/
+.whatsapp-sessions/
 
-# Chrome/Chromium User Data
-.wdm/
+# =================================================================
+# LOGS (May contain sensitive information)
+# =================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+output.log
+test-output.txt
+test_output*.txt
 
-# Output Files
-Outputs/
-outputs/
-*.txt
-*.csv
+# =================================================================
+# BUILD & DEPENDENCIES
+# =================================================================
+node_modules/
+package-lock.json
+yarn.lock
+bower_components/
 
-# System Files
-.DS_Store
+# =================================================================
+# IDE & EDITOR
+# =================================================================
 .vscode/settings.json
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
-# Logs
-logs/
-*.log
+# =================================================================
+# BROWSER & CACHE
+# =================================================================
+.wdm/
+.cache/
+dist/
+build/
 
-# Google API Credentials (SENSITIVE - NEVER COMMIT)
-config/google-credentials.json
-config/*-credentials.json
-config/*-keys.json
-code/GoogleAPI/keys.json
-code/GoogleAPI/*/keys.json
+# =================================================================
+# OUTPUT FILES
+# =================================================================
+Outputs/
+outputs/
+*.csv
+*.txt
 code/Integration/Google/keys.json
 code/Integration/Google/*/keys.json
 *.pem
