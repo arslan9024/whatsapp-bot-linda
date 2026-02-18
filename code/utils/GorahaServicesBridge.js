@@ -7,23 +7,34 @@
  * - Fetch total contact count from GorahaBot Google account
  * - Filter contacts by "D2 Security" in name field
  * - Validate GorahaBot service account (structure + API access)
- * - Cache results to minimize Google API quota usage
+ * - Cache results to minimize Google API quota usage (with CacheManager - Phase 29)
  * - Graceful error handling with fallback to cached data
  * 
  * Integration:
  * - Used by TerminalHealthDashboard for 'goraha status' / 'goraha verify' commands
  * - Requires GoogleServiceAccountManager for credentials
  * - Requires GoogleContactsBridge for API access
+ * - Uses CacheManager for performance optimization (Phase 29)
  * 
  * @since Phase 26 - February 19, 2026
+ * @updated Phase 29 - Performance optimization with CacheManager
  */
+
+import CacheManager from './CacheManager.js';
 
 class GorahaServicesBridge {
   constructor() {
     this.googleServiceAccountManager = null;
     this.googleContactsBridge = null;
     
-    // Caching
+    // Phase 29: Performance optimization with CacheManager
+    this.cache = new CacheManager({
+      maxMemoryMB: 50,
+      defaultTTL: 1800, // 30 minutes
+      cleanupInterval: 60000, // 1 minute
+    });
+    
+    // Legacy caching (for backward compatibility)
     this.contactStatsCache = null;
     this.accountStatusCache = null;
     this.cacheTimestamp = null;
@@ -80,19 +91,24 @@ class GorahaServicesBridge {
 
   /**
    * Get contact statistics
-   * Returns total contacts + D2 Security contacts (with caching)
+   * Returns total contacts + D2 Security contacts (with caching via CacheManager - Phase 29)
    * 
    * @param {boolean} forceRefresh - Force API call, ignore cache
    * @returns {Promise<Object>} - {total: number, d2SecurityCount: number, lastFetched: timestamp, cached: boolean, error?: string}
    */
   async getContactStats(forceRefresh = false) {
     try {
-      // Return cached stats if available and not forced refresh
-      if (this.contactStatsCache && !forceRefresh) {
-        return {
-          ...this.contactStatsCache,
-          cached: true,
-        };
+      // Phase 29: Check CacheManager cache first
+      const cacheKey = 'goraha:contact-stats';
+      if (!forceRefresh) {
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+          this.logger.debug('Contact stats retrieved from cache');
+          return {
+            ...cached,
+            cached: true,
+          };
+        }
       }
 
       this.logger.debug('Fetching GorahaBot contact statistics...');
@@ -116,7 +132,9 @@ class GorahaServicesBridge {
             fetchedAt: new Date().toISOString(),
           };
 
-          // Cache the results
+          // Phase 29: Cache in CacheManager (30 min TTL)
+          this.cache.set(cacheKey, stats, 1800);
+          // Legacy cache for backward compatibility
           this.contactStatsCache = stats;
           this.cacheTimestamp = Date.now();
 
@@ -137,7 +155,9 @@ class GorahaServicesBridge {
       const directStats = await this._fetchContactsViaDirectAPI();
       
       if (directStats) {
-        // Cache the results
+        // Phase 29: Cache in CacheManager
+        this.cache.set(cacheKey, directStats, 1800);
+        // Legacy cache for backward compatibility
         this.contactStatsCache = directStats;
         this.cacheTimestamp = Date.now();
         
@@ -148,9 +168,10 @@ class GorahaServicesBridge {
       }
 
       // Return cached data if available, with error message
-      if (this.contactStatsCache) {
+      const cachedError = this.cache.get(cacheKey);
+      if (cachedError) {
         return {
-          ...this.contactStatsCache,
+          ...cachedError,
           cached: true,
           error: `API Error: Unable to fetch fresh data. Showing cached data.`,
         };
@@ -168,9 +189,11 @@ class GorahaServicesBridge {
       this.logger.error(`Error fetching contact stats: ${error.message}`);
 
       // Return cached data if available, with error message
-      if (this.contactStatsCache) {
+      const cacheKey = 'goraha:contact-stats';
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
         return {
-          ...this.contactStatsCache,
+          ...cached,
           cached: true,
           error: `API Error: ${error.message}. Showing cached data.`,
         };
@@ -402,6 +425,19 @@ class GorahaServicesBridge {
         };
       }
 
+      // Phase 29: Check CacheManager cache with filter-specific key
+      const cacheKey = `goraha:filter:${filterString.toLowerCase()}`;
+      if (!forceRefresh) {
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+          this.logger.debug(`Filtered contacts retrieved from cache for: "${filterString}"`);
+          return {
+            ...cached,
+            cached: true,
+          };
+        }
+      }
+
       this.logger.debug(`Fetching contacts matching filter: "${filterString}"...`);
 
       if (this.googleContactsBridge) {
@@ -409,7 +445,7 @@ class GorahaServicesBridge {
           // Search for contacts matching the filter string
           const filteredContacts = await this.googleContactsBridge.searchContacts(filterString);
           
-          return {
+          const result = {
             contacts: filteredContacts || [],
             totalMatched: (filteredContacts || []).length,
             filterString: filterString,
@@ -417,6 +453,11 @@ class GorahaServicesBridge {
             fetchedAt: new Date().toISOString(),
             cached: false,
           };
+
+          // Phase 29: Cache in CacheManager (30 min TTL)
+          this.cache.set(cacheKey, result, 1800);
+
+          return result;
         } catch (bridgeError) {
           this.logger.warn(`GoogleContactsBridge filter search failed: ${bridgeError.message}`);
           // Fall through to direct API approach
@@ -427,7 +468,7 @@ class GorahaServicesBridge {
       this.logger.debug('Using direct Google People API for filtered search...');
       const filteredContacts = await this._searchContactsViaDirectAPI(filterString);
 
-      return {
+      const result = {
         contacts: filteredContacts || [],
         totalMatched: (filteredContacts || []).length,
         filterString: filterString,
@@ -435,6 +476,11 @@ class GorahaServicesBridge {
         fetchedAt: new Date().toISOString(),
         cached: false,
       };
+
+      // Phase 29: Cache in CacheManager
+      this.cache.set(cacheKey, result, 1800);
+
+      return result;
     } catch (error) {
       this.logger.error(`Error fetching filtered contacts: ${error.message}`);
 
@@ -472,6 +518,47 @@ class GorahaServicesBridge {
       this.logger.error(`Direct API search error: ${error.message}`);
       return [];
     }
+  }
+
+  /**
+   * Phase 29: Get cache statistics
+   * @returns {Object} - Cache stats with hits, misses, memory usage, etc.
+   */
+  getCacheStats() {
+    return this.cache.getStats();
+  }
+
+  /**
+   * Phase 29: Display cache statistics in terminal
+   */
+  displayCacheStats() {
+    this.cache.displayInfo();
+  }
+
+  /**
+   * Phase 29: Clear all cached data
+   */
+  clearCache() {
+    this.cache.clear();
+    this.logger.info('GorahaServicesBridge cache cleared');
+  }
+
+  /**
+   * Phase 29: Clear specific cache pattern
+   * @param {string} pattern - Cache key pattern (e.g., 'goraha:filter:*')
+   */
+  clearCacheByPattern(pattern) {
+    const keys = this.cache.keys(pattern);
+    keys.forEach(key => this.cache.delete(key));
+    this.logger.info(`Cleared ${keys.length} cache entries matching: ${pattern}`);
+  }
+
+  /**
+   * Phase 29: Shutdown the bridge (cleanup intervals)
+   */
+  shutdown() {
+    this.cache.stop();
+    this.logger.info('GorahaServicesBridge shut down');
   }
 }
 
