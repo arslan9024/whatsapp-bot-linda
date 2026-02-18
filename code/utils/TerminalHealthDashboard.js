@@ -268,15 +268,34 @@ class TerminalHealthDashboard {
 
     this.rl.on('line', async (input) => {
       const input_lower = input.trim().toLowerCase();
+      const input_original = input.trim();
       const parts = input_lower.split(/\s+/);
       const command = parts[0];
+
+      // Helper function to extract display name with quoted string support
+      const extractDisplayName = (originalInput, phoneNumber) => {
+        // Find the phone number in the original input
+        const phoneIndex = originalInput.indexOf(phoneNumber);
+        if (phoneIndex === -1) return '';
+        
+        // Get everything after the phone number
+        let afterPhone = originalInput.substring(phoneIndex + phoneNumber.length).trim();
+        
+        // Remove quotes if present
+        if ((afterPhone.startsWith('"') && afterPhone.endsWith('"')) ||
+            (afterPhone.startsWith("'") && afterPhone.endsWith("'"))) {
+          afterPhone = afterPhone.slice(1, -1);
+        }
+        
+        return afterPhone;
+      };
 
       switch (command) {
         // NEW: Link master account with health check (Phase 21 & enhanced Phase 25)
         case 'link':
           if (parts[1] === 'master') {
             const phoneNumber = parts[2]; // e.g., +971553633595
-            const displayName = parts.slice(3).join(' '); // e.g., SecondAccount
+            const displayName = extractDisplayName(input_original, phoneNumber); // e.g., Big Broker
             
             if (phoneNumber) {
               // NEW: Link new master account (Phase 25)
