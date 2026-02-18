@@ -15,6 +15,7 @@
 
 import { CreatingNewWhatsAppClient } from '../WhatsAppBot/CreatingNewWhatsAppClient.js';
 import { setupClientFlow } from '../WhatsAppBot/ClientFlowSetup.js';
+import { killBrowserProcesses, sleep } from './browserCleanup.js';
 
 export class ManualLinkingHandler {
   constructor({
@@ -142,6 +143,61 @@ export class ManualLinkingHandler {
   }
 
   /**
+   * Cleanup existing browser processes and clients before linking
+   */
+  async cleanupExistingConnections(phoneNumber) {
+    try {
+      this.logBot(`\n🧹 Cleaning up existing connections for ${phoneNumber}...`, "info");
+      
+      // Step 1: Close existing client if it exists
+      const existingClient = this.accountClients.get(phoneNumber);
+      if (existingClient && existingClient.pupPage) {
+        try {
+          this.logBot(`  - Closing existing WhatsApp client...`, "info");
+          await existingClient.destroy();
+          this.accountClients.delete(phoneNumber);
+          await sleep(1000); // Wait for process to fully die
+          this.logBot(`  ✅ Existing client closed`, "info");
+        } catch (e) {
+          this.logBot(`  ⚠️  Could not close client gracefully: ${e.message}`, "warn");
+        }
+      }
+      
+      // Step 2: Close connection manager if it exists
+      const connManager = this.connectionManagers.get(phoneNumber);
+      if (connManager) {
+        try {
+          this.logBot(`  - Closing connection manager...`, "info");
+          if (connManager.terminateConnection) {
+            await connManager.terminateConnection();
+          }
+          this.connectionManagers.delete(phoneNumber);
+          this.logBot(`  ✅ Connection manager closed`, "info");
+        } catch (e) {
+          this.logBot(`  ⚠️  Could not close connection manager: ${e.message}`, "warn");
+        }
+      }
+      
+      // Step 3: Kill all browser processes
+      try {
+        this.logBot(`  - Killing browser processes...`, "info");
+        await killBrowserProcesses();
+        await sleep(2000); // Give time for process termination
+        this.logBot(`  ✅ Browser processes killed`, "info");
+      } catch (e) {
+        this.logBot(`  ⚠️  Browser cleanup warning: ${e.message}`, "warn");
+      }
+      
+      this.logBot(`✅ Cleanup complete\n`, "success");
+      return true;
+      
+    } catch (error) {
+      this.logBot(`⚠️  Cleanup error: ${error.message}`, "warn");
+      return true; // Continue despite cleanup issues
+    }
+  }
+
+  /**
    * Initiate master account linking with full flow
    */
   async initiateMasterAccountLinking() {
@@ -179,8 +235,11 @@ export class ManualLinkingHandler {
       this.logBot(`Phone: ${masterConfig.phoneNumber}`, "info");
       this.logBot(`Role: ${masterConfig.role || 'primary'}`, "info");
 
-      // Step 3: Create WhatsApp client
-      this.logBot("\n📱 Creating WhatsApp client...", "info");
+      // Step 3: Cleanup existing connections
+      await this.cleanupExistingConnections(masterConfig.phoneNumber);
+
+      // Step 4: Create WhatsApp client
+      this.logBot("📱 Creating WhatsApp client...", "info");
       const client = await CreatingNewWhatsAppClient(masterConfig.id);
       
       if (!client) {
@@ -191,18 +250,18 @@ export class ManualLinkingHandler {
 
       this.logBot("✅ WhatsApp client created successfully", "success");
 
-      // Step 4: Register client
+      // Step 5: Register client
       this.accountClients.set(masterConfig.phoneNumber, client);
       this.sharedContext.accountClients.set(masterConfig.phoneNumber, client);
       
       // Update master reference
       this.sharedContext.setMasterRef(client);
 
-      // Step 5: Register health monitoring
+      // Step 6: Register health monitoring
       this.clientHealthMonitor.registerClient(masterConfig.phoneNumber, client);
       this.logBot("✅ Health monitoring registered", "success");
 
-      // Step 6: Add device tracking
+      // Step 7: Add device tracking
       if (this.deviceLinkedManager) {
         this.deviceLinkedManager.addDevice(masterConfig.phoneNumber, {
           name: masterConfig.displayName,
@@ -211,7 +270,7 @@ export class ManualLinkingHandler {
         this.terminalHealthDashboard.setMasterPhoneNumber(masterConfig.phoneNumber);
       }
 
-      // Step 7: Setup client flow (shows QR code and waits for scan)
+      // Step 8: Setup client flow (shows QR code and waits for scan)
       this.logBot("\n🎯 Starting device linking flow...", "info");
       this.logBot("📸 QR code will appear below - scan with WhatsApp on your phone", "info");
       this.logBot("⏱️  QR code expires in 15 seconds if not scanned", "info");

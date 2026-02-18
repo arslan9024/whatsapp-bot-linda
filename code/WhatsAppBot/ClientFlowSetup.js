@@ -27,10 +27,11 @@ import ConnectionManager from '../utils/ConnectionManager.js';
  * @property {object}    sharedContext         - DI context for ConnectionManager
  * @property {Function}  setupMessageListeners - (client, phone, connMgr) => void
  * @property {Function}  updateDeviceStatus    - (phone, data) => void
- * @property {object}    QRCodeDisplay         - QRCodeDisplay singleton
+ * @property {object}    enhancedQRCodeDisplayV2 - EnhancedQRCodeDisplayV2 singleton (Phase 26)
  * @property {Function}  createDeviceStatusFile - (phone) => void
  * @property {object|null} deviceLinkedManager - DeviceLinkedManager or null
  * @property {object|null} keepAliveManager    - SessionKeepAliveManager or null
+ * @property {object|null} terminalHealthDashboard - Dashboard for showing status (Phase 26)
  * @property {object|null} contactHandler      - ContactLookupHandler or null (ref container)
  * @property {Function|null} ContactLookupHandler - Constructor for lazy init
  * @property {Function}  setIsInitializing     - (bool) => void
@@ -58,10 +59,11 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     sharedContext,
     setupMessageListeners,
     updateDeviceStatus,
-    QRCodeDisplay,
+    enhancedQRCodeDisplayV2: QRCodeDisplay,
     createDeviceStatusFile,
     deviceLinkedManager,
     keepAliveManager,
+    terminalHealthDashboard,
     contactHandlerRef,     // { current: ContactLookupHandler|null }
     ContactLookupHandler,  // Constructor
     setIsInitializing,
@@ -181,6 +183,18 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
 
     setupMessageListeners(client, phoneNumber, connManager);
     setIsInitializing(false);
+
+    // Update dashboard when device is linked and ready
+    if (terminalHealthDashboard && deviceLinkedManager?.getDevice(phoneNumber)) {
+      logBot('', 'info');
+      logBot('═══════════════════════════════════════════════════════════', 'info');
+      logBot('✅ DEVICE SUCCESSFULLY LINKED AND ONLINE', 'success');
+      logBot('═══════════════════════════════════════════════════════════', 'info');
+      logBot('', 'info');
+      // Display updated dashboard showing new device status
+      terminalHealthDashboard.displayHealthDashboard();
+      logBot('', 'info');
+    }
   });
 
   // ───────────────────────── Auth Failure ────────────────────────────────

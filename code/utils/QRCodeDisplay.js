@@ -158,7 +158,7 @@ class QRCodeDisplay {
    */
   static async display(qrData, options = {}) {
     const {
-      method = 'auto',      // 'auto', 'qrcode-terminal', 'compact', 'ascii', 'simple'
+      method = 'ascii',      // 'auto', 'qrcode-terminal', 'compact', 'ascii', 'simple'
       fallback = true,      // Try fallback methods on failure
       masterAccount = ''
     } = options;

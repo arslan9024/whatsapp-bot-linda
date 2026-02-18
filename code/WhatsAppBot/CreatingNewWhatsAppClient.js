@@ -77,9 +77,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       dumpio: process.env.DEBUG_CHROME === 'true',  // Optional: Show Chrome stderr/stdout if DEBUG_CHROME=true
       args: [
         "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--single-process",  // Run Chrome in single process if not already isolated
-        "--disable-gpu",
+        "--disable-setuid-sandbox",        "--disable-gpu",
         "--disable-dev-shm-usage",  // Disable /dev/shm usage (critical for stability)
         "--disable-extensions",
         "--disable-plugins",
@@ -165,14 +163,14 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
         path: ".wwebjs_cache"
       },
       // FIX: Increased timeouts and page load patience for stability
-      qrTimeoutMs: 240000,  // 240 seconds (4 min) for QR scan - gives more time for WhatsApp Web load
-      connectionTimeoutMs: 120000,  // 120 seconds to establish connection (doubled)
+      qrTimeoutMs: 300000,  // 240 seconds (4 min) for QR scan - gives more time for WhatsApp Web load
+      connectionTimeoutMs: 180000,  // 120 seconds to establish connection (doubled)
       takeoverOnConflict: true,  // Take over if another instance detected
       bypassOnPrem: true,  // Bypass on-premise restrictions
       // NEW: Page load wait settings to prevent premature closure
-      waitForNavigation: { waitUntil: 'networkidle2', timeout: 60000 },  // Wait for network to be mostly idle
-      defaultNavigationTimeout: 60000,  // 60 second timeout for page navigation
-      defaultTimeout: 30000  // 30 second timeout for general operations
+      waitForNavigation: { waitUntil: 'networkidle0', timeout: 90000 },  // Wait for network to be mostly idle
+      defaultNavigationTimeout: 120000,  // 60 second timeout for page navigation
+      defaultTimeout: 60000  // 30 second timeout for general operations
     });
 
     // Add comprehensive error handlers to catch Puppeteer/Protocol errors

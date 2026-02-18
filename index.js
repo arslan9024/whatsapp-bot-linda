@@ -3,8 +3,6 @@ import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAp
 import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceStatus.js";
 import { fullCleanup, killBrowserProcesses, sleep } from "./code/utils/browserCleanup.js";
 import { SessionStateManager } from "./code/utils/SessionStateManager.js";
-import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
-import EnhancedQRCodeDisplay from "./code/utils/EnhancedQRCodeDisplay.js";  // Phase 14: Enhanced QR with terminal detection
 
 // PHASE 20: Secure Credential Management & Interactive Master Setup (February 18, 2026)
 // - GoogleServiceAccountManager: base64-encoded credentials in .env (no secrets in git)
@@ -183,7 +181,7 @@ const sharedContext = {
   accountConfigManager: null,
   setMasterRef: null,              // Set after Lion0 declaration
   deviceLinkedManager: null,
-  QRCodeDisplay: EnhancedQRCodeDisplay,  // Phase 14: Use enhanced version with terminal detection
+  QRCodeDisplay: EnhancedQRCodeDisplayV2,  // Phase 20: Latest professional QR with recovery
   updateDeviceStatus,              // Imported from deviceStatus.js
   accountHealthMonitor,
   clientHealthMonitor,             // NEW: Frame detachment & heartbeat monitor
@@ -228,10 +226,11 @@ function getFlowDeps() {
     sharedContext,
     setupMessageListeners,
     updateDeviceStatus,
-    QRCodeDisplay,
+    enhancedQRCodeDisplayV2,
     createDeviceStatusFile,
     deviceLinkedManager,
     keepAliveManager,
+    terminalHealthDashboard,
     contactHandlerRef,
     ContactLookupHandler,
     setIsInitializing: (val) => { isInitializing = val; },
