@@ -156,6 +156,109 @@ class GoogleServiceAccountManager {
   }
 
   /**
+   * Validate service account credentials with API access test
+   * Performs both structure validation AND attempts API call to verify access
+   * 
+   * @param {string} accountName - Account identifier (e.g., 'goraha', 'poweragent')
+   * @returns {Promise<Object>} - {structureValid: boolean, apiAccessValid: boolean, isActive: boolean, details: object}
+   */
+  async validateCredentialsWithAPITest(accountName) {
+    try {
+      const normalizedName = accountName.toLowerCase();
+      
+      // Step 1: Get and validate structure
+      const credentials = await this.getCredentials(normalizedName);
+      
+      if (!credentials) {
+        return {
+          structureValid: false,
+          apiAccessValid: false,
+          isActive: false,
+          details: {
+            error: 'Credentials not found',
+            email: null,
+            project: null,
+          },
+        };
+      }
+
+      const structureValid = this.validateCredentials(credentials, normalizedName);
+
+      if (!structureValid) {
+        return {
+          structureValid: false,
+          apiAccessValid: false,
+          isActive: false,
+          details: {
+            error: 'Credential structure validation failed',
+            email: credentials.client_email,
+            project: credentials.project_id,
+          },
+        };
+      }
+
+      // Step 2: Test API access with Google Sheets API (lightweight test)
+      try {
+        const { google } = await import('googleapis');
+        
+        const auth = new google.auth.GoogleAuth({
+          credentials: credentials,
+          scopes: [
+            'https://www.googleapis.com/auth/spreadsheets.readonly',
+            'https://www.googleapis.com/auth/contacts.readonly',
+          ],
+        });
+
+        const authClient = await auth.getClient();
+        
+        // Try to get auth token to verify credentials work
+        const token = await authClient.getAccessToken();
+        const apiAccessValid = token && token.token;
+
+        return {
+          structureValid: true,
+          apiAccessValid: !!apiAccessValid,
+          isActive: !!apiAccessValid,
+          details: {
+            email: credentials.client_email,
+            project: credentials.project_id,
+            type: credentials.type,
+            validationMessage: apiAccessValid 
+              ? 'All validations passed' 
+              : 'Failed to obtain access token',
+          },
+        };
+      } catch (apiError) {
+        this.logger.warn(`API access test failed for ${normalizedName}: ${apiError.message}`);
+        
+        return {
+          structureValid: true,
+          apiAccessValid: false,
+          isActive: false,
+          details: {
+            email: credentials.client_email,
+            project: credentials.project_id,
+            type: credentials.type,
+            validationMessage: `API access test failed: ${apiError.message}`,
+            error: apiError.message,
+          },
+        };
+      }
+    } catch (error) {
+      this.logger.error(`Error during comprehensive credential validation: ${error.message}`);
+      
+      return {
+        structureValid: false,
+        apiAccessValid: false,
+        isActive: false,
+        details: {
+          error: error.message,
+        },
+      };
+    }
+  }
+
+  /**
    * Get legacy file path for backward compatibility
    */
   getLegacyPath(accountName) {

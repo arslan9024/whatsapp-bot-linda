@@ -144,6 +144,70 @@ class TerminalHealthDashboard {
   }
 
   /**
+   * Display GorahaBot contact status information
+   * Called when user types 'goraha status' or 'goraha verify'
+   */
+  displayGorahaStatus(stats, validation) {
+    try {
+      const timestamp = new Date().toLocaleTimeString();
+      
+      // Section 1: Contact Statistics
+      console.log(`\n📊 GORAHA BOT - CONTACT STATISTICS`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
+      if (stats.error) {
+        console.log(`  ⚠️  ERROR: ${stats.error}`);
+        if (stats.lastFetched) {
+          console.log(`  Last Successful Fetch: ${new Date(stats.lastFetched).toLocaleString()}`);
+        }
+      } else {
+        console.log(`  Total Contacts:          ${stats.total || 0}`);
+        console.log(`  "D2 Security" Contacts:  ${stats.d2SecurityCount || 0}`);
+        const d2Percentage = stats.total > 0 ? Math.round((stats.d2SecurityCount / stats.total) * 100) : 0;
+        console.log(`  Percentage:              ${d2Percentage}%`);
+        console.log(`  Data Status:             ${stats.cached ? '📦 Cached' : '🔄 Fresh'}`);
+        console.log(`  Last Fetched:            ${new Date(stats.lastFetched).toLocaleString()}`);
+      }
+      console.log();
+
+      // Section 2: Account Status
+      console.log(`📱 GOOGLE SERVICE ACCOUNT STATUS`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
+      if (validation.error) {
+        console.log(`  ❌ Account Status: INVALID`);
+        console.log(`  Error: ${validation.error}`);
+      } else {
+        const accountStatusSymbol = validation.isActive ? '✅' : '❌';
+        const accountStatusText = validation.isActive ? 'ACTIVE & VALID' : 'INVALID / UNREACHABLE';
+        
+        console.log(`  Account Status:          ${accountStatusSymbol} ${accountStatusText}`);
+        console.log(`  Structure Valid:         ${validation.structureValid ? '✅ Yes' : '❌ No'}`);
+        console.log(`  API Access Valid:        ${validation.apiAccessValid ? '✅ Yes' : '❌ No'}`);
+      }
+      
+      if (validation.details && validation.details.email) {
+        console.log(`  Service Account Email:   ${validation.details.email}`);
+      }
+      if (validation.details && validation.details.project) {
+        console.log(`  Google Cloud Project:    ${validation.details.project}`);
+      }
+      
+      console.log(`  Last Checked:            ${timestamp}`);
+      console.log();
+
+      // Section 3: Next Steps
+      console.log(`💡 COMMANDS:`);
+      console.log(`  goraha status            → Refresh contact stats (uses cache if recent)`);
+      console.log(`  goraha verify            → Force full verification and recount`);
+      console.log();
+
+    } catch (error) {
+      console.log(`\n❌ Error displaying GorahaBot status: ${error.message}\n`);
+    }
+  }
+
+  /**
    * Prompt user to re-link an inactive account
    */
   async promptForReLink() {
@@ -249,6 +313,7 @@ class TerminalHealthDashboard {
       onSwitchTo6Digit,
       onShowDeviceDetails,
       onListDevices,
+      onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
     } = callbacks;
 
     console.log(`\n${'═'.repeat(60)}`);
@@ -625,6 +690,49 @@ class TerminalHealthDashboard {
           }
           break;
 
+        // NEW: GorahaBot status (Phase 26)
+        case 'goraha':
+          if (parts[1] === 'verify' || parts[1] === 'v') {
+            // Force verification
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║       📱 GORAHA BOT - VERIFICATION & STATUS CHECK           ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Verifying GorahaBot service account...\n`);
+            
+            if (onGorahaStatusRequested) {
+              try {
+                await onGorahaStatusRequested(true); // true = force refresh
+              } catch (error) {
+                console.log(`  ❌ Error during verification: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Goraha bridge not available\n`);
+            }
+          } else if (!parts[1] || parts[1] === 'status') {
+            // Display status (default command)
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║              📱 GORAHA BOT - CONTACT STATUS                ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Fetching GorahaBot contact stats...\n`);
+            
+            if (onGorahaStatusRequested) {
+              try {
+                await onGorahaStatusRequested(false); // false = use cache if available
+              } catch (error) {
+                console.log(`  ❌ Error fetching status: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Goraha bridge not available\n`);
+            }
+          } else {
+            console.log(`\n⚠️  Usage:`);
+            console.log(`  'goraha status'           → Display contact stats (on-demand, cached)`);
+            console.log(`  'goraha verify'           → Force verification and recount\n`);
+          }
+          break;
+
         case 'help':
           console.log(`\n📚 Available Commands:`);
           console.log(`\n  ACCOUNT MANAGEMENT:`);
@@ -635,6 +743,9 @@ class TerminalHealthDashboard {
           console.log(`    health <+phone>           → Show detailed health for specific account`);
           console.log(`    stats <+phone>            → Show metrics (uptime, messages, errors)`);
           console.log(`    recover <+phone>          → Attempt session restoration`);
+          console.log(`\n  GORAHA BOT:`);
+          console.log(`    goraha status (or 'goraha') → Display contact stats (on-demand, cached)`);
+          console.log(`    goraha verify             → Force verification and recount`);
           console.log(`\n  DEVICE MANAGEMENT:`);
           console.log(`    status / health           → Display full dashboard`);
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);

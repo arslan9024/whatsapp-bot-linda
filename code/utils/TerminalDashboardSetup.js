@@ -18,6 +18,8 @@
  * @param {Function}   opts.setupClientFlow
  * @param {Function}   opts.getFlowDeps
  * @param {object|null} opts.manualLinkingHandler - NEW: Manual linking with health checks (Phase 21)
+ * @param {object|null} opts.gorahaServicesBridge - NEW: GorahaBot contact stats (Phase 26)
+ * @param {object|null} opts.googleServiceAccountManager - NEW: Service account validation (Phase 26)
  */
 export function setupTerminalInputListener(opts) {
   const {
@@ -30,6 +32,8 @@ export function setupTerminalInputListener(opts) {
     getFlowDeps,
     manualLinkingHandler,  // NEW: Manual linking handler
     createClient,          // NEW: For fresh client creation on relink
+    gorahaServicesBridge,  // NEW: GorahaBot integration (Phase 26)
+    googleServiceAccountManager,  // NEW: Service account validation (Phase 26)
   } = opts;
 
   try {
@@ -387,6 +391,29 @@ export function setupTerminalInputListener(opts) {
 
       onListDevices: () => {
         terminalHealthDashboard.listAllDevices();
+      },
+
+      // NEW: GorahaBot status callback (Phase 26)
+      onGorahaStatusRequested: async (forceRefresh = false) => {
+        try {
+          if (!gorahaServicesBridge) {
+            logBot('❌ Goraha bridge not initialized', 'error');
+            console.log('\n❌ GorahaBot service is not available\n');
+            return;
+          }
+
+          // Fetch contact statistics
+          const contactStats = await gorahaServicesBridge.getContactStats(forceRefresh);
+
+          // Fetch account validation
+          const accountValidation = await gorahaServicesBridge.validateAccount();
+
+          // Display the results
+          terminalHealthDashboard.displayGorahaStatus(contactStats, accountValidation);
+        } catch (error) {
+          logBot(`Error fetching GorahaBot status: ${error.message}`, 'error');
+          console.log(`\n❌ Error fetching GorahaBot status: ${error.message}\n`);
+        }
       },
     };
 

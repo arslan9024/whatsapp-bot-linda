@@ -88,6 +88,10 @@ import CampaignCommandsDefault from "./code/Commands/CampaignCommands.js";
 // Includes pre-linking health check and graceful error handling
 import { ManualLinkingHandler } from "./code/utils/ManualLinkingHandler.js";
 
+// PHASE 26: GORAHA BOT INTEGRATION (February 19, 2026)
+// Contact statistics and Google service account validation
+import GorahaServicesBridge from "./code/utils/GorahaServicesBridge.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -118,6 +122,10 @@ let deviceLinkingDiagnostics = null;  // Intelligent error recovery & diagnostic
 // PHASE 21: Manual Linking Handler (February 18, 2026)
 // Disable auto-linking, require user command instead
 let manualLinkingHandler = null;  // Manual linking with health checks (NEW - Phase 21)
+
+// PHASE 26: GorahaBot Integration (February 19, 2026)
+// Contact statistics and Google service account validation
+let gorahaServicesBridge = null;  // GorahaBot contact stats + account validation (NEW - Phase 26)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -406,6 +414,24 @@ async function initializeBot() {
       googleServiceAccountManager.printSecuritySummary();
     }
 
+    // ============================================
+    // NEW: Initialize GorahaServicesBridge (Phase 26)
+    // ============================================
+    if (!gorahaServicesBridge) {
+      gorahaServicesBridge = new GorahaServicesBridge();
+      
+      // Initialize with GoogleServiceAccountManager only
+      // (GoogleContactsBridge has dependency issues, so we'll use direct API access)
+      const bridgeInitialized = await gorahaServicesBridge.initialize(googleServiceAccountManager, null);
+      
+      if (bridgeInitialized) {
+        logBot("✅ GorahaServicesBridge initialized (contact stats + account validation)", "success");
+        services.register('gorahaServicesBridge', gorahaServicesBridge);
+      } else {
+        logBot("⚠️  GorahaServicesBridge initialization failed - Goraha commands may not work", "warn");
+      }
+    }
+
     if (!protocolErrorRecoveryManager) {
       protocolErrorRecoveryManager = new ProtocolErrorRecoveryManager(logBot);
       logBot("✅ ProtocolErrorRecoveryManager initialized", "success");
@@ -665,6 +691,8 @@ async function initializeBot() {
       getFlowDeps,
       manualLinkingHandler,  // NEW: Support manual linking command
       createClient: CreatingNewWhatsAppClient,  // NEW: For fresh client creation on relink
+      gorahaServicesBridge,  // NEW: GorahaBot contact stats (Phase 26)
+      googleServiceAccountManager,  // NEW: For service account validation (Phase 26)
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");

@@ -18,6 +18,25 @@
       "status": "pending",
       "createdAt": "2026-02-11",
       "lastSync": null
+    },
+    "bigbroker": {
+      "id": "master_1771448396526",
+      "phoneNumber": "+971553633595",
+      "displayName": "\"big broker\"",
+      "description": "Master Account - \"big broker\"",
+      "role": "primary",
+      "sessionPath": "sessions/session-971553633595",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-02-18",
+      "lastSync": null
     }
   },
   "default": "arslan-malik",
