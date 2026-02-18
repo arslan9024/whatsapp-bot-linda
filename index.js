@@ -6,6 +6,16 @@ import sessionStateManager from "./code/utils/SessionStateManager.js";
 import QRCodeDisplay from "./code/utils/QRCodeDisplay.js";
 import EnhancedQRCodeDisplay from "./code/utils/EnhancedQRCodeDisplay.js";  // Phase 14: Enhanced QR with terminal detection
 
+// PHASE 20: Secure Credential Management & Interactive Master Setup (February 18, 2026)
+// - GoogleServiceAccountManager: base64-encoded credentials in .env (no secrets in git)
+// - InteractiveMasterAccountSelector: user-friendly account selection with QR guidance
+// - EnhancedQRCodeDisplayV2: professional QR rendering with timeouts and recovery
+// - ProtocolErrorRecoveryManager: intelligent recovery from Puppeteer/WhatsApp-web.js errors
+import GoogleServiceAccountManager from "./code/utils/GoogleServiceAccountManager.js";
+import InteractiveMasterAccountSelector from "./code/utils/InteractiveMasterAccountSelector.js";
+import EnhancedQRCodeDisplayV2 from "./code/utils/EnhancedQRCodeDisplayV2.js";
+import ProtocolErrorRecoveryManager from "./code/utils/ProtocolErrorRecoveryManager.js";
+
 // PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
 // Multi-account orchestration, device recovery, health monitoring, keep-alive system
 import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.js";
@@ -85,6 +95,12 @@ let deviceLinkedManager = null;  // NEW: Device linking tracker
 let accountConfigManager = null;  // NEW: Dynamic account configuration manager
 let dynamicAccountManager = null;  // NEW: Runtime account manager (add/remove accounts)
 let commandHandler = null;  // NEW: Linda AI Command Handler
+
+// PHASE 20: Secure Credential & Interactive Setup Managers (February 18, 2026)
+let googleServiceAccountManager = null;  // Secure, base64-encoded credential management
+let interactiveMasterAccountSelector = null;  // User-friendly master account selection
+let enhancedQRCodeDisplayV2 = null;  // Professional QR code rendering with recovery
+let protocolErrorRecoveryManager = null;  // Intelligent error recovery from browser/protocol errors
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -339,6 +355,38 @@ async function initializeBot() {
       const p17Initialized = await phase17Orchestrator.initialize();
       logBot(p17Initialized ? "✅ Phase 17: Conversation Handling initialized" : "⚠️ Phase 17: Degraded mode (using fallback cache)", "success");
       services.register('phase17', phase17Orchestrator);
+    }
+
+    // ============================================
+    // STEP 1F: Initialize Phase 20 Managers (Feb 18, 2026)
+    // ============================================
+    // Secure credential management, interactive master setup, enhanced QR display, error recovery
+    
+    if (!googleServiceAccountManager) {
+      googleServiceAccountManager = new GoogleServiceAccountManager();
+      logBot("✅ GoogleServiceAccountManager initialized", "success");
+      services.register('googleServiceAccountManager', googleServiceAccountManager);
+      
+      // Print available Google service accounts
+      googleServiceAccountManager.printSecuritySummary();
+    }
+
+    if (!protocolErrorRecoveryManager) {
+      protocolErrorRecoveryManager = new ProtocolErrorRecoveryManager(logBot);
+      logBot("✅ ProtocolErrorRecoveryManager initialized", "success");
+      services.register('protocolErrorRecoveryManager', protocolErrorRecoveryManager);
+    }
+
+    if (!enhancedQRCodeDisplayV2) {
+      enhancedQRCodeDisplayV2 = new EnhancedQRCodeDisplayV2();
+      logBot("✅ EnhancedQRCodeDisplayV2 initialized", "success");
+      services.register('enhancedQRCodeDisplayV2', enhancedQRCodeDisplayV2);
+    }
+
+    if (!interactiveMasterAccountSelector) {
+      interactiveMasterAccountSelector = new InteractiveMasterAccountSelector();
+      logBot("✅ InteractiveMasterAccountSelector initialized", "success");
+      services.register('interactiveMasterAccountSelector', interactiveMasterAccountSelector);
     }
 
     // ============================================
