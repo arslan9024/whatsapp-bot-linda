@@ -103,6 +103,13 @@ import AutoSessionRestoreManager from "./code/utils/AutoSessionRestoreManager.js
 import AutoAccountRelinkingManager from "./code/utils/AutoAccountRelinkingManager.js";
 import AccountConnectionMonitor from "./code/utils/AccountConnectionMonitor.js";
 
+// PHASE 29d: ADVANCED RECOVERY STRATEGIES (February 19, 2026)
+// Auto-reconnect on drops, circuit breaker, graceful degradation
+// Prevents cascading failures and maintains partial service
+import AutoReconnectManager from "./code/utils/AutoReconnectManager.js";
+import CircuitBreakerManager from "./code/utils/CircuitBreakerManager.js";
+import GracefulDegradationManager from "./code/utils/GracefulDegradationManager.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -146,6 +153,12 @@ let autoSessionRestoreManager = null;  // Auto-restore manager (NEW - Phase 27)
 // Auto-relink all accounts and monitor real-time connection status
 let autoAccountRelinkingManager = null;  // Auto-relinking manager (NEW - Phase 29c)
 let accountConnectionMonitor = null;  // Real-time connection monitor (NEW - Phase 29c)
+
+// PHASE 29d: Advanced Recovery Strategies (February 19, 2026)
+// Auto-reconnect on drops, circuit breaker, graceful degradation
+let autoReconnectManager = null;  // Auto-reconnect manager (NEW - Phase 29d)
+let circuitBreakerManager = null;  // Circuit breaker manager (NEW - Phase 29d)
+let gracefulDegradationManager = null;  // Graceful degradation manager (NEW - Phase 29d)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -624,6 +637,45 @@ async function initializeBot() {
       
       logBot("✅ Phase 29c: Connection Monitor initialized (30s health checks)", "success");
       services.register('accountConnectionMonitor', accountConnectionMonitor);
+    }
+
+    // ============================================
+    // STEP 4C: Phase 29d - Advanced Recovery Strategies (NEW)
+    // ============================================
+    if (!autoReconnectManager) {
+      autoReconnectManager = new AutoReconnectManager({
+        accountConnectionMonitor,
+        autoAccountRelinkingManager,
+        terminalDashboard,
+        maxReconnectAttempts: 5,
+        initialBackoffMs: 2000,
+        monitoringIntervalMs: 5000
+      });
+      
+      await autoReconnectManager.initialize();
+      logBot("✅ Phase 29d: Auto-Reconnect Manager initialized", "success");
+      services.register('autoReconnectManager', autoReconnectManager);
+    }
+
+    if (!circuitBreakerManager) {
+      circuitBreakerManager = new CircuitBreakerManager({
+        failureThreshold: 5,
+        resetTimeoutMs: 30000,
+        terminalDashboard
+      });
+      
+      logBot("✅ Phase 29d: Circuit Breaker Manager initialized", "success");
+      services.register('circuitBreakerManager', circuitBreakerManager);
+    }
+
+    if (!gracefulDegradationManager) {
+      gracefulDegradationManager = new GracefulDegradationManager({
+        accountConnectionMonitor,
+        terminalDashboard
+      });
+      
+      logBot("✅ Phase 29d: Graceful Degradation Manager initialized", "success");
+      services.register('gracefulDegradationManager', gracefulDegradationManager);
     }
 
     logBot("", "info");

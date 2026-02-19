@@ -516,6 +516,82 @@ export function setupTerminalInputListener(opts) {
         console.log(`   • Updates dashboard with current status\n`);
         console.log(`${'-'.repeat(70)}\n`);
       },
+
+      // NEW: Phase 29d - Auto-reconnection system info
+      onAutoReconnectInfo: async () => {
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`🔄 PHASE 29d: AUTO-RECONNECTION SYSTEM`);
+        console.log(`${'='.repeat(70)}\n`);
+        
+        console.log(`✅ Auto-Reconnection Features:`);
+        console.log(`   • Automatic detection of connection drops`);
+        console.log(`   • Exponential backoff retry logic`);
+        console.log(`   • Max 5 attempts with increasing delays`);
+        console.log(`   • Real-time status updates to dashboard\n`);
+        
+        console.log(`📊 Monitoring Details:`);
+        console.log(`   • Check interval: 5 seconds`);
+        console.log(`   • Initial backoff: 2 seconds`);
+        console.log(`   • Max backoff: 60 seconds`);
+        console.log(`   • Integration with circuit breaker & degradation\n`);
+        
+        console.log(`💡 How It Works:`);
+        console.log(`   1. Monitor detects account went offline`);
+        console.log(`   2. Auto-reconnect initiates retry`);
+        console.log(`   3. Circuit breaker prevents hammering`);
+        console.log(`   4. Graceful degradation routes to fallback\n`);
+        console.log(`${'-'.repeat(70)}\n`);
+      },
+
+      // NEW: Phase 29d - Circuit breaker status
+      onCircuitStatus: async () => {
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`🔌 PHASE 29d: CIRCUIT BREAKER STATUS`);
+        console.log(`${'='.repeat(70)}\n`);
+        
+        console.log(`✅ Circuit Breaker Pattern:`);
+        console.log(`   • CLOSED: Normal operation (requests pass through)`);
+        console.log(`   • OPEN: Too many failures (requests rejected)`);
+        console.log(`   • HALF-OPEN: Testing recovery (limited requests)\n`);
+        
+        console.log(`📈 Configuration:`);
+        console.log(`   • Failure threshold: 5 consecutive failures`);
+        console.log(`   • Reset timeout: 30 seconds`);
+        console.log(`   • Prevents cascading failures\n`);
+        
+        console.log(`🎯 Benefits:`);
+        console.log(`   • Stops hammering broken endpoints`);
+        console.log(`   • Allows time for recovery`);
+        console.log(`   • Automatically tests recovery`);
+        console.log(`   • Manual reset available\n`);
+        console.log(`${'-'.repeat(70)}\n`);
+      },
+
+      // NEW: Phase 29d - Graceful degradation status
+      onDegradationStatus: async () => {
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`📉 PHASE 29d: GRACEFUL DEGRADATION STATUS`);
+        console.log(`${'='.repeat(70)}\n`);
+        
+        console.log(`✅ Graceful Degradation Features:`);
+        console.log(`   • Continue with partial account availability`);
+        console.log(`   • Smart fallback routing to available accounts`);
+        console.log(`   • Master account priority in fallback chain`);
+        console.log(`   • Automatic recovery tracking\n`);
+        
+        console.log(`📊 System Status:`);
+        console.log(`   • Total degradation events tracked`);
+        console.log(`   • Current degraded account count`);
+        console.log(`   • Recovery success rate`);
+        console.log(`   • Messages routed to fallback\n`);
+        
+        console.log(`🎯 How It Works:`);
+        console.log(`   1. Accounts marked as available/unavailable`);
+        console.log(`   2. Messages route to best available account`);
+        console.log(`   3. Master account used as primary fallback`);
+        console.log(`   4. System continues operating (degraded mode)\n`);
+        console.log(`${'-'.repeat(70)}\n`);
+      },
     };
 
     terminalHealthDashboard.startInteractiveMonitoring(callbacks);
