@@ -97,6 +97,12 @@ import GorahaServicesBridge from "./code/utils/GorahaServicesBridge.js";
 // Prevents need for manual re-linking after every server restart
 import AutoSessionRestoreManager from "./code/utils/AutoSessionRestoreManager.js";
 
+// PHASE 29c: AUTO-RELINKING & CONNECTION MONITORING (February 19, 2026)
+// Auto-restore and relink all accounts on server restart, with real-time health monitoring
+// Tracks online/offline status and provides dashboard updates
+import AutoAccountRelinkingManager from "./code/utils/AutoAccountRelinkingManager.js";
+import AccountConnectionMonitor from "./code/utils/AccountConnectionMonitor.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -135,6 +141,11 @@ let gorahaServicesBridge = null;  // GorahaBot contact stats + account validatio
 // PHASE 27: Auto-Session Restore Manager (February 19, 2026)
 // Automatically restores WhatsApp sessions on server restart
 let autoSessionRestoreManager = null;  // Auto-restore manager (NEW - Phase 27)
+
+// PHASE 29c: Auto-Relinking & Connection Monitoring (February 19, 2026)
+// Auto-relink all accounts and monitor real-time connection status
+let autoAccountRelinkingManager = null;  // Auto-relinking manager (NEW - Phase 29c)
+let accountConnectionMonitor = null;  // Real-time connection monitor (NEW - Phase 29c)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -588,6 +599,34 @@ async function initializeBot() {
       services.register('autoSessionRestoreManager', autoSessionRestoreManager);
     }
 
+    // ============================================
+    // STEP 4B: Phase 29c - Auto-Relinking & Connection Monitoring (NEW)
+    // ============================================
+    if (!autoAccountRelinkingManager) {
+      autoAccountRelinkingManager = new AutoAccountRelinkingManager({
+        unifiedAccountManager: null, // Will be set if UnifiedAccountManager is available
+        terminalDashboard,
+        sessionsDir: './sessions',
+        maxRetries: 3,
+        retryDelayMs: 3000
+      });
+      
+      logBot("✅ Phase 29c: Auto-Relinking Manager initialized", "success");
+      services.register('autoAccountRelinkingManager', autoAccountRelinkingManager);
+    }
+
+    if (!accountConnectionMonitor) {
+      accountConnectionMonitor = new AccountConnectionMonitor({
+        unifiedAccountManager: null, // Will be set if UnifiedAccountManager is available
+        terminalDashboard,
+        healthCheckInterval: 30000  // Health check every 30 seconds
+      });
+      
+      logBot("✅ Phase 29c: Connection Monitor initialized (30s health checks)", "success");
+      services.register('accountConnectionMonitor', accountConnectionMonitor);
+    }
+
+    logBot("", "info");
     logBot("⏳ Waiting for user command to initiate linking...", "info");
     logBot("", "info");
     

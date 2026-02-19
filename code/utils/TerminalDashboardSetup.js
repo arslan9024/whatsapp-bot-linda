@@ -469,6 +469,53 @@ export function setupTerminalInputListener(opts) {
           console.log(`  ❌ Error scanning sessions: ${error.message}\n`);
         }
       },
+
+      // NEW: Phase 29c - Auto-relinking command callback
+      onAutoRelink: async () => {
+        // This callback is invoked when user requests auto-relinking
+        // The actual relinking is triggered from index.js after initialization
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`🔗 PHASE 29c: AUTO-RELINKING SCHEDULER`);
+        console.log(`${'='.repeat(70)}\n`);
+        
+        console.log(`ℹ️  Auto-relinking happens automatically on server restart:`);
+        console.log(`   • Command: node index.js`);
+        console.log(`   • All previously linked accounts are restored\n`);
+        
+        console.log(`📊 To manually trigger relinking:`);
+        console.log(`   • relink <+phone>        → Relink specific account`);
+        console.log(`   • relink-all             → Force relink all accounts\n`);
+        
+        console.log(`📈 To check account status:`);
+        console.log(`   • health                 → View health report`);
+        console.log(`   • account-status         → Detailed account status\n`);
+        console.log(`${'-'.repeat(70)}\n`);
+      },
+
+      // NEW: Phase 29c - Health monitoring dashboard
+      onHealthMonitoring: async () => {
+        // This callback shows Phase 29c health monitoring information
+        console.log(`\n${'='.repeat(70)}`);
+        console.log(`📊 PHASE 29c: REAL-TIME CONNECTION MONITORING`);
+        console.log(`${'='.repeat(70)}\n`);
+        
+        console.log(`✅ Connection Monitor Features:`);
+        console.log(`   • Real-time online/offline status tracking`);
+        console.log(`   • Health checks every 30 seconds`);
+        console.log(`   • Automatic dashboard status updates`);
+        console.log(`   • Error recovery and diagnostics\n`);
+        
+        console.log(`📈 Monitor commands:`);
+        console.log(`   • health                 → Full health dashboard`);
+        console.log(`   • account-status <+phone> → Status for specific account`);
+        console.log(`   • accounts               → List all accounts & status\n`);
+        
+        console.log(`🔄 Auto-recovery:`);
+        console.log(`   • Monitors connection drops`);
+        console.log(`   • Attempts automatic reconnection`);
+        console.log(`   • Updates dashboard with current status\n`);
+        console.log(`${'-'.repeat(70)}\n`);
+      },
     };
 
     terminalHealthDashboard.startInteractiveMonitoring(callbacks);
