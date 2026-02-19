@@ -448,6 +448,69 @@ class AnalyticsManager {
   }
 
   /**
+   * Record a message event (convenience method for message tracking)
+   */
+  recordMessage(phoneNumber, data = {}) {
+    this.recordMetric('message.sent', {
+      phoneNumber,
+      ...data
+    });
+    
+    if (data.fromMe) {
+      this.counters.messagesSent++;
+    } else {
+      this.counters.messagesReceived++;
+    }
+    this.counters.lastMessageTime = new Date();
+  }
+
+  /**
+   * Record an error event (convenience method for error tracking)
+   */
+  recordError(phoneNumber, data = {}) {
+    this.recordMetric('error.event', {
+      phoneNumber,
+      ...data
+    });
+    
+    this.counters.errorCount++;
+    this.counters.lastErrorTime = new Date();
+  }
+
+  /**
+   * Record a status change event (convenience method for status tracking)
+   */
+  recordStatusChange(phoneNumber, data = {}) {
+    this.recordMetric('system.status', {
+      phoneNumber,
+      ...data
+    });
+    
+    // Update account online status
+    if (data.status === 'online') {
+      this.metrics.system.accountsOnline++;
+    } else if (data.status === 'offline') {
+      this.metrics.system.accountsOffline++;
+    }
+  }
+
+  /**
+   * Get account-specific metrics
+   */
+  getAccountMetrics(phoneNumber) {
+    return {
+      phoneNumber,
+      messageCount: this.counters.messagesSent,
+      errorCount: this.counters.errorCount,
+      successRate: this.counters.messagesSent > 0
+        ? ((this.counters.messagesSent - this.counters.errorCount) / this.counters.messagesSent * 100).toFixed(2) + '%'
+        : '0%',
+      uptime: this.getFormattedUptime(),
+      lastActivity: this.counters.lastMessageTime
+    };
+  }
+
+  /**
    * Reset metrics
    */
   reset() {

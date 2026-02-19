@@ -31,6 +31,10 @@ import services from '../utils/ServiceRegistry.js';
  * @property {object|null}    gorahaRef                - { current: GorahaService|null }
  * @property {Map}            accountClients           - phone → client
  * @property {Function}       getAllConnectionDiagnostics - () => Array
+ * @property {object|null}    analyticsManager         - AnalyticsManager for metrics (Phase 29e)
+ * @property {object|null}    uptimeTracker            - UptimeTracker for SLA (Phase 29e)
+ * @property {object|null}    reportGenerator          - ReportGenerator for exports (Phase 29e)
+ * @property {object|null}    metricsDashboard         - MetricsDashboard for display (Phase 29e)
  */
 
 /**
@@ -56,6 +60,10 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     gorahaRef,
     accountClients,
     getAllConnectionDiagnostics,
+    analyticsManager,               // NEW: Phase 29e - Metrics collection
+    uptimeTracker,                  // NEW: Phase 29e - Uptime tracking
+    reportGenerator,                // NEW: Phase 29e - Report generation
+    metricsDashboard,               // NEW: Phase 29e - Metrics display
   } = deps;
 
   // ═══ LISTENER CLEANUP (Phase 10) ═══
@@ -119,6 +127,16 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
     // Keep-alive activity
     if (keepAliveManager) keepAliveManager.updateLastActivity(phoneNumber);
+
+    // NEW: Record message metric (Phase 29e)
+    if (analyticsManager) {
+      analyticsManager.recordMessage(phoneNumber, {
+        type: msg.type,
+        fromMe: msg.fromMe,
+        isGroup: msg.isGroupMsg,
+        timestamp: new Date(),
+      });
+    }
 
     logBot(`📨 [${timestamp}] (${phoneNumber}) ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? '...' : ''}`, 'info');
 
@@ -214,6 +232,15 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       }
     } catch (error) {
       logBot(`Error processing message: ${error.message}`, 'error');
+      
+      // NEW: Record error metric (Phase 29e)
+      if (analyticsManager) {
+        analyticsManager.recordError(phoneNumber, {
+          type: 'message_processing',
+          message: error.message,
+          timestamp: new Date(),
+        });
+      }
       
       // NEW: Detect and report frame detachment errors to health monitor
       if (clientHealthMonitor && error.message.includes('detached')) {

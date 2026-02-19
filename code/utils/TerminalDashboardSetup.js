@@ -20,6 +20,8 @@
  * @param {object|null} opts.manualLinkingHandler - NEW: Manual linking with health checks (Phase 21)
  * @param {object|null} opts.gorahaServicesBridge - NEW: GorahaBot contact stats (Phase 26)
  * @param {object|null} opts.googleServiceAccountManager - NEW: Service account validation (Phase 26)
+ * @param {object|null} opts.analyticsManager - NEW: Analytics metrics (Phase 29e)
+ * @param {object|null} opts.reportGenerator - NEW: Report generation (Phase 29e)
  */
 export function setupTerminalInputListener(opts) {
   const {
@@ -34,6 +36,8 @@ export function setupTerminalInputListener(opts) {
     createClient,          // NEW: For fresh client creation on relink
     gorahaServicesBridge,  // NEW: GorahaBot integration (Phase 26)
     googleServiceAccountManager,  // NEW: Service account validation (Phase 26)
+    analyticsManager,      // NEW: Analytics metrics (Phase 29e)
+    reportGenerator,       // NEW: Report generation (Phase 29e)
   } = opts;
 
   try {
@@ -591,6 +595,56 @@ export function setupTerminalInputListener(opts) {
         console.log(`   3. Master account used as primary fallback`);
         console.log(`   4. System continues operating (degraded mode)\n`);
         console.log(`${'-'.repeat(70)}\n`);
+      },
+
+      // NEW: Phase 29e - Analytics reporting callback
+      onAnalyticsReportRequested: async (reportType = 'realtime', phoneNumber = null) => {
+        try {
+          if (!analyticsManager) {
+            logBot('❌ Analytics manager not initialized', 'error');
+            console.log('\n❌ Analytics service is not available\n');
+            return;
+          }
+
+          console.clear();
+
+          switch (reportType) {
+            case 'realtime':
+              // Display real-time metrics dashboard
+              const metrics = analyticsManager.getSummary();
+              terminalHealthDashboard.displayAnalyticsMetrics(metrics);
+              break;
+
+            case 'report':
+              // Generate full analytics report
+              console.log(`\n📊 GENERATING FULL ANALYTICS REPORT...\n`);
+              const fullReport = reportGenerator.generateFullReport();
+              console.log(fullReport);
+              break;
+
+            case 'uptime':
+              // Show uptime metrics for all accounts
+              const uptimeMetrics = analyticsManager.getSummary();
+              terminalHealthDashboard.displayUptimeMetrics(uptimeMetrics);
+              break;
+
+            case 'account':
+              // Account-specific analytics
+              if (phoneNumber) {
+                const accountMetrics = analyticsManager.getAccountMetrics(phoneNumber);
+                terminalHealthDashboard.displayAccountAnalytics(phoneNumber, accountMetrics);
+              } else {
+                console.log(`\n⚠️  Phone number required for account analytics\n`);
+              }
+              break;
+
+            default:
+              console.log(`\n⚠️  Unknown report type: ${reportType}\n`);
+          }
+        } catch (error) {
+          logBot(`Error generating analytics report: ${error.message}`, 'error');
+          console.log(`\n❌ Error generating analytics report: ${error.message}\n`);
+        }
       },
     };
 

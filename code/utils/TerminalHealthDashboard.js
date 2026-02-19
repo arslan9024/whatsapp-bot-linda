@@ -382,6 +382,7 @@ class TerminalHealthDashboard {
       onRestoreAllSessions,  // NEW: Restore all previous sessions (Phase 28)
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
       onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
+      onAnalyticsReportRequested,  // NEW: Analytics reporting (Phase 29e)
     } = callbacks;
 
     console.log(`\n${'═'.repeat(60)}`);
@@ -873,6 +874,81 @@ class TerminalHealthDashboard {
           }
           break;
 
+        // NEW: Analytics commands (Phase 29e)
+        case 'analytics':
+        case 'metrics':
+          if (parts[1] === 'report') {
+            // Generate full analytics report
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║           📊 FULL ANALYTICS REPORT - PHASE 29e              ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Generating full analytics report...\n`);
+            
+            if (onAnalyticsReportRequested) {
+              try {
+                await onAnalyticsReportRequested('full');
+              } catch (error) {
+                console.log(`  ❌ Error generating report: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Analytics engine not available\n`);
+            }
+          } else if (parts[1] === 'uptime') {
+            // Show uptime metrics for all accounts
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║        ⏱️  UPTIME METRICS - ALL ACCOUNTS (Phase 29e)         ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Loading uptime metrics...\n`);
+            
+            if (onAnalyticsReportRequested) {
+              try {
+                await onAnalyticsReportRequested('uptime');
+              } catch (error) {
+                console.log(`  ❌ Error fetching uptime metrics: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Analytics engine not available\n`);
+            }
+          } else if (parts[1] === 'account' && parts[2]) {
+            // Account-specific analytics
+            const phoneNumber = parts[2];
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║        📈 ACCOUNT ANALYTICS - ${phoneNumber}                   ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Loading account analytics...\n`);
+            
+            if (onAnalyticsReportRequested) {
+              try {
+                await onAnalyticsReportRequested('account', phoneNumber);
+              } catch (error) {
+                console.log(`  ❌ Error fetching account analytics: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Analytics engine not available\n`);
+            }
+          } else {
+            // Show real-time metrics dashboard
+            console.clear();
+            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+            console.log(`║         📊 REAL-TIME METRICS DASHBOARD - Phase 29e          ║`);
+            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+            console.log(`⏳ Loading real-time metrics...\n`);
+            
+            if (onAnalyticsReportRequested) {
+              try {
+                await onAnalyticsReportRequested('realtime');
+              } catch (error) {
+                console.log(`  ❌ Error loading metrics: ${error.message}\n`);
+              }
+            } else {
+              console.log(`  ⚠️  Analytics engine not available\n`);
+            }
+          }
+          break;
+
         case 'help':
           console.log(`\n📚 Available Commands:`);
           console.log(`\n  ACCOUNT MANAGEMENT:`);
@@ -889,6 +965,11 @@ class TerminalHealthDashboard {
           console.log(`    goraha verify                → Force verification and recount`);
           console.log(`    goraha contacts (count)      → Show total contacts count`);
           console.log(`    goraha filter <string>       → Search contacts by name`);
+          console.log(`\n  ANALYTICS (Phase 29e):`);
+          console.log(`    analytics or metrics      → Show real-time metrics dashboard`);
+          console.log(`    analytics report          → Generate full analytics report`);
+          console.log(`    analytics uptime          → Show uptime metrics for all accounts`);
+          console.log(`    analytics account <phone> → Show account-specific analytics`);
           console.log(`\n  DEVICE MANAGEMENT:`);
           console.log(`    status / health           → Display full dashboard`);
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);
@@ -1071,6 +1152,145 @@ class TerminalHealthDashboard {
     if (healthScore >= 50) return '🟡 FAIR';
     if (healthScore >= 20) return '🟠 POOR';
     return '🔴 CRITICAL';
+  }
+
+  /**
+   * Display real-time metrics dashboard (Phase 29e)
+   */
+  displayAnalyticsMetrics(metrics) {
+    try {
+      console.clear();
+      console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+      console.log(`║         📊 REAL-TIME METRICS DASHBOARD - PHASE 29e          ║`);
+      console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+
+      if (!metrics) {
+        console.log(`  ⚠️  No metrics available\n`);
+        return;
+      }
+
+      // Overall metrics
+      console.log(`📈 OVERALL METRICS`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Total Messages Sent:     ${metrics.totalMessages || 0}`);
+      console.log(`  Total Errors:            ${metrics.totalErrors || 0}`);
+      console.log(`  System Uptime:           ${metrics.systemUptime || '--'}`);
+      console.log(`  Active Accounts:         ${metrics.activeAccounts || 0}`);
+      console.log();
+
+      // Per-account metrics
+      if (metrics.accountMetrics && Object.keys(metrics.accountMetrics).length > 0) {
+        console.log(`📱 PER-ACCOUNT METRICS`);
+        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        
+        Object.entries(metrics.accountMetrics).forEach(([phone, data]) => {
+          console.log(`  ${phone}:`);
+          console.log(`    Messages:             ${data.messageCount || 0}`);
+          console.log(`    Errors:               ${data.errorCount || 0}`);
+          console.log(`    Success Rate:         ${data.successRate?.toFixed(2) || '--'}%`);
+          console.log(`    Uptime:               ${data.uptime || '--'}`);
+        });
+        console.log();
+      }
+
+      console.log(`💡 Commands:`);
+      console.log(`  • 'analytics report'           → Generate full report`);
+      console.log(`  • 'analytics uptime'           → Show uptime metrics`);
+      console.log(`  • 'analytics account <phone>'  → Account-specific metrics\n`);
+    } catch (error) {
+      console.log(`\n❌ Error displaying metrics: ${error.message}\n`);
+    }
+  }
+
+  /**
+   * Display uptime metrics (Phase 29e)
+   */
+  displayUptimeMetrics(metrics) {
+    try {
+      console.clear();
+      console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+      console.log(`║         ⏱️  UPTIME METRICS - ALL ACCOUNTS (Phase 29e)        ║`);
+      console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+
+      if (!metrics || !metrics.accountMetrics) {
+        console.log(`  ⚠️  No uptime data available\n`);
+        return;
+      }
+
+      console.log(`📊 ACCOUNT UPTIME SUMMARY`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Total Accounts:          ${Object.keys(metrics.accountMetrics).length}`);
+      console.log();
+
+      Object.entries(metrics.accountMetrics).forEach(([phone, data]) => {
+        const uptime = data.uptime || '--';
+        const uptimePercent = data.uptimePercentage?.toFixed(2) || '--';
+        const statusSymbol = data.isOnline ? '🟢' : '🔴';
+        
+        console.log(`  ${statusSymbol} ${phone}`);
+        console.log(`     Uptime:               ${uptime}`);
+        console.log(`     SLA Compliance:       ${uptimePercent}%`);
+        console.log(`     Last Check:           ${data.lastCheck ? new Date(data.lastCheck).toLocaleTimeString() : '--'}`);
+      });
+      console.log();
+
+      console.log(`💡 SLA Target: 99.9% availability\n`);
+    } catch (error) {
+      console.log(`\n❌ Error displaying uptime metrics: ${error.message}\n`);
+    }
+  }
+
+  /**
+   * Display account-specific analytics (Phase 29e)
+   */
+  displayAccountAnalytics(phoneNumber, metrics) {
+    try {
+      console.clear();
+      console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+      console.log(`║         📈 ACCOUNT ANALYTICS - ${phoneNumber}                   ║`);
+      console.log(`╚════════════════════════════════════════════════════════════╝\n`);
+
+      if (!metrics) {
+        console.log(`  ⚠️  No analytics data for ${phoneNumber}\n`);
+        return;
+      }
+
+      console.log(`📊 ACCOUNT PERFORMANCE`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Phone Number:            ${phoneNumber}`);
+      console.log(`  Status:                  ${metrics.status || '--'}`);
+      console.log(`  Connection:              ${metrics.isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
+      console.log();
+
+      console.log(`📈 ACTIVITY METRICS`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Messages Sent:           ${metrics.messageCount || 0}`);
+      console.log(`  Errors Encountered:      ${metrics.errorCount || 0}`);
+      console.log(`  Success Rate:            ${metrics.successRate?.toFixed(2) || '--'}%`);
+      console.log();
+
+      console.log(`⏱️  UPTIME METRICS`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`  Total Uptime:            ${metrics.uptime || '--'}`);
+      console.log(`  SLA Compliance:          ${metrics.uptimePercentage?.toFixed(2) || '--'}%`);
+      console.log(`  Last Heartbeat:          ${metrics.lastHeartbeat ? new Date(metrics.lastHeartbeat).toLocaleTimeString() : '--'}`);
+      console.log();
+
+      if (metrics.lastError) {
+        console.log(`⚠️  RECENT ISSUE`);
+        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`  Error:                   ${metrics.lastError.message || metrics.lastError}`);
+        console.log(`  Time:                    ${metrics.lastError.timestamp ? new Date(metrics.lastError.timestamp).toLocaleTimeString() : '--'}`);
+        console.log();
+      }
+
+      console.log(`💡 Commands:`);
+      console.log(`  • 'analytics'            → Real-time metrics dashboard`);
+      console.log(`  • 'analytics report'     → Full analytics report`);
+      console.log(`  • 'health <phone>'       → Detailed health report\n`);
+    } catch (error) {
+      console.log(`\n❌ Error displaying account analytics: ${error.message}\n`);
+    }
   }
 
   /**

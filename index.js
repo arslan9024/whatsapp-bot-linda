@@ -110,6 +110,14 @@ import AutoReconnectManager from "./code/utils/AutoReconnectManager.js";
 import CircuitBreakerManager from "./code/utils/CircuitBreakerManager.js";
 import GracefulDegradationManager from "./code/utils/GracefulDegradationManager.js";
 
+// PHASE 29e: ANALYTICS & REPORTING (February 19, 2026)
+// Real-time metrics collection, uptime monitoring, SLA compliance, comprehensive reporting
+// Tracks cache, database, recovery, relinking, messages, errors, and system health
+import AnalyticsManager from "./code/utils/AnalyticsManager.js";
+import UptimeTracker from "./code/utils/UptimeTracker.js";
+import ReportGenerator from "./code/utils/ReportGenerator.js";
+import MetricsDashboard from "./code/utils/MetricsDashboard.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -159,6 +167,13 @@ let accountConnectionMonitor = null;  // Real-time connection monitor (NEW - Pha
 let autoReconnectManager = null;  // Auto-reconnect manager (NEW - Phase 29d)
 let circuitBreakerManager = null;  // Circuit breaker manager (NEW - Phase 29d)
 let gracefulDegradationManager = null;  // Graceful degradation manager (NEW - Phase 29d)
+
+// PHASE 29e: Analytics & Reporting (February 19, 2026)
+// Real-time metrics collection, SLA monitoring, report generation, visual dashboards
+let analyticsManager = null;  // Centralized metrics collection (NEW - Phase 29e)
+let uptimeTracker = null;  // Uptime monitoring with SLA compliance (NEW - Phase 29e)
+let reportGenerator = null;  // Multi-format report generation (NEW - Phase 29e)
+let metricsDashboard = null;  // Terminal-based metrics display (NEW - Phase 29e)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -250,6 +265,10 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     gorahaRef,
     accountClients,
     getAllConnectionDiagnostics,
+    analyticsManager,               // NEW: Phase 29e - Metrics collection
+    uptimeTracker,                  // NEW: Phase 29e - Uptime tracking
+    reportGenerator,                // NEW: Phase 29e - Report generation
+    metricsDashboard,               // NEW: Phase 29e - Metrics display
   });
 }
 
@@ -275,6 +294,8 @@ function getFlowDeps() {
     contactHandlerRef,
     ContactLookupHandler,
     setIsInitializing: (val) => { isInitializing = val; },
+    analyticsManager,      // NEW: Phase 29e - Metrics collection
+    uptimeTracker,         // NEW: Phase 29e - SLA tracking
   };
 }
 
@@ -618,7 +639,7 @@ async function initializeBot() {
     if (!autoAccountRelinkingManager) {
       autoAccountRelinkingManager = new AutoAccountRelinkingManager({
         unifiedAccountManager: null, // Will be set if UnifiedAccountManager is available
-        terminalDashboard,
+        terminalDashboard: terminalHealthDashboard,
         sessionsDir: './sessions',
         maxRetries: 3,
         retryDelayMs: 3000
@@ -631,7 +652,7 @@ async function initializeBot() {
     if (!accountConnectionMonitor) {
       accountConnectionMonitor = new AccountConnectionMonitor({
         unifiedAccountManager: null, // Will be set if UnifiedAccountManager is available
-        terminalDashboard,
+        terminalDashboard: terminalHealthDashboard,
         healthCheckInterval: 30000  // Health check every 30 seconds
       });
       
@@ -646,7 +667,7 @@ async function initializeBot() {
       autoReconnectManager = new AutoReconnectManager({
         accountConnectionMonitor,
         autoAccountRelinkingManager,
-        terminalDashboard,
+        terminalDashboard: terminalHealthDashboard,
         maxReconnectAttempts: 5,
         initialBackoffMs: 2000,
         monitoringIntervalMs: 5000
@@ -661,7 +682,7 @@ async function initializeBot() {
       circuitBreakerManager = new CircuitBreakerManager({
         failureThreshold: 5,
         resetTimeoutMs: 30000,
-        terminalDashboard
+        terminalDashboard: terminalHealthDashboard
       });
       
       logBot("✅ Phase 29d: Circuit Breaker Manager initialized", "success");
@@ -671,11 +692,41 @@ async function initializeBot() {
     if (!gracefulDegradationManager) {
       gracefulDegradationManager = new GracefulDegradationManager({
         accountConnectionMonitor,
-        terminalDashboard
+        terminalDashboard: terminalHealthDashboard
       });
       
       logBot("✅ Phase 29d: Graceful Degradation Manager initialized", "success");
       services.register('gracefulDegradationManager', gracefulDegradationManager);
+    }
+
+    // ============================================
+    // STEP 4D: Phase 29e - Analytics & Reporting (NEW)
+    // ============================================
+    if (!analyticsManager) {
+      analyticsManager = new AnalyticsManager();
+      await analyticsManager.initialize();
+      logBot("✅ Phase 29e: AnalyticsManager initialized (real-time metrics collection)", "success");
+      services.register('analyticsManager', analyticsManager);
+    }
+
+    if (!uptimeTracker) {
+      uptimeTracker = new UptimeTracker({ slaTarget: 0.99 });
+      await uptimeTracker.initialize();
+      logBot("✅ Phase 29e: UptimeTracker initialized (SLA compliance tracking)", "success");
+      services.register('uptimeTracker', uptimeTracker);
+    }
+
+    if (!reportGenerator) {
+      reportGenerator = new ReportGenerator(analyticsManager, uptimeTracker);
+      logBot("✅ Phase 29e: ReportGenerator initialized (multi-format reports)", "success");
+      services.register('reportGenerator', reportGenerator);
+    }
+
+    if (!metricsDashboard) {
+      metricsDashboard = new MetricsDashboard(analyticsManager, uptimeTracker);
+      logBot("✅ Phase 29e: MetricsDashboard initialized (visual metrics display)", "success");
+      services.register('metricsDashboard', metricsDashboard);
+      logBot("   - Use command: 'metrics', 'health', 'sla', 'uptime' for dashboard views", "info");
     }
 
     logBot("", "info");
@@ -832,6 +883,8 @@ async function initializeBot() {
       createClient: CreatingNewWhatsAppClient,  // NEW: For fresh client creation on relink
       gorahaServicesBridge,  // NEW: GorahaBot contact stats (Phase 26)
       googleServiceAccountManager,  // NEW: For service account validation (Phase 26)
+      analyticsManager,      // NEW: Analytics metrics (Phase 29e)
+      reportGenerator,       // NEW: Report generation (Phase 29e)
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");

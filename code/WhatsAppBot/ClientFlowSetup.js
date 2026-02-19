@@ -35,6 +35,8 @@ import ConnectionManager from '../utils/ConnectionManager.js';
  * @property {object|null} contactHandler      - ContactLookupHandler or null (ref container)
  * @property {Function|null} ContactLookupHandler - Constructor for lazy init
  * @property {Function}  setIsInitializing     - (bool) => void
+ * @property {object|null} analyticsManager    - AnalyticsManager for metrics (Phase 29e)
+ * @property {object|null} uptimeTracker       - UptimeTracker for SLA tracking (Phase 29e)
  */
 
 /**
@@ -67,6 +69,8 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     contactHandlerRef,     // { current: ContactLookupHandler|null }
     ContactLookupHandler,  // Constructor
     setIsInitializing,
+    analyticsManager,      // NEW: Phase 29e - Metrics collection
+    uptimeTracker,         // NEW: Phase 29e - SLA tracking
   } = deps;
 
   const mode = isRestore ? 'restore' : 'qr';
@@ -115,6 +119,15 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
       authMethod: mode,
     });
 
+    // NEW: Record authentication event (Phase 29e)
+    if (analyticsManager) {
+      analyticsManager.recordStatusChange(phoneNumber, {
+        event: 'authenticated',
+        status: 'authenticated',
+        timestamp: new Date(),
+      });
+    }
+
     if (deviceLinkedManager) {
       deviceLinkedManager.markDeviceLinked(phoneNumber, {
         linkedAt: now,
@@ -159,6 +172,20 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
 
     // Register for health monitoring
     accountHealthMonitor.registerAccount(phoneNumber, client);
+
+    // NEW: Record account online status (Phase 29e)
+    if (analyticsManager) {
+      analyticsManager.recordStatusChange(phoneNumber, {
+        event: 'ready',
+        status: 'online',
+        timestamp: new Date(),
+      });
+    }
+
+    // NEW: Start uptime tracking (Phase 29e)
+    if (uptimeTracker) {
+      uptimeTracker.startTracking(phoneNumber);
+    }
 
     // Start keep-alive heartbeats for 24/7 operation
     if (keepAliveManager) {
@@ -224,6 +251,21 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     const reasonStr = reason || 'unknown';
     logBot(`Disconnected (${phoneNumber}): ${reasonStr}`, 'warn');
 
+    // NEW: Record offline status (Phase 29e)
+    if (analyticsManager) {
+      analyticsManager.recordStatusChange(phoneNumber, {
+        event: 'disconnected',
+        status: 'offline',
+        reason: reasonStr,
+        timestamp: new Date(),
+      });
+    }
+
+    // NEW: Stop uptime tracking (Phase 29e)
+    if (uptimeTracker) {
+      uptimeTracker.stopTracking(phoneNumber);
+    }
+
     // Mark device as unlinked
     if (deviceLinkedManager) {
       deviceLinkedManager.markDeviceUnlinked(phoneNumber, reasonStr);
@@ -254,6 +296,16 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) return;
 
     logBot(`Client error (${phoneNumber}): ${msg}`, 'error');
+    
+    // NEW: Record error metric (Phase 29e)
+    if (analyticsManager) {
+      analyticsManager.recordError(phoneNumber, {
+        type: 'client_error',
+        message: msg,
+        timestamp: new Date(),
+      });
+    }
+
     connManager.errorCount++;
     if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
       connManager.activateCircuitBreaker();
