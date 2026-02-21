@@ -22,6 +22,7 @@
  * @param {object|null} opts.googleServiceAccountManager - NEW: Service account validation (Phase 26)
  * @param {object|null} opts.analyticsManager - NEW: Analytics metrics (Phase 29e)
  * @param {object|null} opts.reportGenerator - NEW: Report generation (Phase 29e)
+ * @param {object|null} opts.googleSheetsManager - NEW: Google Sheets CRUD operations (Phase 30)
  */
 export function setupTerminalInputListener(opts) {
   const {
@@ -38,6 +39,7 @@ export function setupTerminalInputListener(opts) {
     googleServiceAccountManager,  // NEW: Service account validation (Phase 26)
     analyticsManager,      // NEW: Analytics metrics (Phase 29e)
     reportGenerator,       // NEW: Report generation (Phase 29e)
+    googleSheetsManager,   // NEW: Google Sheets CRUD (Phase 30)
   } = opts;
 
   try {
@@ -644,6 +646,173 @@ export function setupTerminalInputListener(opts) {
         } catch (error) {
           logBot(`Error generating analytics report: ${error.message}`, 'error');
           console.log(`\n❌ Error generating analytics report: ${error.message}\n`);
+        }
+      },
+
+      // NEW: Phase 30 - Google Sheets CRUD operations
+      onGoogleSheetsRead: async (spreadsheetId, range = 'Sheet1') => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n📊 Reading Google Sheet...`);
+          const result = await googleSheetsManager.readSheet(spreadsheetId, range);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Successfully read ${result.rowCount} rows\n`);
+          console.log(`Range: ${result.range}`);
+          console.log(`Columns: ${result.columnCount}`);
+          console.log(`\n📋 Data:\n`);
+          
+          if (result.data.length === 0) {
+            console.log('  (empty)');
+          } else {
+            result.data.forEach((row, idx) => {
+              console.log(`  ${idx + 1}. ${row.join(' | ')}`);
+            });
+          }
+          console.log();
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onGoogleSheetsCreate: async (spreadsheetId, sheetName, values) => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n📝 Adding row to sheet...`);
+          const result = await googleSheetsManager.appendRow(spreadsheetId, sheetName, values);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Successfully added row`);
+          console.log(`Sheet: ${sheetName}`);
+          console.log(`Cells Updated: ${result.updatedCells}\n`);
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onGoogleSheetsUpdate: async (spreadsheetId, cellReference, value) => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n✏️  Updating cell...`);
+          const result = await googleSheetsManager.updateCell(spreadsheetId, cellReference, value);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Successfully updated`);
+          console.log(`Cell: ${cellReference}`);
+          console.log(`New Value: ${value}\n`);
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onGoogleSheetsDelete: async (spreadsheetId, sheetName, rowIndex) => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n🗑️  Deleting row...`);
+          const result = await googleSheetsManager.deleteRow(spreadsheetId, sheetName, rowIndex);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Successfully deleted row ${rowIndex} from ${sheetName}\n`);
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onGoogleSheetsSearch: async (spreadsheetId, range, searchValue) => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n🔍 Searching sheet for: "${searchValue}"...`);
+          const result = await googleSheetsManager.searchSheet(spreadsheetId, range, searchValue);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Found ${result.found} match(es)\n`);
+          
+          if (result.results.length === 0) {
+            console.log('  (no matches)');
+          } else {
+            result.results.forEach((match, idx) => {
+              console.log(`  ${idx + 1}. Cell: ${match.cell}`);
+              console.log(`     Value: ${match.value}\n`);
+            });
+          }
+          console.log();
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onGoogleSheetsMetadata: async (spreadsheetId) => {
+        try {
+          if (!googleSheetsManager) {
+            logBot('❌ Google Sheets manager not initialized', 'error');
+            console.log('\n❌ Google Sheets service is not available\n');
+            return;
+          }
+
+          console.log(`\n📊 Fetching spreadsheet metadata...`);
+          const result = await googleSheetsManager.getMetadata(spreadsheetId);
+
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+
+          console.log(`\n✅ Spreadsheet: ${result.spreadsheet}`);
+          console.log(`Total Sheets: ${result.sheetCount}\n`);
+          console.log(`📋 Sheets:\n`);
+
+          result.sheets.forEach((sheet, idx) => {
+            console.log(`  ${idx + 1}. ${sheet.name}`);
+            console.log(`     ID: ${sheet.id}`);
+            console.log(`     Size: ${sheet.rowCount} rows × ${sheet.columnCount} columns\n`);
+          });
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
         }
       },
     };

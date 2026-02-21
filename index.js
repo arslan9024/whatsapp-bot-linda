@@ -117,6 +117,7 @@ import AnalyticsManager from "./code/utils/AnalyticsManager.js";
 import UptimeTracker from "./code/utils/UptimeTracker.js";
 import ReportGenerator from "./code/utils/ReportGenerator.js";
 import MetricsDashboard from "./code/utils/MetricsDashboard.js";
+import GoogleSheetsManager from "./code/utils/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
@@ -174,6 +175,7 @@ let analyticsManager = null;  // Centralized metrics collection (NEW - Phase 29e
 let uptimeTracker = null;  // Uptime monitoring with SLA compliance (NEW - Phase 29e)
 let reportGenerator = null;  // Multi-format report generation (NEW - Phase 29e)
 let metricsDashboard = null;  // Terminal-based metrics display (NEW - Phase 29e)
+let googleSheetsManager = null;  // Google Sheets CRUD operations (NEW - Phase 30)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -729,6 +731,17 @@ async function initializeBot() {
       logBot("   - Use command: 'metrics', 'health', 'sla', 'uptime' for dashboard views", "info");
     }
 
+    // ============================================
+    // STEP 4E: Phase 30 - Google Sheets CRUD (NEW)
+    // ============================================
+    if (!googleSheetsManager) {
+      googleSheetsManager = new GoogleSheetsManager(googleServiceAccountManager);
+      await googleSheetsManager.initialize('poweragent');
+      logBot("✅ Phase 30: GoogleSheetsManager initialized (Google Sheets CRUD operations)", "success");
+      services.register('googleSheetsManager', googleSheetsManager);
+      logBot("   - Use command: 'sheets read <id>', 'sheets add <id> <sheet> <values>', etc.", "info");
+    }
+
     logBot("", "info");
     logBot("⏳ Waiting for user command to initiate linking...", "info");
     logBot("", "info");
@@ -885,6 +898,7 @@ async function initializeBot() {
       googleServiceAccountManager,  // NEW: For service account validation (Phase 26)
       analyticsManager,      // NEW: Analytics metrics (Phase 29e)
       reportGenerator,       // NEW: Report generation (Phase 29e)
+      googleSheetsManager,   // NEW: Google Sheets CRUD operations (Phase 30)
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");

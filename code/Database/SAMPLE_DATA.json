@@ -1,0 +1,374 @@
+{
+  "sample_scenario": {
+    "title": "Sample Scenario: Joint Ownership + Active Tenancy",
+    "description": "Complete relationship example with 2 owners, 1 tenant, 1 agent",
+    "collections": [
+      "developers",
+      "clusters",
+      "people",
+      "properties",
+      "furnishingstatuses",
+      "occupancystatuses",
+      "availabilitystatuses",
+      "propertyownerships",
+      "propertytenancies",
+      "propertyagents"
+    ]
+  },
+
+  "developers": [
+    {
+      "_id": null,
+      "developerId": "DEV-DAMAC-001",
+      "developerName": "DAMAC Properties",
+      "contactEmail": "info@damacgroup.com",
+      "contactPhone": "+971-4-XXX-XXXX",
+      "website": "https://www.damacgroup.com",
+      "status": "active",
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+
+  "clusters": [
+    {
+      "_id": null,
+      "clusterId": "CLUSTER-DAMAC-HILLS-2",
+      "clusterName": "DAMAC HILLS 2",
+      "location": "Dubai Land",
+      "developerId": "ObjectId reference to developer",
+      "description": "Luxury residential project with multiple villa and apartment communities",
+      "totalUnits": 500,
+      "status": "active",
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ],
+
+  "furnishingstatuses": [
+    {
+      "_id": null,
+      "status": "furnished",
+      "description": "Fully furnished property"
+    },
+    {
+      "_id": null,
+      "status": "unfurnished",
+      "description": "Unfurnished property"
+    },
+    {
+      "_id": null,
+      "status": "semi-furnished",
+      "description": "Semi-furnished property"
+    }
+  ],
+
+  "occupancystatuses": [
+    {
+      "_id": null,
+      "status": "occupied_by_owner",
+      "description": "Owner occupies the property"
+    },
+    {
+      "_id": null,
+      "status": "occupied_by_tenant",
+      "description": "Tenant occupies the property"
+    },
+    {
+      "_id": null,
+      "status": "vacant",
+      "description": "Property is vacant"
+    }
+  ],
+
+  "availabilitystatuses": [
+    {
+      "_id": null,
+      "status": "available_for_rent",
+      "category": "active",
+      "description": "Available for rental"
+    },
+    {
+      "_id": null,
+      "status": "available_for_sale",
+      "category": "active",
+      "description": "Available for sale"
+    },
+    {
+      "_id": null,
+      "status": "available_for_both",
+      "category": "active",
+      "description": "Available for rent and sale"
+    },
+    {
+      "_id": null,
+      "status": "not_available",
+      "category": "inactive",
+      "description": "Not available"
+    },
+    {
+      "_id": null,
+      "status": "sold",
+      "category": "terminal",
+      "description": "Property sold"
+    }
+  ],
+
+  "people": [
+    {
+      "_id": null,
+      "personId": "PERSON-20240115-AH001",
+      "firstName": "Ahmed",
+      "lastName": "Hassan",
+      "fullName": "Ahmed Hassan",
+      "mobile": "+971501234567",
+      "email": "ahmed.hassan@email.com",
+      "status": "active",
+      "source": "direct",
+      "notes": "Co-owner of DAMAC HILLS 2 Unit 305",
+      "createdAt": "2024-01-15T10:00:00Z"
+    },
+    {
+      "_id": null,
+      "personId": "PERSON-20240116-FA001",
+      "firstName": "Fatima",
+      "lastName": "Ali",
+      "fullName": "Fatima Ali",
+      "mobile": "+971501234568",
+      "email": "fatima.ali@email.com",
+      "status": "active",
+      "source": "direct",
+      "notes": "Co-owner of DAMAC HILLS 2 Unit 305",
+      "createdAt": "2024-01-16T10:00:00Z"
+    },
+    {
+      "_id": null,
+      "personId": "PERSON-20240120-JS001",
+      "firstName": "John",
+      "lastName": "Smith",
+      "fullName": "John Smith",
+      "mobile": "+971507654321",
+      "email": "john.smith@email.com",
+      "status": "active",
+      "source": "online_leads_platform",
+      "notes": "Tenant of DAMAC HILLS 2 Unit 305, 2-year lease",
+      "createdAt": "2024-01-20T14:30:00Z"
+    },
+    {
+      "_id": null,
+      "personId": "PERSON-20240101-MK001",
+      "firstName": "Mohammed",
+      "lastName": "Khan",
+      "fullName": "Mohammed Khan",
+      "mobile": "+971509876543",
+      "email": "mohammed.khan@realestate.com",
+      "status": "active",
+      "source": "direct",
+      "notes": "Licensed real estate agent",
+      "createdAt": "2024-01-01T09:00:00Z"
+    }
+  ],
+
+  "properties": [
+    {
+      "_id": null,
+      "propertyId": "PROP-20240115-DH2-305",
+      "clusterId": "CLUSTER-DAMAC-HILLS-2",
+      "unitNumber": "305",
+      "builtUpArea": 1450,
+      "plotArea": 1800,
+      "hasParking": true,
+      "parkingSpaces": 2,
+      "furnishingStatusId": "ObjectId ref to furnished",
+      "occupancyStatusId": "ObjectId ref to occupied_by_tenant",
+      "availabilityStatusIds": [
+        "ObjectId ref to available_for_rent",
+        "ObjectId ref to available_for_sale"
+      ],
+      "currentTenancyId": "ObjectId ref to PropertyTenancy",
+      "currentTenantPersonId": "ObjectId ref to John Smith",
+      "imageUrls": [
+        "https://images.damac.com/hills2/305/room1.jpg",
+        "https://images.damac.com/hills2/305/room2.jpg",
+        "https://images.damac.com/hills2/305/lounge.jpg"
+      ],
+      "floorPlanUrl": "https://plans.damac.com/hills2/305-floorplan.pdf",
+      "serviceCharges": 2200,
+      "serviceChargesCurrency": "AED",
+      "status": "active",
+      "notes": "2 Bedroom, 2 Bathroom apartment with modern fixtures",
+      "createdAt": "2024-01-15T11:00:00Z"
+    }
+  ],
+
+  "propertyownerships": [
+    {
+      "_id": null,
+      "linkId": "OWNERSHIP-20240115-AH-DH305",
+      "personId": "ObjectId ref to Ahmed Hassan",
+      "propertyId": "ObjectId ref to PROP-DH2-305",
+      "ownershipPercentage": 50,
+      "ownershipType": "joint",
+      "acquisitionDate": "2023-06-15T00:00:00Z",
+      "acquisitionPrice": 850000,
+      "currentEstimatedValue": 925000,
+      "currency": "AED",
+      "lastValuationDate": "2024-01-10T00:00:00Z",
+      "status": "active",
+      "notes": "Joint purchase with Fatima Ali",
+      "createdAt": "2024-01-15T11:30:00Z"
+    },
+    {
+      "_id": null,
+      "linkId": "OWNERSHIP-20240116-FA-DH305",
+      "personId": "ObjectId ref to Fatima Ali",
+      "propertyId": "ObjectId ref to PROP-DH2-305",
+      "ownershipPercentage": 50,
+      "ownershipType": "joint",
+      "acquisitionDate": "2023-06-15T00:00:00Z",
+      "acquisitionPrice": 850000,
+      "currentEstimatedValue": 925000,
+      "currency": "AED",
+      "lastValuationDate": "2024-01-10T00:00:00Z",
+      "status": "active",
+      "notes": "Joint purchase with Ahmed Hassan",
+      "createdAt": "2024-01-16T11:30:00Z"
+    }
+  ],
+
+  "propertytenancies": [
+    {
+      "_id": null,
+      "tenancyId": "TENANCY-20240120-DH305-JS",
+      "propertyId": "ObjectId ref to PROP-DH2-305",
+      "tenantPersonId": "ObjectId ref to John Smith",
+      "landlordPersonIds": [
+        "ObjectId ref to Ahmed Hassan",
+        "ObjectId ref to Fatima Ali"
+      ],
+      "contractStartDate": "2024-02-01T00:00:00Z",
+      "contractExpiryDate": "2026-01-31T00:00:00Z",
+      "contractAmount": 85000,
+      "contractCurrency": "AED",
+      "paymentSchedule": {
+        "totalCheques": 4,
+        "cheques": [
+          {
+            "chequeNumber": "CH-001",
+            "chequeAmount": 21250,
+            "chequeDueDate": "2024-02-15T00:00:00Z",
+            "isPaid": true,
+            "paidDate": "2024-02-10T00:00:00Z",
+            "remarks": "Paid on time"
+          },
+          {
+            "chequeNumber": "CH-002",
+            "chequeAmount": 21250,
+            "chequeDueDate": "2024-05-15T00:00:00Z",
+            "isPaid": true,
+            "paidDate": "2024-05-12T00:00:00Z",
+            "remarks": "Paid on time"
+          },
+          {
+            "chequeNumber": "CH-003",
+            "chequeAmount": 21250,
+            "chequeDueDate": "2024-08-15T00:00:00Z",
+            "isPaid": false,
+            "paidDate": null,
+            "remarks": "OVERDUE - Follow up needed"
+          },
+          {
+            "chequeNumber": "CH-004",
+            "chequeAmount": 21250,
+            "chequeDueDate": "2024-11-15T00:00:00Z",
+            "isPaid": false,
+            "paidDate": null,
+            "remarks": null
+          }
+        ]
+      },
+      "maintenanceResponsibility": "landlord",
+      "utilitiesResponsibility": "tenant",
+      "allowPets": false,
+      "allowSubletting": false,
+      "depositAmount": 21250,
+      "status": "active",
+      "notes": "Standard 2-year lease with annual review clause",
+      "createdAt": "2024-01-20T15:00:00Z"
+    }
+  ],
+
+  "propertyagents": [
+    {
+      "_id": null,
+      "linkId": "AGENT-20240120-MK-DH305",
+      "personId": "ObjectId ref to Mohammed Khan",
+      "propertyId": "ObjectId ref to PROP-DH2-305",
+      "agentRole": "rental_agent",
+      "commissionPercentage": 5,
+      "status": "active",
+      "notes": "Responsible for tenant coordination and lease management",
+      "createdAt": "2024-01-20T15:10:00Z"
+    }
+  ],
+
+  "query_examples": {
+    "description": "Example queries to test relationships",
+    "examples": [
+      {
+        "name": "Find person with all roles",
+        "query": "QueryHelper.findPersonWithAllRoles(Person, johnSmithObjectId)",
+        "returns": "John Smith's record + roles as tenant, renting from Ahmed & Fatima"
+      },
+      {
+        "name": "Find property with all people",
+        "query": "QueryHelper.findPropertyWithAllPeople(Property, propObjectId)",
+        "returns": "Property 305 + owners (Ahmed 50%, Fatima 50%) + tenant (John) + agents (Mohammed)"
+      },
+      {
+        "name": "Find co-owners of property",
+        "query": "QueryHelper.getPropertyCoOwners(PropertyOwnership, propObjectId)",
+        "returns": "Ahmed Hassan (50%), Fatima Ali (50%)"
+      },
+      {
+        "name": "Get tenancy payment status",
+        "query": "QueryHelper.getTenancyPaymentSummary(PropertyTenancy, tenancyObjectId)",
+        "returns": "Total: 85,000 AED, Paid: 42,500, Unpaid: 42,500, Completion: 50%"
+      },
+      {
+        "name": "Find overdue cheques",
+        "query": "QueryHelper.findOverdueCheques(PropertyTenancy)",
+        "returns": "Cheque CH-003 (21,250 AED, due 2024-08-15, overdue)"
+      },
+      {
+        "name": "Validate no duplicate persons",
+        "query": "ValidationHelper.checkPersonDuplicates(Person, 'John', 'Smith', '+971507654321')",
+        "returns": "No duplicates found"
+      },
+      {
+        "name": "Validate property composite key",
+        "query": "ValidationHelper.validateCompositeKey(Property, 'CLUSTER-DAMAC-HILLS-2', '305')",
+        "returns": "Composite key is unique"
+      },
+      {
+        "name": "Validate landlords own property",
+        "query": "ValidationHelper.validateLandlordsOwnProperty([ahmedId, fatimaId], propObjectId, PropertyOwnership)",
+        "returns": "Both landlords own 50% each - validation passes"
+      }
+    ]
+  },
+
+  "data_entry_checklist": {
+    "description": "Steps to manually enter sample data",
+    "steps": [
+      "1. Insert Developer record",
+      "2. Insert Cluster record",
+      "3. Insert FurnishingStatus, OccupancyStatus, AvailabilityStatus records",
+      "4. Insert Person records (Ahmed, Fatima, John, Mohammed)",
+      "5. Insert Property record (Unit 305)",
+      "6. Insert PropertyOwnership records (Ahmed 50%, Fatima 50%)",
+      "7. Insert PropertyTenancy record with 4 cheques",
+      "8. Insert PropertyAgent record (Mohammed as rental agent)",
+      "9. Verify all relationships using QueryHelper",
+      "10. Update currentTenancyId and currentTenantPersonId in Property record"
+    ]
+  }
+}

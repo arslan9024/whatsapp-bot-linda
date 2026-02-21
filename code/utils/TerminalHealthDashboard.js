@@ -383,6 +383,12 @@ class TerminalHealthDashboard {
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
       onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
       onAnalyticsReportRequested,  // NEW: Analytics reporting (Phase 29e)
+      onGoogleSheetsRead,  // NEW: Google Sheets read (Phase 30)
+      onGoogleSheetsCreate,  // NEW: Google Sheets create (Phase 30)
+      onGoogleSheetsUpdate,  // NEW: Google Sheets update (Phase 30)
+      onGoogleSheetsDelete,  // NEW: Google Sheets delete (Phase 30)
+      onGoogleSheetsSearch,  // NEW: Google Sheets search (Phase 30)
+      onGoogleSheetsMetadata,  // NEW: Google Sheets metadata (Phase 30)
     } = callbacks;
 
     console.log(`\n${'═'.repeat(60)}`);
@@ -949,6 +955,89 @@ class TerminalHealthDashboard {
           }
           break;
 
+        // NEW: Phase 30 - Google Sheets CRUD operations
+        case 'google':
+        case 'sheets':
+          if (parts[1] === 'read') {
+            const sheetId = parts[2];
+            const range = parts[3] || 'Sheet1';
+            if (sheetId) {
+              if (onGoogleSheetsRead) {
+                await onGoogleSheetsRead(sheetId, range);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets read <spreadsheet-id> [range]'`);
+              console.log(`     Example: 'sheets read 1A2B3C4D5E6F7G8H Sheet1!A1:Z100'\n`);
+            }
+          } else if (parts[1] === 'add' || parts[1] === 'create') {
+            const sheetId = parts[2];
+            const sheetName = parts[3] || 'Sheet1';
+            const values = parts.slice(4);
+            if (sheetId && values.length > 0) {
+              if (onGoogleSheetsCreate) {
+                await onGoogleSheetsCreate(sheetId, sheetName, values);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets add <spreadsheet-id> <sheet-name> <value1> [value2] ...'`);
+              console.log(`     Example: 'sheets add 1A2B3C4D5E6F7G8H Sheet1 John Doe john@example.com'\n`);
+            }
+          } else if (parts[1] === 'update') {
+            const sheetId = parts[2];
+            const cell = parts[3];
+            const value = parts.slice(4).join(' ');
+            if (sheetId && cell && value) {
+              if (onGoogleSheetsUpdate) {
+                await onGoogleSheetsUpdate(sheetId, cell, value);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets update <spreadsheet-id> <cell> <value>'`);
+              console.log(`     Example: 'sheets update 1A2B3C4D5E6F7G8H Sheet1!A1 Updated Value'\n`);
+            }
+          } else if (parts[1] === 'delete' || parts[1] === 'remove') {
+            const sheetId = parts[2];
+            const sheetName = parts[3] || 'Sheet1';
+            const rowIndex = parseInt(parts[4]) || 1;
+            if (sheetId) {
+              if (onGoogleSheetsDelete) {
+                await onGoogleSheetsDelete(sheetId, sheetName, rowIndex);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets delete <spreadsheet-id> <sheet-name> [row-index]'`);
+              console.log(`     Example: 'sheets delete 1A2B3C4D5E6F7G8H Sheet1 1'\n`);
+            }
+          } else if (parts[1] === 'search') {
+            const sheetId = parts[2];
+            const range = parts[3] || 'Sheet1';
+            const searchValue = parts.slice(4).join(' ');
+            if (sheetId && searchValue) {
+              if (onGoogleSheetsSearch) {
+                await onGoogleSheetsSearch(sheetId, range, searchValue);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets search <spreadsheet-id> [range] <search-value>'`);
+              console.log(`     Example: 'sheets search 1A2B3C4D5E6F7G8H Sheet1 John'\n`);
+            }
+          } else if (parts[1] === 'info' || parts[1] === 'meta' || parts[1] === 'metadata') {
+            const sheetId = parts[2];
+            if (sheetId) {
+              if (onGoogleSheetsMetadata) {
+                await onGoogleSheetsMetadata(sheetId);
+              }
+            } else {
+              console.log(`\n⚠️  Usage: 'sheets info <spreadsheet-id>'`);
+              console.log(`     Example: 'sheets info 1A2B3C4D5E6F7G8H'\n`);
+            }
+          } else {
+            console.log(`\n📊 Google Sheets Operations (Phase 30):`);
+            console.log(`   sheets read <id> [range]                → Read sheet data`);
+            console.log(`   sheets add <id> <sheet> <values...>     → Add row to sheet`);
+            console.log(`   sheets update <id> <cell> <value>       → Update cell value`);
+            console.log(`   sheets delete <id> <sheet> [row]        → Delete row`);
+            console.log(`   sheets search <id> [range] <text>       → Search for value`);
+            console.log(`   sheets info <id>                        → Get sheet metadata\n`);
+          }
+          break;
+
         case 'help':
           console.log(`\n📚 Available Commands:`);
           console.log(`\n  ACCOUNT MANAGEMENT:`);
@@ -970,6 +1059,13 @@ class TerminalHealthDashboard {
           console.log(`    analytics report          → Generate full analytics report`);
           console.log(`    analytics uptime          → Show uptime metrics for all accounts`);
           console.log(`    analytics account <phone> → Show account-specific analytics`);
+          console.log(`\n  GOOGLE SHEETS (Phase 30):`);
+          console.log(`    sheets read <id> [range]                → Read sheet data`);
+          console.log(`    sheets add <id> <sheet> <values...>     → Add row to sheet`);
+          console.log(`    sheets update <id> <cell> <value>       → Update cell value`);
+          console.log(`    sheets delete <id> <sheet> [row]        → Delete row`);
+          console.log(`    sheets search <id> [range] <text>       → Search for value`);
+          console.log(`    sheets info <id>                        → Get sheet metadata`);
           console.log(`\n  DEVICE MANAGEMENT:`);
           console.log(`    status / health           → Display full dashboard`);
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);

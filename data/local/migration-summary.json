@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-02-19T19:30:29.727Z",
+  "duration": "0.00s",
+  "statistics": {
+    "totalOwners": 100,
+    "totalContacts": 100,
+    "totalRecords": 200,
+    "averagePropertiesPerOwner": "2.99",
+    "verifiedOwners": 78,
+    "activeStatus": 100
+  },
+  "files": {
+    "owners": "data\\local\\owners.json",
+    "contacts": "data\\local\\contacts.json",
+    "summary": "data\\local\\migration-summary.json"
+  }
+}

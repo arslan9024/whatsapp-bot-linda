@@ -1,30 +1,48 @@
-# WhatsApp Bot Linda - README
+# 🤖 WhatsApp Bot Linda
 
-A sophisticated WhatsApp automation bot built with Node.js, designed for managing messaging campaigns, contact validation, and automated responses.
+**Enterprise-grade WhatsApp automation platform** for real estate property management, built with Node.js, MongoDB, and Express.
+
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)]()
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_9-green.svg)]()
+[![Express](https://img.shields.io/badge/Express-5.x-blue.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-890_passing-brightgreen.svg)]()
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)]()
 
 ## 📋 Table of Contents
 
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Development](#development)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [API Endpoints](#-api-endpoints)
+- [Bot Commands](#-bot-commands)
+- [Testing](#-testing)
+- [Configuration](#-configuration)
+- [Documentation](#-documentation)
 
 ---
 
 ## ✨ Features
 
-- **Multi-Bot Support** - Run multiple WhatsApp bots simultaneously
-- **Campaign Management** - Send bulk messages with scheduling and rate limiting
-- **Contact Validation** - Validate phone numbers with country code checking
-- **Message Analyzer** - Analyze incoming messages for intelligent responses
-- **Google Sheets Integration** - Read/write data to Google Sheets
-- **Session Management** - Persistent session storage with automatic QR code handling
-- **Structured Logging** - Comprehensive logging with file output and log levels
-- **Error Handling** - Centralized error handling with recovery strategies
+### Core Bot
+- **Multi-Bot Support** — Run multiple WhatsApp bots simultaneously
+- **Campaign Management** — Bulk messages with scheduling and rate limiting
+- **Contact Validation** — Phone number validation with country code checking
+- **Message Analyzer** — Intelligent incoming message analysis
+- **Google Sheets Integration** — Read/write property data to Google Sheets
+- **Session Persistence** — Automatic QR code handling and session restore
+- **24/7 Production Mode** — Keep-alive, health monitoring, auto-recovery
+
+### Phase 5: Advanced Features (890 tests, 100% pass rate)
+- **📧 Communication Templates** — Template management, variable substitution, WhatsApp/email/SMS delivery (16 API endpoints, 11 bot commands)
+- **💰 Commission Tracking** — Percentage, fixed, tiered & revenue-share calculations with approval workflows (17 endpoints, 10 commands)
+- **📊 Analytics & Reporting** — Portfolio analytics, market comparisons, performance snapshots & trend analysis (14 endpoints, 10 commands)
+- **🧾 Payment & Invoicing** — Invoice generation, payment recording, aging reports & overdue tracking (25 endpoints, 12 commands)
+- **🔔 Automated Notifications** — Contract expiry alerts, payment reminders, maintenance schedules & escalation chains (22 endpoints, 13 commands)
+
+### Database
+- **16 Mongoose Models** — Normalized, relational schema for properties, tenants, contracts, payments, commissions, and more
+- **94 RESTful API Endpoints** — Full CRUD across all entities
+- **56 WhatsApp Bot Commands** — Natural language property management via chat
 
 ---
 
@@ -80,53 +98,53 @@ npm start
 
 ```
 WhatsApp-Bot-Linda/
-├── index.js                    # Main entry point
-├── config.js                   # Configuration management
-├── logger.js                   # Logging system
-├── errorHandler.js             # Error handling utilities
-├── validation.js               # Input validation utilities
-├── package.json                # Dependencies
-├── .env.example                # Example environment config
-├── .gitignore                  # Git ignore rules
-├── .eslintrc.json             # ESLint configuration
-├── .prettierrc.json           # Prettier configuration
+├── index.js                         # Bot entry point (24/7 production mode)
+├── express-server.js                # Express API server (94 endpoints)
+├── express-server-inmemory.js       # In-memory MongoDB dev server
+├── config.js                        # Configuration management
+├── logger.js                        # Structured logging system
+├── errorHandler.js                  # Centralized error handling
+├── validation.js                    # Input validation utilities
+├── package.json                     # Dependencies & npm scripts
 │
-├── code/                       # Core functionality
-│   ├── WhatsAppBot/           # WhatsApp integration
-│   │   ├── WhatsAppClientFunctions.js
-│   │   ├── CreatingNewWhatsAppClient.js
-│   │   ├── MessageAnalyzer.js
-│   │   └── ...
-│   ├── Message/               # Message management
-│   │   ├── SendMessage.js
-│   │   ├── sendBroadToList.js
-│   │   └── ...
-│   ├── Contacts/              # Contact utilities
-│   │   ├── validateContactNumber.js
-│   │   ├── rectifyOnePhoneNumber.js
-│   │   └── ...
-│   ├── Campaigns/             # Campaign management
-│   │   ├── MakeCampaign.js
-│   │   └── MissionOneE.js
-│   ├── GoogleSheet/           # Google Sheets API
-│   │   ├── getGoogleSheet.js
-│   │   ├── WriteToSheet.js
-│   │   └── ...
-│   └── Time/                  # Timing utilities
-│       ├── sleepTime.js
-│       ├── RandomDelay.js
-│       └── ...
+├── code/                            # Core application (483 files)
+│   ├── WhatsAppBot/                 # WhatsApp client, bootstrap, session mgmt
+│   ├── Commands/                    # Bot command handlers (56 commands)
+│   ├── Database/                    # Mongoose schemas (16 models)
+│   ├── Services/                    # Business logic & calculation engines
+│   ├── Routes/                      # Express API routes (94 endpoints)
+│   ├── Message/                     # Message sending & formatting
+│   ├── Contacts/                    # Contact validation & linking
+│   ├── Campaigns/                   # Bulk messaging campaigns
+│   ├── GoogleSheet/                 # Google Sheets API integration
+│   ├── AI/                          # AI-powered features
+│   ├── Analytics/                   # Real-time analytics
+│   ├── utils/                       # Shared utilities
+│   └── ...                          # 30+ organized modules
 │
-├── Inputs/                     # Contact lists and configurations
-│   ├── ArslanNumbers.js
-│   ├── NawalNumbers.js
-│   └── ...
+├── bot/                             # Bot framework (hybrid architecture)
+├── scripts/                         # Utility & migration scripts
+├── tests/                           # Test suites (890 tests)
+├── docs/                            # All documentation
+│   ├── phases/                      # Phase 1-30 implementation docs
+│   ├── sessions/                    # Session notes & summaries
+│   ├── guides/                      # Setup, deployment & reference guides
+│   ├── delivery/                    # Delivery packages & summaries
+│   ├── architecture/                # Architecture diagrams & decisions
+│   ├── security/                    # Security audits & remediation
+│   ├── bot/                         # Bot framework documentation
+│   ├── project/                     # Project status & dashboards
+│   ├── api/                         # API documentation & references
+│   ├── goraha/                      # Goraha account documentation
+│   ├── qr-device/                   # QR code & device linking docs
+│   └── archive/                     # Historical documentation
 │
-├── Outputs/                    # Campaign results and reports
-│
-├── sessions/                   # WhatsApp session storage (git-ignored)
-│
-└── Backup/                     # Archived files
+├── config/                          # Configuration files
+├── data/                            # Data files & JSON databases
+├── logs/                            # Application logs
+├── sessions/                        # WhatsApp session storage (git-ignored)
+├── Inputs/                          # Contact lists & configurations
+└── Outputs/                         # Campaign results & reports
 ```
 
 ---
@@ -135,215 +153,117 @@ WhatsApp-Bot-Linda/
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+```bash
+cp .env.example .env
+```
 
+Key variables:
 ```env
-# Bot Settings
-NODE_ENV=development
-LOG_LEVEL=debug
-DEBUG_MODE=true
-
-# WhatsApp Bots
-BOT_NUMBERS=971501234567,971509876543
-BOT_ENABLE_PAIRING_CODE=true
-BOT_SESSION_STORE_PATH=./sessions
-
-# Google Sheets
-GOOGLE_SHEETS_KEY_PATH=./code/GoogleAPI/keys.json
-GOOGLE_SHEET_ID=your_spreadsheet_id
-
-# Server
+NODE_ENV=production
+MONGODB_URI=mongodb://localhost:27017/linda-bot
+GOOGLE_SERVICE_ACCOUNT_KEY_BASE64=<base64-encoded-key>
+GOOGLE_SHEET_ID=<your-spreadsheet-id>
 PORT=3000
-HOST=localhost
-
-# Delays (milliseconds)
-MESSAGE_DELAY_MS=1000
-BATCH_DELAY_MS=5000
-
-# Validation
-COUNTRY_CODE_VALIDATION=true
-PRIMARY_COUNTRY_CODE=971
-```
-
-### Log Levels
-
-- `error` - Only errors
-- `warn` - Warnings and errors
-- `info` - Info, warnings, and errors
-- `debug` - All messages (development)
-
----
-
-## 💻 Usage
-
-### Starting a Single Bot
-
-```javascript
-import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
-import { WhatsAppClientFunctions } from "./code/WhatsAppBot/WhatsAppClientFunctions.js";
-
-const botNumber = "971501234567";
-const client = await CreatingNewWhatsAppClient(botNumber);
-WhatsAppClientFunctions(client, botNumber, true); // true = enable pairing code
-```
-
-### Sending a Message
-
-```javascript
-import { SendMessage } from "./code/Message/SendMessage.js";
-
-const result = await SendMessage(client, "971501234567", "Hello!");
-```
-
-### Running a Campaign
-
-```javascript
-import { MakeCampaign } from "./code/Campaigns/MakeCampaign.js";
-
-const result = await MakeCampaign(contactList, messageTemplate);
-```
-
-### Validating Phone Numbers
-
-```javascript
-import { validatePhoneNumber } from "./validation.js";
-
-if (validatePhoneNumber("971501234567")) {
-  console.log("Valid phone number");
-}
 ```
 
 ---
 
-## 🛠️ Development
+## 🔌 API Endpoints
 
-### Install Dependencies
-
+Start the API server:
 ```bash
-npm install
+npm run express-server      # With live MongoDB
+npm run express-inmemory    # With in-memory MongoDB (dev)
 ```
 
-### Run in Development Mode
+| Feature | Endpoints | Base Path |
+|---------|-----------|-----------|
+| Communication Templates | 16 | `/api/communication` |
+| Commission Rules | 17 | `/api/commission-rules` |
+| Analytics & Reporting | 14 | `/api/analytics` |
+| Invoices & Payments | 25 | `/api/invoices` |
+| Notifications | 22 | `/api/notifications` |
+| Properties | varies | `/api/properties` |
+| Tenants | varies | `/api/tenants` |
+| Contacts | varies | `/api/contacts` |
+
+---
+
+## 💬 Bot Commands
+
+56 commands available via WhatsApp. Examples:
+```
+!template list              # List communication templates
+!commission calculate       # Calculate commission on a deal
+!analytics portfolio        # Portfolio performance summary
+!invoice create             # Create a new invoice
+!notify scan                # Scan for due notifications
+!help                       # Show all available commands
+```
+
+---
+
+## 🧪 Testing
 
 ```bash
+# Run all Phase 5 feature tests (890 tests)
+npm run test:phase5
+
+# Individual feature tests
+npm run test:communication    # 120 tests
+npm run test:commission       # 95 tests
+npm run test:analytics        # 192 tests
+npm run test:invoice          # 243 tests
+npm run test:notification     # 240 tests
+
+# Infrastructure tests
+npm run phase5-express        # E2E + performance + load tests
+npm run test:all-features     # Everything combined
+```
+
+---
+
+## 🚀 Running
+
+```bash
+# Bot (24/7 production mode)
+npm start
+
+# Bot (development with auto-reload)
 npm run dev
-# Auto-reloads on file changes
-```
 
-### Code Quality
+# API Server
+npm run express-server
 
-```bash
-# Check for linting issues
-npm run lint
-
-# Auto-fix linting issues
-npm run lint:fix
-
-# Format code with Prettier
-npm run format
-```
-
-### Logging
-
-Logs are written to `./logs/bot.log` and console:
-
-```javascript
-import logger from "./logger.js";
-
-logger.info("Bot started");
-logger.warn("Unusual activity", { userId: 123 });
-logger.error("Failed to send message", { number: "971501234567" });
-logger.debug("Detailed debugging info");
-```
-
-### Error Handling
-
-```javascript
-import { handleError, withErrorHandling, ValidationError } from "./errorHandler.js";
-
-try {
-  // ... code
-} catch (error) {
-  handleError(error, { context: "sending message" });
-}
-
-// Or wrap async functions
-const safeSendMessage = withErrorHandling(SendMessage, { operation: "send" });
+# API Server (development with auto-reload)
+npm run express-dev
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 📚 Documentation
 
-### Bot Not Connecting
+All documentation is organized in `docs/`:
 
-1. **Check credentials**: Verify phone number format
-2. **QR Code not scanning**: Try linking device again
-3. **Session expired**: Delete session folder and restart
-
-### Messages Not Sending
-
-1. **Check delays**: Increase `MESSAGE_DELAY_MS` in .env
-2. **Rate limiting**: Verify contact list count
-3. **Number validation**: Use `validatePhoneNumber()` to check format
-
-### Google Sheets API Errors
-
-1. **Authentication**: Verify `keys.json` is valid
-2. **Permissions**: Check sheet is shared with service account
-3. **Sheet ID**: Confirm correct ID in .env
-
-### High Memory Usage
-
-1. **Reduce batch size**: Lower `CAMPAIGN_BATCH_SIZE`
-2. **Increase delays**: Higher message delays
-3. **Monitor processes**: Use `ps aux | grep node`
-
----
-
-## 📊 Logging and Monitoring
-
-All bot activity is logged to `./logs/bot.log`:
-
-```
-[2026-02-06T10:30:45.123Z] [INFO] WhatsAppBot: Bot started
-[2026-02-06T10:30:46.456Z] [DEBUG] WhatsAppBot: Authenticating...
-[2026-02-06T10:30:47.789Z] [INFO] WhatsAppBot: Client is ready
-```
-
-Monitor logs in real-time:
-
-```bash
-# Unix/Linux/macOS
-tail -f logs/bot.log
-
-# Windows
-powershell "Get-Content logs/bot.log -Wait"
-```
-
----
-
-## 📞 Support
-
-For issues or questions:
-
-1. Check the troubleshooting section
-2. Review log files in `./logs/`
-3. Check `.env` configuration
-4. Verify WhatsApp session is active
+| Folder | Contents |
+|--------|----------|
+| `docs/phases/` | Phase 1-30 implementation documentation (343 files) |
+| `docs/sessions/` | Session notes and work summaries (157 files) |
+| `docs/guides/` | Setup, deployment, and reference guides (57 files) |
+| `docs/delivery/` | Delivery packages and summaries |
+| `docs/architecture/` | Architecture diagrams and decisions |
+| `docs/security/` | Security audits and remediation guides |
+| `docs/bot/` | Bot framework documentation |
+| `docs/project/` | Project status dashboards and reports |
+| `docs/api/` | API documentation and references |
 
 ---
 
 ## 📄 License
 
-ISC License - See LICENSE file for details
-
----
+ISC License — See LICENSE file for details.
 
 ## 👤 Author
 
-**Arslan Malik**
-
-Created: 2026-02-06  
-Last Updated: 2026-02-06
+**Arslan Malik** — Built for 24/7 production real estate operations in Dubai/UAE.
 
