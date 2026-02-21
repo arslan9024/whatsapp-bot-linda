@@ -8,6 +8,8 @@
  * @since Phase 13 — February 14, 2026
  */
 
+import services from './ServiceRegistry.js';
+
 /**
  * @param {Object} opts
  * @param {Function}   opts.logBot
@@ -816,6 +818,10 @@ export function setupTerminalInputListener(opts) {
         }
       },
     };
+
+    // Register callbacks for WhatsAppCommandBridge (Phase 31)
+    // This allows the bridge to invoke the same callbacks from WhatsApp messages
+    services.register('terminalCallbacks', callbacks);
 
     terminalHealthDashboard.startInteractiveMonitoring(callbacks);
   } catch (error) {

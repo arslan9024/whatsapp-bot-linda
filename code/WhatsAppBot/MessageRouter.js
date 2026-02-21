@@ -35,6 +35,7 @@ import services from '../utils/ServiceRegistry.js';
  * @property {object|null}    uptimeTracker            - UptimeTracker for SLA (Phase 29e)
  * @property {object|null}    reportGenerator          - ReportGenerator for exports (Phase 29e)
  * @property {object|null}    metricsDashboard         - MetricsDashboard for display (Phase 29e)
+ * @property {object|null}    commandBridge            - WhatsAppCommandBridge for chat commands (Phase 31)
  */
 
 /**
@@ -64,6 +65,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     uptimeTracker,                  // NEW: Phase 29e - Uptime tracking
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
+    commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
   } = deps;
 
   // ═══ LISTENER CLEANUP (Phase 10) ═══
@@ -160,6 +162,18 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       // ── Master account detection ────────────────────────────────
       const masterPhone = accountConfigManager?.getMasterPhoneNumber();
       const isMasterAccount = phoneNumber === masterPhone;
+
+      // ── WhatsApp Command Bridge (Phase 31) ─────────────────────
+      // Intercept "linda <command>" messages from other master accounts
+      if (isMasterAccount && commandBridge && !msg.fromMe && !msg.from?.includes('@g.us')) {
+        if (commandBridge.shouldHandle(msg, phoneNumber)) {
+          const handled = await commandBridge.handleMessage(msg);
+          if (handled) {
+            logBot(`📱 Bridge command processed from ${msg.from}`, 'success');
+            return;
+          }
+        }
+      }
 
       // ── Linda AI command system (master only) ───────────────────
       if (isMasterAccount && commandHandler && msg.body.startsWith('!')) {

@@ -119,6 +119,11 @@ import ReportGenerator from "./code/utils/ReportGenerator.js";
 import MetricsDashboard from "./code/utils/MetricsDashboard.js";
 import GoogleSheetsManager from "./code/utils/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
 
+// PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
+// Allows master accounts to send "linda <command>" messages to primary master
+// for remote command execution with console output capture
+import { WhatsAppCommandBridge } from "./code/WhatsAppBot/WhatsAppCommandBridge.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -176,6 +181,7 @@ let uptimeTracker = null;  // Uptime monitoring with SLA compliance (NEW - Phase
 let reportGenerator = null;  // Multi-format report generation (NEW - Phase 29e)
 let metricsDashboard = null;  // Terminal-based metrics display (NEW - Phase 29e)
 let googleSheetsManager = null;  // Google Sheets CRUD operations (NEW - Phase 30)
+let commandBridge = null;  // WhatsApp Command Bridge (NEW - Phase 31)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -271,6 +277,7 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     uptimeTracker,                  // NEW: Phase 29e - Uptime tracking
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
+    commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
   });
 }
 
@@ -904,6 +911,26 @@ async function initializeBot() {
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");
     logBot("   Chat commands: Type !help for full command list", "info");
     logBot("", "info");
+
+    // ============================================
+    // STEP 9: Initialize WhatsApp Command Bridge (Phase 31 - Feb 21, 2026)
+    // ============================================
+    // Allows other master accounts to send "linda <command>" to primary master
+    // for remote command execution via WhatsApp chat
+    if (!commandBridge) {
+      commandBridge = new WhatsAppCommandBridge({
+        logBot,
+        accountConfigManager,
+        terminalHealthDashboard,
+        deviceLinkedManager,
+      });
+      services.register('commandBridge', commandBridge);
+      logBot("✅ Phase 31: WhatsApp Command Bridge initialized", "success");
+      logBot("   - Send 'linda help' from any master account to primary master", "info");
+      logBot("   - Bridges terminal commands to WhatsApp with output capture", "info");
+    }
+    logBot("", "info");
+
     logBot("🔗 TO LINK MASTER WHATSAPP ACCOUNT:", "info");
     logBot("   Type: link master", "info");
     logBot("", "info");
