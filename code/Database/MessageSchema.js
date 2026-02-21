@@ -137,7 +137,7 @@ const messageSchema = new Schema({
   processed: Boolean,
   processingTime: Number,
   errors: [String],
-}, { collection: 'messages', timestamps: true });
+}, { collection: 'messages', timestamps: true, suppressReservedKeysWarning: true });
 
 // ============================================
 // CONVERSATION SCHEMA

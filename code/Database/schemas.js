@@ -293,7 +293,7 @@ const syncLogSchema = new Schema({
   sourceFile: String,
   duration: Number, // milliseconds
   notes: String,
-}, { collection: 'sync_logs' });
+}, { collection: 'sync_logs', suppressReservedKeysWarning: true });
 
 // ============================================
 // CREATE MODELS

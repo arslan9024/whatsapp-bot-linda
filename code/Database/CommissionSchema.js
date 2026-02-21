@@ -46,7 +46,7 @@ const commissionSchema = new mongoose.Schema({
   // Deal Information
   dealId: {
     type: String,
-    index: true
+    // index defined via schema.index() below — no inline duplicate
   },
   
   propertyAddress: {
