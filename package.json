@@ -39,8 +39,9 @@
         "test:analytics": "node scripts/test-analytics-feature.js",
         "test:invoice": "node scripts/test-invoice-feature.js",
         "test:notification": "node scripts/test-notification-feature.js",
+        "test:bridge": "node scripts/test-command-bridge.js",
         "test:phase5": "npm run test:communication && echo '' && npm run test:commission && echo '' && npm run test:analytics && echo '' && npm run test:invoice && echo '' && npm run test:notification",
-        "test:all-features": "npm run phase5-express && echo '' && npm run test:phase5"
+        "test:all-features": "npm run phase5-express && echo '' && npm run test:phase5 && echo '' && npm run test:bridge"
     },
     "nodemonConfig": {
         "ignore": [
