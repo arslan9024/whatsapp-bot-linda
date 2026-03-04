@@ -8,6 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { apiLimiter } from './middleware/rateLimit.js';
 
 // Import all route handlers
 import peopleRoutes from './routes/people.routes.js';
@@ -61,6 +62,9 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// Apply rate limiting globally (can be fine-tuned per route)
+app.use(apiLimiter);
 
 // ========================================
 // DATABASE CONNECTION
@@ -154,8 +158,24 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.message);
-  console.error('Stack:', err.stack);
+  // Redact sensitive fields from error output
+  const redact = (obj) => {
+    if (!obj) return obj;
+    const clone = { ...obj };
+    if (clone.password) clone.password = '[REDACTED]';
+    if (clone.token) clone.token = '[REDACTED]';
+    if (clone.secret) clone.secret = '[REDACTED]';
+    return clone;
+  };
+  const safeError = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    details: redact(err.details),
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    timestamp: new Date().toISOString(),
+  };
+  console.error('❌ Error:', safeError);
 
   // MongoDB validation error
   if (err.name === 'ValidationError') {
@@ -166,7 +186,6 @@ app.use((err, req, res, next) => {
       timestamp: new Date().toISOString()
     });
   }
-
   // MongoDB duplicate key error
   if (err.code === 11000) {
     return res.status(409).json({
@@ -176,7 +195,6 @@ app.use((err, req, res, next) => {
       timestamp: new Date().toISOString()
     });
   }
-
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
@@ -185,11 +203,10 @@ app.use((err, req, res, next) => {
       timestamp: new Date().toISOString()
     });
   }
-
   // Default error
   res.status(err.statusCode || 500).json({
     success: false,
-    error: err.message || 'Internal server error',
+    error: safeError,
     timestamp: new Date().toISOString()
   });
 });

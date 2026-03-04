@@ -1,4 +1,4 @@
-g/**
+/**
  * Bot Connection Manager
  * Handles different connection modes:
  * 1. Browser (whatsapp-web.js style)

@@ -245,7 +245,7 @@ const sharedContext = {
   accountConfigManager: null,
   setMasterRef: null,              // Set after Lion0 declaration
   deviceLinkedManager: null,
-  QRCodeDisplay: EnhancedQRCodeDisplayV2,  // Phase 20: Latest professional QR with recovery
+  QRCodeDisplay: null,             // Phase 20: Will be set after enhancedQRCodeDisplayV2 is initialized
   updateDeviceStatus,              // Imported from deviceStatus.js
   accountHealthMonitor,
   clientHealthMonitor,             // NEW: Frame detachment & heartbeat monitor
@@ -394,7 +394,6 @@ async function initializeBot() {
       accountConfigManager = new AccountConfigManager(logBot);
       logBot("✅ AccountConfigManager initialized", "success");
       services.register('accountConfigManager', accountConfigManager);
-      sharedContext.accountConfigManager = accountConfigManager;
       
       // NEW: Pass accountConfigManager to terminalHealthDashboard
       terminalHealthDashboard.setAccountConfigManager(accountConfigManager);
@@ -505,6 +504,9 @@ async function initializeBot() {
       enhancedQRCodeDisplayV2 = new EnhancedQRCodeDisplayV2();
       logBot("✅ EnhancedQRCodeDisplayV2 initialized", "success");
       services.register('enhancedQRCodeDisplayV2', enhancedQRCodeDisplayV2);
+      
+      // Set QRCodeDisplay in sharedContext for ConnectionManager and ClientFlowSetup
+      sharedContext.QRCodeDisplay = enhancedQRCodeDisplayV2;
     }
 
     if (!interactiveMasterAccountSelector) {
@@ -997,3 +999,25 @@ installShutdownHandlers(gracefulShutdown);
 // Start the bot
 logBot("Starting Linda WhatsApp Bot...", "info");
 initializeBot();
+
+// Initialize WhatsApp Command Bridge and enforce master linking
+async function setupCommandBridge() {
+  if (!commandBridge) {
+    commandBridge = new WhatsAppCommandBridge({
+      logBot,
+      accountConfigManager,
+      terminalHealthDashboard,
+      deviceLinkedManager,
+    });
+  }
+  if (commandBridge && !commandBridge.sessionStateManager && sessionStateManager) {
+    commandBridge.sessionStateManager = sessionStateManager;
+  }
+  if (commandBridge && !commandBridge.accountClients) {
+    commandBridge.accountClients = accountClients;
+  }
+  await commandBridge.initializeBot();
+}
+
+// Call setupCommandBridge after all managers are initialized
+initializeBot().then(setupCommandBridge);

@@ -106,9 +106,8 @@ describe('MessageTemplateEngine', () => {
       expect(result.content).toContain('John');
     });
 
-    it.skip('should render template with multiple variables', () => {
-      // TODO: Fix template lifecycle management
-      // Create fresh template for this test
+    it('should render template with multiple variables', () => {
+      // FIXED: Template lifecycle management now works correctly
       engine.createTemplate({
         name: 'order',
         content: 'Order #{{orderId}} for {{customer}}: {{amount}}'
@@ -120,6 +119,7 @@ describe('MessageTemplateEngine', () => {
         amount: '$99.99'
       });
 
+      expect(result.success).toBe(true);
       expect(result.content).toContain('12345');
       expect(result.content).toContain('John Doe');
       expect(result.content).toContain('$99.99');
@@ -187,14 +187,8 @@ describe('MessageTemplateEngine', () => {
       });
     });
 
-    it.skip('should render batch templates for multiple recipients', async () => {
-      // TODO: Fix template lifecycle management in batch context
-      // Create fresh template for this test
-      engine.createTemplate({
-        name: 'batch_test',
-        content: 'Hello {{name}}, welcome!'
-      });
-      
+    it('should render batch templates for multiple recipients', async () => {
+      // FIXED: Template lifecycle management now works in batch context
       const recipients = [
         { id: 'user1', variables: { name: 'Alice' } },
         { id: 'user2', variables: { name: 'Bob' } },
@@ -210,14 +204,8 @@ describe('MessageTemplateEngine', () => {
       expect(result.messages[2].content).toContain('Charlie');
     });
 
-    it.skip('should handle batch with 100 recipients', async () => {
-      // TODO: Fix template lifecycle management in batch context
-      // Create fresh template for this test
-      engine.createTemplate({
-        name: 'batch_test',
-        content: 'Hello {{name}}, welcome!'
-      });
-      
+    it('should handle batch with 100 recipients', async () => {
+      // FIXED: Template lifecycle management now works in batch context
       const recipients = Array.from({ length: 100 }, (_, i) => ({
         id: `user_${i}`,
         variables: { name: `User ${i}` }
@@ -229,14 +217,8 @@ describe('MessageTemplateEngine', () => {
       expect(result.messages).toHaveLength(100);
     });
 
-    it.skip('should track batch processing time', async () => {
-      // TODO: Fix template lifecycle management in batch context
-      // Create fresh template for this test
-      engine.createTemplate({
-        name: 'batch_test',
-        content: 'Hello {{name}}, welcome!'
-      });
-      
+    it('should track batch processing time', async () => {
+      // FIXED: Template lifecycle management now works in batch context
       const recipients = fixtures.recipients;
 
       const result = await engine.renderBatchTemplates('batch_test', recipients);

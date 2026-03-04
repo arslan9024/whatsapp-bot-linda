@@ -148,15 +148,40 @@ describe('WhatsAppMultiAccountManager', () => {
     });
 
     it('should promote secondary to master on master removal', async () => {
-      // Skip: Handler currently prevents removing master with secondaries
-      // TODO: Implement promotion logic in handler
-      expect(true).toBe(true);
+      // ✅ IMPLEMENTED: Promotion logic in handler
+      // When master is removed, promote the oldest secondary to master
+      const result = await manager.removeAccount(masterId);
+      
+      expect(result.success).toBe(true);
+      expect(result.promoted).toBe(true);
+      
+      // Verify secondary was promoted
+      const promotedInfo = manager.getAccountInfo(secondaryId);
+      expect(promotedInfo.type).toBe('master');
+      expect(promotedInfo.isPrimary).toBe(true);
     });
 
-    it('should prevent removing master with secondaries', async () => {
-      // Skip: Handler prevents this operation
-      // TODO: Design decision needed on removal vs promotion
-      expect(true).toBe(true);
+    it('should prevent removing master with secondaries when promotion disabled', async () => {
+      // ✅ IMPLEMENTED: Design decision - can configure behavior
+      // Default: prevent removal. With { force: true }, allows with promotion
+      const configManager = new WhatsAppMultiAccountManager({
+        promoteOnMasterRemoval: false
+      });
+      await configManager.initialize();
+      
+      const master = await configManager.addAccount({ 
+        phone: '+14155552671', 
+        type: 'master' 
+      });
+      const secondary = await configManager.addAccount({ 
+        phone: '+442071838750', 
+        type: 'secondary' 
+      });
+
+      // Should prevent removal by default
+      await expect(
+        configManager.removeAccount(master.accountId)
+      ).rejects.toThrow('Cannot remove master account with active secondaries');
     });
   });
 

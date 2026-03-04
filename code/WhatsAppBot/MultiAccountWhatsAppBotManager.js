@@ -13,6 +13,7 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Client, LocalAuth } from 'whatsapp-web.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,59 @@ class MultiAccountWhatsAppBotManager {
     } catch (error) {
       console.error('Error loading bots configuration:', error.message);
       throw new Error('Failed to load WhatsApp bots configuration');
+    }
+  }
+
+  /**
+   * ✅ IMPLEMENTED: Initialize WhatsApp client for a bot
+   * Creates and initializes a WhatsApp client instance for the specified bot
+   * @param {Object} botConfig - Bot configuration
+   * @returns {Promise<Client>} - Initialized WhatsApp client
+   */
+  async createWhatsAppClient(botConfig) {
+    try {
+      const sessionPath = path.join(__dirname, '..', '..', 'sessions', botConfig.id);
+      
+      const client = new Client({
+        authStrategy: new LocalAuth({
+          dataPath: sessionPath
+        }),
+        puppeteer: {
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        }
+      });
+
+      // Set up event handlers
+      client.on('ready', () => {
+        console.log(`✅ [${botConfig.displayName}] WhatsApp client ready`);
+      });
+
+      client.on('authenticated', () => {
+        console.log(`🔐 [${botConfig.displayName}] Authenticated successfully`);
+      });
+
+      client.on('auth_failure', (error) => {
+        console.error(`❌ [${botConfig.displayName}] Authentication failed:`, error.message);
+      });
+
+      client.on('disconnected', (reason) => {
+        console.log(`📴 [${botConfig.displayName}] Disconnected: ${reason}`);
+      });
+
+      client.on('message', (msg) => {
+        console.log(`📨 [${botConfig.displayName}] Message from ${msg.from}: ${msg.body.substring(0, 50)}...`);
+      });
+
+      // Initialize the client
+      await client.initialize();
+      
+      console.log(`🤖 [${botConfig.displayName}] WhatsApp client initialized`);
+      return client;
+      
+    } catch (error) {
+      console.error(`❌ [${botConfig.displayName}] Failed to create WhatsApp client:`, error.message);
+      throw error;
     }
   }
 
@@ -75,8 +129,17 @@ class MultiAccountWhatsAppBotManager {
             error: null
           };
 
-          // TODO: Initialize WhatsApp client for this bot
-          // This would connect to WhatsApp using the session path
+          // ✅ IMPLEMENTED: Initialize WhatsApp client for this bot
+          // This connects to WhatsApp using the session path
+          try {
+            const client = await this.createWhatsAppClient(botConfig);
+            botInstance.client = client;
+            botInstance.initialized = true;
+            console.log(`✅ ${botConfig.displayName} WhatsApp client ready`);
+          } catch (clientError) {
+            botInstance.error = clientError.message;
+            console.warn(`⚠️ ${botConfig.displayName} client init failed: ${clientError.message}`);
+          }
           
           this.bots.set(botKey, botInstance);
 
@@ -173,7 +236,7 @@ class MultiAccountWhatsAppBotManager {
   }
 
   /**
-   * Send message from specific bot
+   * ✅ IMPLEMENTED: Send message from specific bot
    * @param {string} botId - Bot ID or phone number
    * @param {string} chatId - Target chat ID
    * @param {string} message - Message text
@@ -190,14 +253,21 @@ class MultiAccountWhatsAppBotManager {
       throw new Error(`Bot is disabled: ${bot.displayName}`);
     }
 
+    if (!bot.client) {
+      throw new Error(`Bot client not initialized: ${bot.displayName}`);
+    }
+
     try {
       console.log(`📨 [${bot.displayName}] Sending to ${chatId}...`);
       
-      // Send message using bot client
-      // TODO: Implement actual message sending
+      // ✅ IMPLEMENTED: Actual message sending using bot client
+      const sentMessage = await bot.client.sendMessage(chatId, message);
+      
+      console.log(`✅ [${bot.displayName}] Message sent successfully`);
       
       return {
         success: true,
+        messageId: sentMessage.id._serialized,
         botName: bot.displayName,
         botPhone: bot.phoneNumber,
         targetChat: chatId,
@@ -205,6 +275,85 @@ class MultiAccountWhatsAppBotManager {
       };
     } catch (error) {
       console.error(`Error sending message from ${bot.displayName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ IMPLEMENTED: Send message with media from specific bot
+   * @param {string} botId - Bot ID or phone number
+   * @param {string} chatId - Target chat ID
+   * @param {string|MessageMedia} media - Media file path or MessageMedia object
+   * @param {string} caption - Optional caption
+   * @returns {Promise<Object>} - Send result
+   */
+  async sendMediaFromBot(botId, chatId, media, caption = null) {
+    const bot = this.bots.get(botId) || this.getBotByPhone(botId);
+    
+    if (!bot) {
+      throw new Error(`Bot not found: ${botId}`);
+    }
+
+    if (!bot.client) {
+      throw new Error(`Bot client not initialized: ${bot.displayName}`);
+    }
+
+    try {
+      console.log(`📨 [${bot.displayName}] Sending media to ${chatId}...`);
+      
+      const options = caption ? { caption } : {};
+      const sentMessage = await bot.client.sendMessage(chatId, media, options);
+      
+      return {
+        success: true,
+        messageId: sentMessage.id._serialized,
+        botName: bot.displayName,
+        botPhone: bot.phoneNumber,
+        targetChat: chatId,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error(`Error sending media from ${bot.displayName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ IMPLEMENTED: Send location from specific bot
+   * @param {string} botId - Bot ID or phone number
+   * @param {string} chatId - Target chat ID
+   * @param {number} latitude - Latitude
+   * @param {number} longitude - Longitude
+   * @param {string} title - Optional title
+   * @returns {Promise<Object>} - Send result
+   */
+  async sendLocationFromBot(botId, chatId, latitude, longitude, title = null) {
+    const bot = this.bots.get(botId) || this.getBotByPhone(botId);
+    
+    if (!bot) {
+      throw new Error(`Bot not found: ${botId}`);
+    }
+
+    if (!bot.client) {
+      throw new Error(`Bot client not initialized: ${bot.displayName}`);
+    }
+
+    try {
+      console.log(`📍 [${bot.displayName}] Sending location to ${chatId}...`);
+      
+      const options = title ? { title } : {};
+      const sentMessage = await bot.client.sendLocation(chatId, latitude, longitude, options);
+      
+      return {
+        success: true,
+        messageId: sentMessage.id._serialized,
+        botName: bot.displayName,
+        botPhone: bot.phoneNumber,
+        targetChat: chatId,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error(`Error sending location from ${bot.displayName}:`, error);
       throw error;
     }
   }
@@ -282,6 +431,34 @@ class MultiAccountWhatsAppBotManager {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Disconnect a specific bot
+   * @param {string} botId - Bot ID
+   */
+  async disconnectBot(botId) {
+    const bot = this.bots.get(botId);
+    if (bot && bot.client) {
+      await bot.client.destroy();
+      bot.client = null;
+      bot.initialized = false;
+      console.log(`[BotManager] ${bot.displayName} disconnected`);
+    }
+  }
+
+  /**
+   * Disconnect all bots
+   */
+  async disconnectAll() {
+    for (const [botId, bot] of this.bots.entries()) {
+      if (bot.client) {
+        await bot.client.destroy();
+        bot.client = null;
+      }
+    }
+    this.bots.clear();
+    console.log('[BotManager] All bots disconnected');
   }
 
   /**

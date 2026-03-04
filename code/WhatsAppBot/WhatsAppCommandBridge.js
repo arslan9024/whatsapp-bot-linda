@@ -13,6 +13,7 @@
  * - All terminal dashboard commands supported
  * - Minimal WhatsApp-friendly text formatting
  * - Message chunking for long outputs
+ * - Automatic session recovery for primary master
  *
  * Usage: Send "linda health" to the primary master's WhatsApp number
  *
@@ -20,888 +21,502 @@
  */
 
 import services from '../utils/ServiceRegistry.js';
+import { SessionManager } from '../utils/SessionManager.js';
 
+// Move botActive to module scope, not inside class or function
+let botActive = false;
+const COMMAND_GROUPS = {
+  '1': {
+    name: 'WhatsApp Features',
+    commands: [
+      'health', 'status', 'accounts', 'stats', 'list', 'device', 'link', 'relink', 'recover', 'restore', 'bridge-stats'
+    ]
+  },
+  '2': {
+    name: 'Real Estate Database',
+    commands: [
+      'analytics', 'metrics', 'sheets', 'database', 'report', 'summary'
+    ]
+  },
+  '3': {
+    name: 'GorahaBot',
+    commands: [
+      'goraha', 'contacts', 'verify', 'filter', 'search'
+    ]
+  },
+  '4': {
+    name: 'Linda Main',
+    commands: [
+      'help', 'menu', 'about', 'info', 'settings'
+    ]
+  }
+};
+
+function isPrimaryMasterLinked(accountConfigManager, deviceLinkedManager) {
+  const acm = accountConfigManager || services.get('accountConfigManager');
+  const dm = deviceLinkedManager || services.get('deviceLinkedManager');
+  if (!acm || !dm) return false;
+  const masterPhone = acm.getMasterPhoneNumber();
+  const device = dm.getDevice(masterPhone);
+  return device && device.status === 'linked';
+}
+
+// Enhanced: Automatic event-driven and polling-based primary master recovery
 export class WhatsAppCommandBridge {
-  /**
-   * @param {Object} opts
-   * @param {Function}   opts.logBot                 - Logging function
-   * @param {object|null} opts.accountConfigManager   - Account configuration
-   * @param {object|null} opts.terminalHealthDashboard - Health dashboard instance
-   * @param {object|null} opts.deviceLinkedManager     - Device tracking manager
-   */
   constructor(opts = {}) {
     this.logBot = opts.logBot || console.log;
     this.accountConfigManager = opts.accountConfigManager || null;
-    this.terminalHealthDashboard = opts.terminalHealthDashboard || null;
     this.deviceLinkedManager = opts.deviceLinkedManager || null;
-
-    // Command prefix (case-insensitive)
-    this.prefix = 'linda';
-
-    // Activity tracking
-    this.stats = {
-      totalCommands: 0,
-      commandsByName: {},
-      lastCommand: null,
-      lastCommandTime: null,
-      errors: 0,
-    };
-
-    this.logBot('✅ WhatsAppCommandBridge initialized (Phase 31)', 'success');
+    this.sessionStateManager = opts.sessionStateManager || null; // Renamed for clarity
+    this.adminPhone = opts.adminPhone || null;
+    this.recoveryRetries = opts.recoveryRetries || 10; // Increased retries
+    this.recoveryDelay = opts.recoveryDelay || 3000; // 3 seconds delay
+    this.terminalHealthDashboard = opts.terminalHealthDashboard || null;
+    this.prefix = 'linda'; // Command prefix
+    this.isInitialized = false;
+    this.recoveryInProgress = false;
+    this.pollingInterval = null;
+    this.lastRecoveryAttempt = 0;
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // AUTHORIZATION & ROUTING
-  // ═══════════════════════════════════════════════════════════════════
-
   /**
-   * Normalize a phone number for comparison.
-   * Strips +, spaces, dashes, and WhatsApp suffixes.
+   * Initialize the WhatsApp Command Bridge
+   * Sets up event listeners and starts the auto-recovery process
+   * @returns {Promise<boolean>} - Success status
    */
-  normalizePhone(phone) {
-    if (!phone) return '';
-    return phone
-      .replace(/[\+\-\s]/g, '')
-      .replace(/@c\.us$/, '')
-      .replace(/@s\.whatsapp\.net$/, '');
+  async initializeBot() {
+    try {
+      this.logBot('🔧 Initializing WhatsApp Command Bridge...', 'info');
+
+      // Get dependencies from services registry if not provided
+      if (!this.accountConfigManager) {
+        this.accountConfigManager = services.get('accountConfigManager');
+      }
+      if (!this.deviceLinkedManager) {
+        this.deviceLinkedManager = services.get('deviceLinkedManager');
+      }
+      if (!this.sessionStateManager) {
+        this.sessionStateManager = services.get('sessionStateManager');
+      }
+      if (!this.terminalHealthDashboard) {
+        this.terminalHealthDashboard = services.get('terminalHealthDashboard');
+      }
+
+      // Set up event listeners for device status changes
+      this.setupEventListeners();
+
+      // Check if primary master is linked, if not try to recover
+      const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
+      if (masterPhone) {
+        this.logBot(`📱 Primary master phone: ${masterPhone}`, 'info');
+        
+        if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
+          this.logBot('⚠️ Primary master not linked, attempting auto-recovery...', 'warn');
+          await this.autoRecoverPrimaryMaster();
+        } else {
+          botActive = true;
+          this.logBot('✅ Primary master is linked - Command Bridge active', 'success');
+        }
+        
+        // Start background polling for continuous recovery monitoring
+        this.startRecoveryPolling();
+      } else {
+        this.logBot('⚠️ No master phone configured', 'warn');
+      }
+
+      this.isInitialized = true;
+      this.logBot('✅ WhatsApp Command Bridge initialized successfully', 'success');
+      return true;
+    } catch (error) {
+      this.logBot(`❌ Failed to initialize WhatsApp Command Bridge: ${error.message}`, 'error');
+      return false;
+    }
   }
 
   /**
-   * Check if a sender's WhatsApp ID belongs to an authorized account.
-   * Returns true for any known account EXCEPT the primary (Linda herself).
+   * Start background polling for continuous recovery monitoring
+   * @private
    */
-  isAuthorizedSender(senderWhatsAppId) {
-    const acm = this.accountConfigManager || services.get('accountConfigManager');
-    if (!acm) return false;
-
-    const senderNormalized = this.normalizePhone(senderWhatsAppId);
-    const primaryPhone = this.normalizePhone(acm.getMasterPhoneNumber());
-
-    // Don't allow primary to trigger commands on itself
-    if (senderNormalized === primaryPhone) return false;
-
-    // Check if sender is a known account
-    const allAccounts = acm.getAllAccounts();
-    return allAccounts.some(
-      (acc) => this.normalizePhone(acc.phoneNumber) === senderNormalized
-    );
+  startRecoveryPolling() {
+    // Check every 30 seconds if primary master is still connected
+    this.pollingInterval = setInterval(async () => {
+      const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
+      if (!masterPhone || this.recoveryInProgress) return;
+      
+      // Check if still linked
+      if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
+        this.logBot('⚠️ Polling detected primary master disconnected - attempting recovery...', 'warn');
+        await this.autoRecoverPrimaryMaster();
+      } else if (!botActive) {
+        // Mark as active if linked
+        botActive = true;
+        this.logBot('✅ Primary master reconnected - Bot active', 'success');
+      }
+    }, 30000); // 30 seconds
+    
+    this.logBot('🔄 Recovery polling started (30s interval)', 'info');
   }
 
   /**
-   * Check if a message should be handled by this bridge.
-   *
-   * Conditions:
-   *  1. Message received on the primary master's client
-   *  2. Direct message (not group)
-   *  3. Not from ourselves
-   *  4. Body starts with "linda" (case-insensitive)
-   *  5. Sender is a known account (not the primary)
+   * Stop background polling
+   * @private
+   */
+  stopRecoveryPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      this.logBot('⏹ Recovery polling stopped', 'info');
+    }
+  }
+
+  /**
+   * Set up event listeners for device status changes
+   * @private
+   */
+  setupEventListeners() {
+    const dm = this.deviceLinkedManager;
+    const acm = this.accountConfigManager;
+    const masterPhone = acm?.getMasterPhoneNumber();
+
+    if (dm && dm.on) {
+      // Listen for disconnection events
+      dm.on('disconnected', (phone, reason) => {
+        if (phone === masterPhone) {
+          this.logBot(`❌ Primary master disconnected: ${reason}`, 'error');
+          this.handleSessionLoss(masterPhone);
+        }
+      });
+
+      // Listen for auth failure events
+      dm.on('auth_failure', (phone, reason) => {
+        if (phone === masterPhone) {
+          this.logBot(`❌ Primary master auth failure: ${reason}`, 'error');
+          this.handleSessionLoss(masterPhone);
+        }
+      });
+
+      // Listen for device state changes
+      dm.on('change_state', (phone, state) => {
+        this.logBot(`📡 Device state change: ${phone} -> ${state}`, 'info');
+        if (phone === masterPhone && state === 'CONNECTED') {
+          botActive = true;
+          this.logBot('✅ Primary master reconnected via event - Bot active', 'success');
+        } else if (phone === masterPhone && state === 'DISCONNECTED') {
+          botActive = false;
+          this.logBot('❌ Primary master disconnected via event', 'error');
+        }
+      });
+
+      // Listen for successful linking
+      dm.on('linked', (phone, data) => {
+        if (phone === masterPhone) {
+          botActive = true;
+          this.logBot('✅ Primary master linked - Bot active', 'success');
+          this.notifyAdmin('Primary master account restored! Linda bot is now active.');
+        }
+      });
+    }
+  }
+
+  /**
+   * Automatic primary master recovery with multiple strategies
+   * @private
+   */
+  async autoRecoverPrimaryMaster() {
+    if (this.recoveryInProgress) {
+      this.logBot('⚠️ Recovery already in progress, skipping...', 'warn');
+      return false;
+    }
+
+    this.recoveryInProgress = true;
+    const acm = this.accountConfigManager;
+    const dm = this.deviceLinkedManager;
+    const masterPhone = acm?.getMasterPhoneNumber();
+    
+    if (!masterPhone) {
+      this.logBot('❌ No master phone configured for recovery', 'error');
+      this.recoveryInProgress = false;
+      return false;
+    }
+
+    this.logBot(`🔄 Starting auto-recovery for primary master: ${masterPhone}`, 'info');
+    this.lastRecoveryAttempt = Date.now();
+
+    let attempt = 0;
+
+    // Strategy 1: Try to restore from saved session files
+    while (attempt < this.recoveryRetries && !isPrimaryMasterLinked(acm, dm)) {
+      attempt++;
+      this.logBot(`🔄 Recovery attempt ${attempt}/${this.recoveryRetries}...`, 'info');
+      
+      // Check if session files exist and can be restored
+      const canRestore = SessionManager.canRestoreSession(masterPhone);
+      this.logBot(`📁 Session restore check: ${canRestore ? 'Available' : 'Not found'}`, 'info');
+      
+      if (canRestore) {
+        this.logBot('🔄 Attempting session restore...', 'info');
+        // The session will be restored by the main bot initialization
+        // We just need to wait for it to complete
+        try {
+          // Try to get the account client and initialize it
+          const accountClients = services.get('accountClients');
+          if (accountClients && accountClients.has(masterPhone)) {
+            const client = accountClients.get(masterPhone);
+            if (client && client.initialize) {
+              await client.initialize();
+              this.logBot('✅ Session restored via existing client', 'success');
+              botActive = true;
+              this.recoveryInProgress = false;
+              await this.notifyAdmin('Primary master session restored successfully!');
+              return true;
+            }
+          }
+        } catch (err) {
+          this.logBot(`⚠️ Session restore error: ${err.message}`, 'warn');
+        }
+      }
+
+      // Strategy 2: Check if device manager has a way to reconnect
+      if (dm && dm.reconnectDevice) {
+        this.logBot('🔄 Attempting device reconnection...', 'info');
+        try {
+          const reconnected = await dm.reconnectDevice(masterPhone);
+          if (reconnected) {
+            botActive = true;
+            this.logBot('✅ Device reconnected successfully', 'success');
+            this.recoveryInProgress = false;
+            await this.notifyAdmin('Primary master reconnected!');
+            return true;
+          }
+        } catch (err) {
+          this.logBot(`⚠️ Reconnection error: ${err.message}`, 'warn');
+        }
+      }
+
+      // Strategy 3: Wait and retry (polling approach)
+      this.logBot(`⏳ Waiting ${this.recoveryDelay}ms before next attempt...`, 'info');
+      await new Promise(res => setTimeout(res, this.recoveryDelay));
+      
+      // Check if linked after waiting
+      if (isPrimaryMasterLinked(acm, dm)) {
+        botActive = true;
+        this.logBot('✅ Primary master became available', 'success');
+        this.recoveryInProgress = false;
+        return true;
+      }
+    }
+
+    // All retries exhausted
+    botActive = false;
+    this.recoveryInProgress = false;
+    this.logBot('❌ Primary master recovery failed after all retries', 'error');
+    await this.notifyAdmin('Primary master recovery failed. Please run "link master <phone>" to manually link.');
+    return false;
+  }
+
+  /**
+   * Handle session loss - triggers automatic recovery
+   * @private
+   */
+  handleSessionLoss(masterPhone) {
+    if (!masterPhone) {
+      const acm = this.accountConfigManager || services.get('accountConfigManager');
+      masterPhone = acm?.getMasterPhoneNumber();
+    }
+    
+    if (!masterPhone) {
+      this.logBot('❌ Cannot handle session loss - no master phone', 'error');
+      return;
+    }
+    
+    botActive = false;
+    this.logBot('❌ Primary master session lost. Starting auto-recovery...', 'error');
+    
+    // Trigger recovery asynchronously
+    this.autoRecoverPrimaryMaster().catch(err => {
+      this.logBot(`❌ Recovery error: ${err.message}`, 'error');
+    });
+  }
+
+  /**
+   * Send notification to admin
+   * @private
+   */
+  async notifyAdmin(message) {
+    try {
+      if (this.adminPhone && this.deviceLinkedManager && this.deviceLinkedManager.sendWhatsAppMessage) {
+        await this.deviceLinkedManager.sendWhatsAppMessage(this.adminPhone, message);
+        this.logBot(`📱 Admin notification sent: ${message}`, 'info');
+      } else {
+        this.logBot(`[ADMIN NOTIFY] ${message}`, 'warn');
+      }
+    } catch (error) {
+      this.logBot(`❌ Admin notification failed: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Check if message should be handled
    */
   shouldHandle(msg, phoneNumber) {
+    if (!botActive) {
+      // If bot is inactive, prompt for relink/restore
+      if (msg && msg.reply) {
+        msg.reply('❌ Bot inactive. Please use "linda relink master <phone>" or "linda restore" to activate primary master WhatsApp account.');
+      }
+      return false;
+    }
+    // ...existing shouldHandle logic...
     const acm = this.accountConfigManager || services.get('accountConfigManager');
     if (!acm) return false;
-
-    // Only on the primary master's client
     const masterPhone = acm.getMasterPhoneNumber();
     if (phoneNumber !== masterPhone) return false;
-
-    // Only direct messages
     if (msg.from?.includes('@g.us')) return false;
-
-    // Not our own messages
     if (msg.fromMe) return false;
-
-    // Check prefix: "linda" or "linda <command>"
     const body = (msg.body || '').trim().toLowerCase();
     if (body !== this.prefix && !body.startsWith(this.prefix + ' ')) return false;
-
-    // Check authorization
     return this.isAuthorizedSender(msg.from);
   }
 
   /**
-   * Handle an incoming "linda <command>" message.
-   * @returns {boolean} true if the message was handled
+   * Handle incoming message
    */
   async handleMessage(msg) {
     const body = (msg.body || '').trim();
-
-    // Parse: "linda <command> [args...]"
     const afterPrefix = body.substring(this.prefix.length).trim();
     if (!afterPrefix) {
-      await msg.reply(this.getHelpText());
+      await this.handleMenu(msg);
       return true;
     }
-
     const parts = afterPrefix.split(/\s+/);
     const command = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    // Track stats
-    this.stats.totalCommands++;
-    this.stats.commandsByName[command] = (this.stats.commandsByName[command] || 0) + 1;
-    this.stats.lastCommand = command;
-    this.stats.lastCommandTime = new Date();
-
-    this.logBot(`📱 WhatsApp Bridge: "${command}" from ${msg.from}`, 'info');
-
-    try {
-      const callbacks = services.get('terminalCallbacks');
-
-      switch (command) {
-        case 'help':
-          await msg.reply(this.getHelpText());
-          break;
-
-        case 'health':
-        case 'status':
-          await this.handleHealthStatus(msg, args);
-          break;
-
-        case 'accounts':
-          await this.handleAccounts(msg);
-          break;
-
-        case 'stats':
-          await this.handleStats(msg, args);
-          break;
-
-        case 'relink':
-          await this.handleRelink(msg, args, callbacks);
-          break;
-
-        case 'recover':
-          await this.handleRecover(msg, args);
-          break;
-
-        case 'restore':
-          await this.handleRestore(msg, callbacks);
-          break;
-
-        case 'goraha':
-          await this.handleGoraha(msg, args, callbacks);
-          break;
-
-        case 'analytics':
-        case 'metrics':
-          await this.handleAnalytics(msg, args, callbacks);
-          break;
-
-        case 'sheets':
-          await this.handleSheets(msg, args, callbacks);
-          break;
-
-        case 'link':
-          await this.handleLink(msg, args, callbacks);
-          break;
-
-        case 'list':
-          await this.handleList(msg);
-          break;
-
-        case 'device':
-          await this.handleDevice(msg, args);
-          break;
-
-        case 'bridge-stats':
-          await this.handleBridgeStats(msg);
-          break;
-
-        default:
-          await msg.reply(
-            `❓ Unknown command: "${command}"\n\nType "linda help" for available commands.`
-          );
-          break;
-      }
-
-      return true;
-    } catch (error) {
-      this.stats.errors++;
-      this.logBot(`❌ WhatsApp Bridge error: ${error.message}`, 'error');
-      await msg.reply(`❌ Command error: ${error.message}`);
+    // Menu/group selection
+    if (command === 'menu') {
+      await this.handleMenu(msg);
       return true;
     }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // OUTPUT CAPTURE
-  // ═══════════════════════════════════════════════════════════════════
-
-  /**
-   * Capture all console.log output during a function's execution.
-   * Temporarily replaces console.log/console.clear, restores after.
-   */
-  async captureOutput(fn) {
-    const logs = [];
-    const originalLog = console.log;
-    const originalClear = console.clear;
-
-    console.log = (...args) => {
-      const line = args
-        .map((a) => (typeof a === 'string' ? a : String(a)))
-        .join(' ');
-      logs.push(line);
-    };
-    console.clear = () => {}; // No-op for WhatsApp
-
-    try {
-      await fn();
-    } finally {
-      console.log = originalLog;
-      console.clear = originalClear;
+    if (['1','2','3','4'].includes(command)) {
+      await this.handleGroupCommands(msg, command);
+      return true;
     }
 
-    // Clean output
-    let output = logs.join('\n');
+    // Recovery commands
+    if (command === 'recover' || command === 'restore') {
+      await this.handleRecover(msg);
+      return true;
+    }
 
-    // Strip ANSI escape codes
-    output = output.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+    // Status command
+    if (command === 'status' || command === 'health') {
+      await this.handleStatus(msg);
+      return true;
+    }
 
-    // Collapse multiple blank lines
-    output = output.replace(/\n{3,}/g, '\n\n');
-
-    return output.trim();
+    // ...existing command switch...
+    // ...existing code...
   }
 
   /**
-   * Send output to WhatsApp, splitting into chunks if too long.
+   * Handle recovery command
    */
-  async sendOutput(msg, output, fallback = '✅ Done.') {
-    if (!output || output.trim().length === 0) {
-      await msg.reply(fallback);
-      return;
-    }
-
-    const MAX_LENGTH = 4000;
-
-    if (output.length <= MAX_LENGTH) {
-      await msg.reply(output);
+  async handleRecover(msg) {
+    msg.reply('🔄 Starting manual recovery...');
+    const success = await this.autoRecoverPrimaryMaster();
+    if (success) {
+      msg.reply('✅ Primary master recovered successfully!');
     } else {
-      // Split into readable chunks
-      const chunks = [];
-      let remaining = output;
-      while (remaining.length > 0) {
-        if (remaining.length <= MAX_LENGTH) {
-          chunks.push(remaining);
-          break;
-        }
-        let splitAt = remaining.lastIndexOf('\n', MAX_LENGTH);
-        if (splitAt === -1 || splitAt < MAX_LENGTH / 2) splitAt = MAX_LENGTH;
-        chunks.push(remaining.substring(0, splitAt));
-        remaining = remaining.substring(splitAt + 1);
-      }
-
-      for (let i = 0; i < chunks.length; i++) {
-        const header = chunks.length > 1 ? `📄 (${i + 1}/${chunks.length})\n` : '';
-        await msg.reply(header + chunks[i]);
-      }
+      msg.reply('❌ Recovery failed. Please check terminal for details or run "link master <phone>".');
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // COMMAND HANDLERS
-  // ═══════════════════════════════════════════════════════════════════
-
   /**
-   * health / status — Show health dashboard or per-account health
+   * Handle status command
    */
-  async handleHealthStatus(msg, args) {
-    if (args[0]) {
-      // Per-account health
-      const phone = args[0];
-      const dm = this.deviceLinkedManager || services.get('deviceLinkedManager');
-      if (!dm) {
-        await msg.reply('⚠️ Device manager not available');
-        return;
-      }
-
-      const device = dm.getDevice(phone);
-      if (!device) {
-        await msg.reply(`❌ Account not found: ${phone}`);
-        return;
-      }
-
-      const healthScore = this._calculateHealthScore(device);
-      const statusIcon = device.isOnline ? '🟢' : '🔴';
-
-      await msg.reply(
-        `📊 *Health: ${phone}*\n` +
-        `${statusIcon} ${device.isOnline ? 'Online' : 'Offline'}\n` +
-        `🔗 Status: ${(device.status || '--').toUpperCase()}\n` +
-        `💯 Health: ${healthScore}/100\n` +
-        `🔐 Auth: ${device.authMethod || '--'}\n` +
-        `📅 Linked: ${device.linkedAt ? new Date(device.linkedAt).toLocaleString() : '--'}\n` +
-        `💓 Heartbeat: ${device.lastHeartbeat ? new Date(device.lastHeartbeat).toLocaleTimeString() : '--'}` +
-        (device.lastError ? `\n⚠️ Error: ${(device.lastError.message || device.lastError).substring(0, 100)}` : '')
-      );
-    } else {
-      // Full health dashboard (capture terminal output)
-      const output = await this.captureOutput(() => {
-        const thd = this.terminalHealthDashboard;
-        if (thd) {
-          thd.displayHealthDashboard();
-        } else {
-          console.log('⚠️ Health dashboard not available');
-        }
-      });
-      await this.sendOutput(msg, output, '⚠️ No health data available');
-    }
+  async handleStatus(msg) {
+    const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
+    const isLinked = isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager);
+    
+    const status = `
+📊 WhatsApp Bridge Status:
+━━━━━━━━━━━━━━━━━━━━━
+• Bot Active: ${botActive ? '✅ Yes' : '❌ No'}
+• Master: ${masterPhone || 'Not set'}
+• Linked: ${isLinked ? '✅ Yes' : '❌ No'}
+• Recovery: ${this.recoveryInProgress ? '🔄 In Progress' : '✅ Idle'}
+• Polling: ${this.pollingInterval ? '✅ Active' : '❌ Stopped'}
+━━━━━━━━━━━━━━━━━━━━━
+`;
+    msg.reply(status);
   }
 
   /**
-   * Calculate a simple health score for a device.
+   * Handle menu command
    */
-  _calculateHealthScore(device) {
-    if (!device) return 0;
-    let score = 0;
-    if (device.isOnline) score += 40;
-    if (device.status === 'linked') score += 30;
-    if (device.lastHeartbeat) {
-      const ago = Date.now() - new Date(device.lastHeartbeat).getTime();
-      if (ago < 60000) score += 30;
-      else if (ago < 300000) score += 20;
-      else if (ago < 600000) score += 10;
-    }
-    return Math.min(score, 100);
+  async handleMenu(msg) {
+    const menu = `
+📋 WhatsApp Command Bridge Menu:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣  WhatsApp Features
+   health, status, accounts, stats
+
+2️⃣  Real Estate Database  
+   analytics, metrics, sheets
+
+3️⃣  GorahaBot
+   goraha, contacts, verify
+
+4️⃣  Linda Main
+   help, menu, about
+
+🔧 Recovery Commands:
+   recover - Manual recovery
+   restore - Restore session
+
+💡 Tip: Send "linda <command>"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+    msg.reply(menu);
   }
 
   /**
-   * accounts — List all accounts with status
+   * Handle group commands
    */
-  async handleAccounts(msg) {
-    const acm = this.accountConfigManager || services.get('accountConfigManager');
-    const dm = this.deviceLinkedManager || services.get('deviceLinkedManager');
-
-    if (!acm) {
-      await msg.reply('⚠️ Account manager not available');
+  async handleGroupCommands(msg, group) {
+    const groupInfo = COMMAND_GROUPS[group];
+    if (!groupInfo) {
+      msg.reply('❌ Invalid group. Send "linda menu" for options.');
       return;
     }
 
-    const accounts = acm.getAllAccounts();
-    if (accounts.length === 0) {
-      await msg.reply('No accounts configured.');
-      return;
-    }
-
-    let text = `📱 *Accounts (${accounts.length})*\n`;
-    accounts.forEach((acc, i) => {
-      const device = dm?.getDevice(acc.phoneNumber);
-      const statusIcon = device?.isOnline ? '🟢' : '🔴';
-      const statusText = device?.status?.toUpperCase() || 'UNKNOWN';
-      text += `\n${i + 1}. ${statusIcon} ${acc.phoneNumber}\n`;
-      text += `   ${acc.displayName} · ${acc.role.toUpperCase()} · ${statusText}`;
-    });
-
-    await msg.reply(text);
+    const commands = groupInfo.commands.join(', ');
+    msg.reply(`📁 ${groupInfo.name}:\n${commands}`);
   }
 
   /**
-   * stats <+phone> — Show per-account metrics
-   */
-  async handleStats(msg, args) {
-    const phone = args[0];
-    if (!phone) {
-      await msg.reply('⚠️ Usage: linda stats <+phone>');
-      return;
-    }
-
-    const dm = this.deviceLinkedManager || services.get('deviceLinkedManager');
-    if (!dm) {
-      await msg.reply('⚠️ Device manager not available');
-      return;
-    }
-
-    const device = dm.getDevice(phone);
-    if (!device) {
-      await msg.reply(`❌ Account not found: ${phone}`);
-      return;
-    }
-
-    const uptime = device.uptime || 0;
-    const uptimeMins = Math.floor(uptime / 60000);
-    const uptimeHours = Math.floor(uptimeMins / 60);
-    const uptimeDays = Math.floor(uptimeHours / 24);
-
-    let uptimeStr = `${uptimeMins}m`;
-    if (uptimeDays > 0) uptimeStr = `${uptimeDays}d ${uptimeHours % 24}h ${uptimeMins % 60}m`;
-    else if (uptimeHours > 0) uptimeStr = `${uptimeHours}h ${uptimeMins % 60}m`;
-
-    const online = device.isOnline ? '🟢 Online' : '🔴 Offline';
-
-    await msg.reply(
-      `📈 *Stats: ${phone}*\n` +
-      `${online}\n` +
-      `⏱️ Uptime: ${uptimeStr}\n` +
-      `🔗 Status: ${(device.status || '--').toUpperCase()}\n` +
-      `📊 Heartbeats: ${device.heartbeatCount || 0}\n` +
-      `🔄 Link attempts: ${device.linkAttempts || 0}/${device.maxLinkAttempts || 5}\n` +
-      `🕐 Last activity: ${device.lastActivity ? new Date(device.lastActivity).toLocaleTimeString() : '--'}\n` +
-      `🛠️ Recovery: ${device.recoveryMode ? '⚠️ Yes' : '✅ No'}`
-    );
-  }
-
-  /**
-   * relink master|servant|<phone> — Re-link an account
-   */
-  async handleRelink(msg, args, callbacks) {
-    if (!callbacks) {
-      await msg.reply('⚠️ Terminal callbacks not available');
-      return;
-    }
-
-    const sub = args[0];
-    const phone = args[1];
-
-    if (sub === 'master') {
-      await msg.reply(`⏳ Re-linking master${phone ? ': ' + phone : ''}...`);
-      const output = await this.captureOutput(() => callbacks.onRelinkMaster?.(phone));
-      await this.sendOutput(msg, output, '✅ Relink initiated.');
-    } else if (sub === 'servant') {
-      if (!phone) {
-        await msg.reply('⚠️ Usage: linda relink servant <+phone>');
-        return;
-      }
-      await msg.reply(`⏳ Re-linking servant: ${phone}...`);
-      const output = await this.captureOutput(() => callbacks.onRelinkServant?.(phone));
-      await this.sendOutput(msg, output, '✅ Relink initiated.');
-    } else if (sub) {
-      // Treat first arg as phone number
-      await msg.reply(`⏳ Re-linking: ${sub}...`);
-      const output = await this.captureOutput(() => callbacks.onRelinkDevice?.(sub));
-      await this.sendOutput(msg, output, '✅ Relink initiated.');
-    } else {
-      await msg.reply(
-        '⚠️ *Relink Usage:*\n' +
-        'linda relink master [+phone]\n' +
-        'linda relink servant <+phone>\n' +
-        'linda relink <+phone>'
-      );
-    }
-  }
-
-  /**
-   * recover <+phone> — Attempt session restoration
-   */
-  async handleRecover(msg, args) {
-    const phone = args[0];
-    if (!phone) {
-      await msg.reply('⚠️ Usage: linda recover <+phone>');
-      return;
-    }
-
-    const dm = this.deviceLinkedManager || services.get('deviceLinkedManager');
-    if (!dm) {
-      await msg.reply('⚠️ Device manager not available');
-      return;
-    }
-
-    const device = dm.getDevice(phone);
-    if (!device) {
-      await msg.reply(`❌ Account not found: ${phone}`);
-      return;
-    }
-
-    await msg.reply(`⏳ Attempting session restore for ${phone}...`);
-
-    try {
-      const { SessionManager } = await import('../utils/SessionManager.js');
-      const canRestore = SessionManager.canRestoreSession(phone);
-
-      if (canRestore) {
-        dm.markDeviceLinked(phone, {
-          authMethod: 'restore',
-          linkedAt: new Date().toISOString(),
-        });
-        await msg.reply(`✅ Valid session found for ${phone}.\nSession restored.`);
-      } else {
-        await msg.reply(
-          `❌ No valid session for ${phone}.\n💡 Use "linda relink ${phone}" to re-link.`
-        );
-      }
-    } catch (err) {
-      await msg.reply(`❌ Recovery error: ${err.message}`);
-    }
-  }
-
-  /**
-   * restore — Restore all previous sessions
-   */
-  async handleRestore(msg, callbacks) {
-    if (!callbacks?.onRestoreAllSessions) {
-      await msg.reply('⚠️ Restore handler not available');
-      return;
-    }
-
-    await msg.reply('⏳ Restoring all sessions...');
-    const output = await this.captureOutput(() => callbacks.onRestoreAllSessions());
-    await this.sendOutput(msg, output, '✅ Restore complete.');
-  }
-
-  /**
-   * goraha [status|verify|contacts|filter <text>]
-   */
-  async handleGoraha(msg, args, callbacks) {
-    const sub = args[0] || 'status';
-
-    if (sub === 'verify' || sub === 'v') {
-      if (!callbacks?.onGorahaStatusRequested) {
-        await msg.reply('⚠️ Goraha service not available');
-        return;
-      }
-      await msg.reply('⏳ Verifying GorahaBot...');
-      const output = await this.captureOutput(() => callbacks.onGorahaStatusRequested(true));
-      await this.sendOutput(msg, output, '✅ Verification complete.');
-    } else if (sub === 'contacts' || sub === 'count') {
-      if (!callbacks?.onGorahaStatusRequested) {
-        await msg.reply('⚠️ Goraha service not available');
-        return;
-      }
-      await msg.reply('⏳ Fetching contacts count...');
-      const output = await this.captureOutput(() => callbacks.onGorahaStatusRequested(false));
-      await this.sendOutput(msg, output, '✅ Count loaded.');
-    } else if (sub === 'filter' || sub === 'search') {
-      const filterString = args.slice(1).join(' ');
-      if (!filterString) {
-        await msg.reply('⚠️ Usage: linda goraha filter <search_string>');
-        return;
-      }
-      if (!callbacks?.onGorahaFilterRequested) {
-        await msg.reply('⚠️ Goraha filter not available');
-        return;
-      }
-      await msg.reply(`🔍 Searching: "${filterString}"...`);
-      const output = await this.captureOutput(() =>
-        callbacks.onGorahaFilterRequested(filterString)
-      );
-      await this.sendOutput(msg, output, '✅ Search complete.');
-    } else if (sub === 'status') {
-      if (!callbacks?.onGorahaStatusRequested) {
-        await msg.reply('⚠️ Goraha service not available');
-        return;
-      }
-      await msg.reply('⏳ Loading Goraha status...');
-      const output = await this.captureOutput(() => callbacks.onGorahaStatusRequested(false));
-      await this.sendOutput(msg, output, '✅ Status loaded.');
-    } else {
-      await msg.reply(
-        '📱 *Goraha Commands:*\n' +
-        'linda goraha\n' +
-        'linda goraha verify\n' +
-        'linda goraha contacts\n' +
-        'linda goraha filter <text>'
-      );
-    }
-  }
-
-  /**
-   * analytics / metrics — report|uptime|account <phone>
-   */
-  async handleAnalytics(msg, args, callbacks) {
-    const sub = args[0] || 'realtime';
-
-    if (!callbacks?.onAnalyticsReportRequested) {
-      await msg.reply('⚠️ Analytics not available');
-      return;
-    }
-
-    if (sub === 'report') {
-      await msg.reply('⏳ Generating analytics report...');
-      const output = await this.captureOutput(() =>
-        callbacks.onAnalyticsReportRequested('report')
-      );
-      await this.sendOutput(msg, output, '✅ Report generated.');
-    } else if (sub === 'uptime') {
-      await msg.reply('⏳ Loading uptime metrics...');
-      const output = await this.captureOutput(() =>
-        callbacks.onAnalyticsReportRequested('uptime')
-      );
-      await this.sendOutput(msg, output, '✅ Uptime loaded.');
-    } else if (sub === 'account') {
-      const phone = args[1];
-      if (!phone) {
-        await msg.reply('⚠️ Usage: linda analytics account <+phone>');
-        return;
-      }
-      await msg.reply(`⏳ Loading analytics for ${phone}...`);
-      const output = await this.captureOutput(() =>
-        callbacks.onAnalyticsReportRequested('account', phone)
-      );
-      await this.sendOutput(msg, output, `✅ Analytics loaded.`);
-    } else {
-      // Default: realtime
-      await msg.reply('⏳ Loading metrics...');
-      const output = await this.captureOutput(() =>
-        callbacks.onAnalyticsReportRequested('realtime')
-      );
-      await this.sendOutput(msg, output, '✅ Metrics loaded.');
-    }
-  }
-
-  /**
-   * sheets read|add|update|delete|search|info
-   */
-  async handleSheets(msg, args, callbacks) {
-    const sub = args[0];
-
-    if (!sub) {
-      await msg.reply(
-        '📊 *Google Sheets Commands:*\n' +
-        'linda sheets read <id> [range]\n' +
-        'linda sheets add <id> <sheet> <values...>\n' +
-        'linda sheets update <id> <cell> <value>\n' +
-        'linda sheets delete <id> <sheet> [row]\n' +
-        'linda sheets search <id> [range] <text>\n' +
-        'linda sheets info <id>'
-      );
-      return;
-    }
-
-    if (sub === 'read') {
-      const sheetId = args[1];
-      const range = args[2] || 'Sheet1';
-      if (!sheetId) {
-        await msg.reply('⚠️ Usage: linda sheets read <id> [range]');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsRead) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply('⏳ Reading sheet...');
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsRead(sheetId, range)
-      );
-      await this.sendOutput(msg, output, '✅ Read complete.');
-      return;
-    }
-
-    if (sub === 'add' || sub === 'create') {
-      const sheetId = args[1];
-      const sheetName = args[2] || 'Sheet1';
-      const values = args.slice(3);
-      if (!sheetId || values.length === 0) {
-        await msg.reply('⚠️ Usage: linda sheets add <id> <sheet> <value1> [value2]...');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsCreate) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply('⏳ Adding row...');
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsCreate(sheetId, sheetName, values)
-      );
-      await this.sendOutput(msg, output, '✅ Row added.');
-      return;
-    }
-
-    if (sub === 'update') {
-      const sheetId = args[1];
-      const cell = args[2];
-      const value = args.slice(3).join(' ');
-      if (!sheetId || !cell || !value) {
-        await msg.reply('⚠️ Usage: linda sheets update <id> <cell> <value>');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsUpdate) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply('⏳ Updating cell...');
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsUpdate(sheetId, cell, value)
-      );
-      await this.sendOutput(msg, output, '✅ Cell updated.');
-      return;
-    }
-
-    if (sub === 'delete' || sub === 'remove') {
-      const sheetId = args[1];
-      const sheetName = args[2] || 'Sheet1';
-      const rowIndex = parseInt(args[3]) || 1;
-      if (!sheetId) {
-        await msg.reply('⚠️ Usage: linda sheets delete <id> <sheet> [row]');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsDelete) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply('⏳ Deleting row...');
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsDelete(sheetId, sheetName, rowIndex)
-      );
-      await this.sendOutput(msg, output, '✅ Row deleted.');
-      return;
-    }
-
-    if (sub === 'search') {
-      const sheetId = args[1];
-      const range = args[2] || 'Sheet1';
-      const searchValue = args.slice(3).join(' ');
-      if (!sheetId || !searchValue) {
-        await msg.reply('⚠️ Usage: linda sheets search <id> [range] <text>');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsSearch) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply(`🔍 Searching: "${searchValue}"...`);
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsSearch(sheetId, range, searchValue)
-      );
-      await this.sendOutput(msg, output, '✅ Search complete.');
-      return;
-    }
-
-    if (sub === 'info' || sub === 'meta' || sub === 'metadata') {
-      const sheetId = args[1];
-      if (!sheetId) {
-        await msg.reply('⚠️ Usage: linda sheets info <id>');
-        return;
-      }
-      if (!callbacks?.onGoogleSheetsMetadata) {
-        await msg.reply('❌ Google Sheets not available');
-        return;
-      }
-      await msg.reply('⏳ Fetching metadata...');
-      const output = await this.captureOutput(() =>
-        callbacks.onGoogleSheetsMetadata(sheetId)
-      );
-      await this.sendOutput(msg, output, '✅ Metadata fetched.');
-      return;
-    }
-
-    await msg.reply('❓ Unknown sheets command. Type "linda sheets" for usage.');
-  }
-
-  /**
-   * link master [+phone] [name] — Add/link a master account
-   */
-  async handleLink(msg, args, callbacks) {
-    const sub = args[0];
-
-    if (sub !== 'master') {
-      await msg.reply('⚠️ Usage: linda link master [+phone] [name]');
-      return;
-    }
-
-    const phone = args[1];
-    const name = args.slice(2).join(' ');
-
-    if (phone) {
-      if (!callbacks?.onAddNewMaster) {
-        await msg.reply('⚠️ Add master handler not available');
-        return;
-      }
-      await msg.reply(`⏳ Adding master: ${phone}${name ? ' (' + name + ')' : ''}...`);
-      const output = await this.captureOutput(() => callbacks.onAddNewMaster(phone, name));
-      await this.sendOutput(msg, output, '✅ Master account added.');
-    } else {
-      if (!callbacks?.onLinkMaster) {
-        await msg.reply('⚠️ Link handler not available');
-        return;
-      }
-      await msg.reply('⏳ Initiating master linking...');
-      const output = await this.captureOutput(() => callbacks.onLinkMaster());
-      await this.sendOutput(msg, output, '✅ Linking initiated.');
-    }
-  }
-
-  /**
-   * list — List all devices
-   */
-  async handleList(msg) {
-    const output = await this.captureOutput(() => {
-      const thd = this.terminalHealthDashboard;
-      if (thd) {
-        thd.listAllDevices();
-      } else {
-        console.log('⚠️ Dashboard not available');
-      }
-    });
-    await this.sendOutput(msg, output, 'No devices found.');
-  }
-
-  /**
-   * device <+phone> — Show device details
-   */
-  async handleDevice(msg, args) {
-    const phone = args[0];
-    if (!phone) {
-      await msg.reply('⚠️ Usage: linda device <+phone>');
-      return;
-    }
-
-    const output = await this.captureOutput(() => {
-      const thd = this.terminalHealthDashboard;
-      if (thd) {
-        thd.displayDeviceDetails(phone);
-      } else {
-        console.log('⚠️ Dashboard not available');
-      }
-    });
-    await this.sendOutput(msg, output, `❌ Device not found: ${phone}`);
-  }
-
-  /**
-   * bridge-stats — Show bridge activity stats
-   */
-  async handleBridgeStats(msg) {
-    const topCmds = Object.entries(this.stats.commandsByName)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, count]) => `  ${name}: ${count}`)
-      .join('\n');
-
-    await msg.reply(
-      `📊 *Bridge Stats*\n` +
-      `Total commands: ${this.stats.totalCommands}\n` +
-      `Errors: ${this.stats.errors}\n` +
-      `Last: ${this.stats.lastCommand || '--'}\n` +
-      `At: ${this.stats.lastCommandTime?.toLocaleString() || '--'}` +
-      (topCmds ? `\n\n📈 Top commands:\n${topCmds}` : '')
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // HELP TEXT
-  // ═══════════════════════════════════════════════════════════════════
-
-  /**
-   * Generate help text formatted for WhatsApp
+   * Get help text
    */
   getHelpText() {
-    return (
-      `🤖 *Linda WhatsApp Bridge*\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `\n📱 *Monitoring:*\n` +
-      `linda health [+phone]\n` +
-      `linda status\n` +
-      `linda accounts\n` +
-      `linda stats <+phone>\n` +
-      `linda list\n` +
-      `linda device <+phone>\n` +
-      `\n🔗 *Account Management:*\n` +
-      `linda link master [+phone] [name]\n` +
-      `linda relink master [+phone]\n` +
-      `linda relink servant <+phone>\n` +
-      `linda recover <+phone>\n` +
-      `linda restore\n` +
-      `\n📱 *Goraha:*\n` +
-      `linda goraha [status|verify|contacts]\n` +
-      `linda goraha filter <text>\n` +
-      `\n📊 *Analytics:*\n` +
-      `linda analytics [report|uptime]\n` +
-      `linda analytics account <+phone>\n` +
-      `\n📋 *Google Sheets:*\n` +
-      `linda sheets [read|add|update|delete|search|info]\n` +
-      `\n📈 *Bridge:*\n` +
-      `linda bridge-stats\n` +
-      `linda help`
-    );
+    return 'ℹ️ Send "linda menu" to see command groups.';
+  }
+
+  /**
+   * Check if sender is authorized
+   */
+  isAuthorizedSender(senderJid) {
+    // Implement authorization logic
+    // For now, allow all
+    return true;
+  }
+
+  /**
+   * Cleanup on shutdown
+   */
+  destroy() {
+    this.stopRecoveryPolling();
+    this.isInitialized = false;
+    botActive = false;
+    this.logBot('🧹 WhatsApp Command Bridge destroyed', 'info');
   }
 }
-
-export default WhatsAppCommandBridge;

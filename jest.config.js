@@ -9,21 +9,11 @@ export default {
   // Environment
   testEnvironment: 'node',
   
-  // Module configuration
-  type: 'module',
-  extensionsToTreatAsEsm: ['.js'],
   testMatch: [
     '**/__tests__/**/*.js',
     '**/*.test.js',
     '**/*.spec.js'
   ],
-  
-  // Globals configuration
-  globals: {
-    'ts-jest': {
-      useESM: true,
-    },
-  },
   
   // Transform configuration
   transformIgnorePatterns: [
@@ -58,38 +48,13 @@ export default {
   },
   
   // Reporter configuration
-  reporters: [
-    'default',
-    [
-      'jest-junit',
-      {
-        outputDirectory: './test-results',
-        outputName: 'junit.xml',
-        usePathAsTestSuite: true
-      }
-    ],
-    [
-      'jest-html-reporters',
-      {
-        publicPath: './test-results',
-        filename: 'report.html'
-      }
-    ]
-  ],
-  
-  // Setup files
-  setupFilesAfterEnv: [
-    '<rootDir>/bot/tests/setup.js'
-  ],
-  
-  // Bail on first test failure
-  bail: false,
+  reporters: ['default'],
   
   // Verbose output
   verbose: true,
   
   // Notify on completion
-  notify: true,
+  notify: false,
   
   // Clear mocks between tests
   clearMocks: true,

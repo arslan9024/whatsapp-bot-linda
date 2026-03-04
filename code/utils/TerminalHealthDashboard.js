@@ -49,6 +49,56 @@ class TerminalHealthDashboard {
   }
 
   /**
+   * NEW: Show master account selection UI (Phase 10)
+   * Displays available master accounts and prompts user to select one
+   */
+  async showMasterSelection(onRelinkMaster) {
+    try {
+      if (!this.accountConfigManager) {
+        console.log(`\n❌ Account manager not available\n`);
+        return;
+      }
+
+      // Get all master accounts
+      const masterAccounts = this.accountConfigManager.getAllAccounts?.()?.filter(a => a.role === 'master') || [];
+      
+      if (masterAccounts.length === 0) {
+        console.log(`\n⚠️  No master accounts found.\n`);
+        console.log(`   Use 'link master <+phone>' to add a master account.\n`);
+        return;
+      }
+
+      if (masterAccounts.length === 1) {
+        // Only one master - auto-select
+        const master = masterAccounts[0];
+        console.log(`\n⏳ Auto-relinking: ${master.displayName} (${master.phoneNumber})`);
+        if (onRelinkMaster) {
+          await onRelinkMaster(master.phoneNumber);
+        }
+        return;
+      }
+
+      // Multiple masters - show selection UI
+      console.log(`\n📱 Available Master Accounts:`);
+      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
+      masterAccounts.forEach((account, index) => {
+        console.log(`  [${index + 1}] ${account.displayName}`);
+        console.log(`       └─ Phone: ${account.phoneNumber}`);
+        if (account.servants && account.servants.length > 0) {
+          console.log(`       └─ Servants: ${account.servants.length}`);
+        }
+      });
+      console.log();
+      console.log(`  💡 Usage: 'relink master <phone>'`);
+      console.log(`     (e.g., 'relink master ${masterAccounts[0].phoneNumber}')\n`);
+
+    } catch (error) {
+      console.log(`\n❌ Error showing master selection: ${error.message}\n`);
+    }
+  }
+
+  /**
    * Initialize readline interface for user input
    */
   initializeInput() {
@@ -468,16 +518,32 @@ class TerminalHealthDashboard {
         case 'relink':
           if (parts[1] === 'master') {
             // NEW: Support "relink master <phone>" for specific master account
-            const masterPhone = parts[2] || this.masterPhoneNumber;
+            const masterPhone = parts[2];
+            
             if (masterPhone) {
+              // Specific master requested - relink directly
               console.log(`\n⏳ Re-linking master account: ${masterPhone}...`);
               if (onRelinkMaster) {
                 await onRelinkMaster(masterPhone);
               }
             } else {
-              console.log(`\n⚠️  No master account specified.`);
-              console.log(`   Usage: 'relink master [+phone-number]'`);
-              console.log(`   Example: 'relink master +971505760056'\n`);
+              // No phone specified - show master selection UI
+              if (this.accountConfigManager) {
+                await this.showMasterSelection(onRelinkMaster);
+              } else {
+                // Fallback: use default master phone
+                const defaultMasterPhone = this.masterPhoneNumber;
+                if (defaultMasterPhone) {
+                  console.log(`\n⏳ Re-linking master account: ${defaultMasterPhone}...`);
+                  if (onRelinkMaster) {
+                    await onRelinkMaster(defaultMasterPhone);
+                  }
+                } else {
+                  console.log(`\n⚠️  No master account specified.`);
+                  console.log(`   Usage: 'relink master [+phone-number]'`);
+                  console.log(`   Example: 'relink master +971505760056'\n`);
+                }
+              }
             }
           } else if (parts[1] === 'servant') {
             // NEW: Support "relink servant <phone>" for servant account relinking
