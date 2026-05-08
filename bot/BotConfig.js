@@ -14,7 +14,9 @@ class BotConfig {
   static instance = null;
 
   constructor(configPath = null) {
-    if (BotConfig.instance) {
+    // In tests, always build a fresh config so process.env changes are picked up.
+    // In normal runtime, retain singleton behavior.
+    if (BotConfig.instance && process.env.NODE_ENV !== 'test') {
       return BotConfig.instance;
     }
 

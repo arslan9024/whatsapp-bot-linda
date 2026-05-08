@@ -23,7 +23,11 @@ class BotIntegration {
     this.engineConfig = {
       name: 'Linda Property Bot',
       version: '1.0.0',
-      maxMessageQueueSize: this.config.config.messages.maxQueueSize
+      mode: this.config.config.bot.mode,
+      sessionDir: this.config.config.bot.sessionName || './sessions',
+      maxMessageQueueSize: this.config.config.messages.maxQueueSize,
+      // BotIntegration owns connection lifecycle; avoid duplicate auto-connect path
+      autoStart: false,
     };
 
     this.engine = null;
@@ -147,7 +151,10 @@ class BotIntegration {
    */
   async initializeWebhookServer() {
     this.log('Initializing webhook server...');
-    const webhookConfig = this.config.config.webhook;
+    const webhookConfig = { ...this.config.config.webhook };
+    if (process.env.NODE_ENV === 'test') {
+      webhookConfig.port = 0;
+    }
     this.webhookServer = new WebhookServer(webhookConfig);
     
     // Setup webhook handlers
@@ -410,9 +417,18 @@ class BotIntegration {
     try {
       this.log('🛑 Stopping bot integration...');
 
-      await this.connection.disconnect();
-      await this.webhookServer.stop();
-      this.sessionManager.destroy();
+      if (this.connection?.disconnect) {
+        await this.connection.disconnect();
+      }
+      if (this.engine?.destroy) {
+        await this.engine.destroy();
+      }
+      if (this.webhookServer?.stop) {
+        await this.webhookServer.stop();
+      }
+      if (this.sessionManager?.destroy) {
+        this.sessionManager.destroy();
+      }
 
       this.isRunning = false;
       this.log('✅ Bot integration stopped');

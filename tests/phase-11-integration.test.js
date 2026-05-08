@@ -408,8 +408,9 @@ async function runTests() {
   };
 }
 
-// Run tests
-const results = await runTests();
-
-// Exit with appropriate code
-process.exit(results.success ? 0 : 1);
+describe('Phase 11 Enterprise Integration', () => {
+  test('should pass the phase 11 validation suite', async () => {
+    const results = await runTests();
+    expect(results.success).toBe(true);
+  });
+});

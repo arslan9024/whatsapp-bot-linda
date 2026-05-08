@@ -16,7 +16,8 @@
  * Phase: 6 M2 Module 1
  */
 
-const logger = require('../Integration/Google/utils/logger');
+const loggerModule = require('../../Integration/Google/utils/logger.js');
+const logger = loggerModule?.logger || loggerModule?.default || loggerModule;
 const EventEmitter = require('events');
 
 class WhatsAppMultiAccountManager extends EventEmitter {
@@ -31,6 +32,7 @@ class WhatsAppMultiAccountManager extends EventEmitter {
     this.maxSecondaryAccounts = options.maxSecondaryAccounts || 5;
     this.loadBalancingStrategy = options.loadBalancingStrategy || 'round-robin';
     this.failoverEnabled = options.failoverEnabled !== false;
+    this.promoteOnMasterRemoval = options.promoteOnMasterRemoval !== false;
     this.initialized = false;
   }
 
@@ -159,15 +161,17 @@ class WhatsAppMultiAccountManager extends EventEmitter {
         throw new Error(`Account not found: ${accountId}`);
       }
 
-      // Cannot remove master if secondary accounts exist
-      if (account.type === 'master' && this.secondaryAccounts.length > 0) {
-        throw new Error('Cannot remove master account while secondary accounts exist');
+      // Master removal behavior with configurable promotion
+      if (account.type === 'master' && this.secondaryAccounts.length > 0 && !this.promoteOnMasterRemoval) {
+        throw new Error('Cannot remove master account with active secondaries');
       }
 
       // Remove from secondary accounts list if applicable
       if (this.secondaryAccounts.includes(accountId)) {
         this.secondaryAccounts = this.secondaryAccounts.filter(id => id !== accountId);
       }
+
+      let promoted = false;
 
       // Reset master if removing master account
       if (this.masterAccount === accountId) {
@@ -176,6 +180,8 @@ class WhatsAppMultiAccountManager extends EventEmitter {
           const newMaster = this.accounts.get(this.masterAccount);
           newMaster.type = 'master';
           newMaster.isPrimary = true;
+          this.secondaryAccounts = this.secondaryAccounts.filter(id => id !== this.masterAccount);
+          promoted = true;
         } else {
           this.masterAccount = null;
         }
@@ -188,7 +194,7 @@ class WhatsAppMultiAccountManager extends EventEmitter {
       logger.info('Account removed', { accountId });
       this.emit('account:removed', { accountId });
 
-      return { success: true, accountId };
+      return { success: true, accountId, promoted };
     } catch (error) {
       logger.error('Failed to remove account', { error: error.message });
       throw error;

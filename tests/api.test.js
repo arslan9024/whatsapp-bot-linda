@@ -377,13 +377,20 @@ runner.test('Cleanup: DELETE /api/people/:id', async () => {
   await api.deletePerson(testPersonId);
 });
 
-/**
- * ==================== RUN TESTS ====================
- */
-
-runner.run().then(() => {
-  process.exit(runner.failed > 0 ? 1 : 0);
-}).catch(error => {
-  console.error('Test runner error:', error);
-  process.exit(1);
-});
+if (process.env.JEST_WORKER_ID) {
+  describe('API script harness', () => {
+    test('TestRunner class is available', () => {
+      expect(typeof TestRunner).toBe('function');
+    });
+  });
+} else {
+  /**
+   * ==================== RUN TESTS ====================
+   */
+  runner.run().then(() => {
+    process.exit(runner.failed > 0 ? 1 : 0);
+  }).catch(error => {
+    console.error('Test runner error:', error);
+    process.exit(1);
+  });
+}

@@ -51,6 +51,8 @@ class CustomBotEngine extends EventEmitter {
     this.connection = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
+    this.reconnectTimer = null;
+    this.isShuttingDown = false;
 
     // Message queue for offline handling
     this.messageQueue = [];
@@ -76,6 +78,9 @@ class CustomBotEngine extends EventEmitter {
     });
 
     this.on('disconnected', () => {
+      if (this.isShuttingDown) {
+        return;
+      }
       this.log('⚠️ Bot disconnected, attempting reconnection...', 'warn');
       this.scheduleReconnection();
     });
@@ -90,6 +95,12 @@ class CustomBotEngine extends EventEmitter {
    */
   async connect() {
     try {
+      this.isShuttingDown = false;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+
       this.log('🔄 Connecting bot...');
 
       // Create connection based on mode
@@ -227,6 +238,10 @@ class CustomBotEngine extends EventEmitter {
    * Schedule reconnection with exponential backoff
    */
   scheduleReconnection() {
+    if (this.isShuttingDown) {
+      return;
+    }
+
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       this.log('❌ Max reconnection attempts reached', 'error');
       this.emit('maxReconnectAttemptsExceeded');
@@ -241,7 +256,10 @@ class CustomBotEngine extends EventEmitter {
     this.reconnectAttempts++;
     this.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
 
-    setTimeout(() => this.connect(), delay);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
   }
 
   /**
@@ -249,12 +267,17 @@ class CustomBotEngine extends EventEmitter {
    */
   async disconnect() {
     try {
+      this.isShuttingDown = true;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+
       this.log('🛑 Disconnecting bot...');
       if (this.connection) {
         await this.connection.disconnect();
       }
       this.isConnected = false;
-      this.emit('disconnected');
       this.log('✅ Bot disconnected');
     } catch (error) {
       this.log(`Disconnect error: ${error.message}`, 'error');
@@ -271,6 +294,20 @@ class CustomBotEngine extends EventEmitter {
       queuedMessages: this.messageQueue.length,
       reconnectAttempts: this.reconnectAttempts,
       uptime: this.connection?.getUptime?.() || 0
+    };
+  }
+
+  /**
+   * Backward-compatible stats API
+   */
+  getStats() {
+    const status = this.getStatus();
+    return {
+      status,
+      uptime: status.uptime,
+      queueSize: this.messageQueue.length,
+      reconnectAttempts: this.reconnectAttempts,
+      connected: this.isConnected,
     };
   }
 
@@ -316,6 +353,25 @@ class CustomBotEngine extends EventEmitter {
         error: error.message,
         status: this.getStatus()
       };
+    }
+  }
+
+  /**
+   * Cleanup and shutdown helper
+   */
+  async destroy() {
+    try {
+      this.isShuttingDown = true;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      await this.disconnect();
+    } catch (_) {
+      // best effort cleanup
+    }
+    if (this.sessionManager?.destroy) {
+      this.sessionManager.destroy();
     }
   }
 }

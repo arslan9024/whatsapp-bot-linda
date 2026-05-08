@@ -16,7 +16,8 @@
  * Phase: 6 M2 Module 1
  */
 
-const logger = require('../Integration/Google/utils/logger');
+const loggerModule = require('../../Integration/Google/utils/logger.js');
+const logger = loggerModule?.logger || loggerModule?.default || loggerModule;
 
 class MessageTemplateEngine {
   constructor(options = {}) {
@@ -104,7 +105,7 @@ class MessageTemplateEngine {
    */
   createTemplate(templateConfig) {
     try {
-      const templateId = templateConfig.id || this.generateTemplateId();
+      const templateId = templateConfig.id || templateConfig.name || this.generateTemplateId();
       const template = {
         id: templateId,
         name: templateConfig.name,
@@ -283,6 +284,7 @@ class MessageTemplateEngine {
         results.push({
           recipientId: recipient.id,
           recipientNumber: recipient.number,
+          content: rendered.content,
           message: rendered.content,
           status: 'ready',
           timestamp: new Date().toISOString()

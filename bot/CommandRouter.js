@@ -24,6 +24,22 @@ class CommandRouter {
   }
 
   /**
+   * Register a custom command at runtime
+   * @param {string} command
+   * @param {Function} handler
+   */
+  async registerCommand(command, handler) {
+    if (!command || typeof command !== 'string') {
+      throw new Error('Command name is required');
+    }
+    if (typeof handler !== 'function') {
+      throw new Error('Command handler must be a function');
+    }
+    this.commands[command.toLowerCase()] = async (...args) => handler(...args);
+    return true;
+  }
+
+  /**
    * Main router - parses message and routes to handler
    */
   async route(message) {

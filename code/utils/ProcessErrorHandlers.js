@@ -14,10 +14,10 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOG_DIR   = path.join(__dirname, '../../logs');
+// Use process.cwd() to remain compatible with Jest/CommonJS transpilation
+// where import.meta may be unavailable.
+const LOG_DIR   = path.join(process.cwd(), 'logs');
 const MAX_RECENT_ERRORS = 20; // ring buffer size
 
 // ─── non-critical patterns ────────────────────────────────────────────

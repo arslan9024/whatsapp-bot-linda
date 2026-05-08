@@ -4,7 +4,7 @@
  * Enables multi-scenario deal processing (buyer, seller, tenant, landlord, agent)
  */
 
-import { logger } from '../Integration/Google/utils/logger.js';
+import { logger } from '../../Integration/Google/utils/logger.js';
 
 class DealContextInjector {
   constructor(config = {}) {

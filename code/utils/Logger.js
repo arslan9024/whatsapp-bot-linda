@@ -26,11 +26,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 // ─── constants ───────────────────────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOG_DIR = path.join(__dirname, '../../logs');
+const LOG_DIR = path.join(process.cwd(), 'logs');
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };

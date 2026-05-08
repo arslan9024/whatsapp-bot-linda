@@ -354,3 +354,4 @@ class Session {
 }
 
 export { SessionManager, Session };
+export default SessionManager;

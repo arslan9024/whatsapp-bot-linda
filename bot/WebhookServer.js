@@ -15,7 +15,7 @@ class WebhookServer extends EventEmitter {
     super();
 
     this.config = config;
-    this.port = config.port || 3001;
+    this.port = config.port ?? 3001;
     this.host = config.host || 'localhost';
     this.app = express();
     this.server = null;

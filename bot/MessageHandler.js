@@ -23,6 +23,10 @@ class MessageHandler extends EventEmitter {
    * Main message processor
    */
   async process(rawMessage) {
+    if (!rawMessage || typeof rawMessage !== 'object') {
+      throw new Error('Invalid message payload');
+    }
+
     this.messageQueue.push(rawMessage);
 
     if (!this.isProcessing) {
@@ -54,14 +58,19 @@ class MessageHandler extends EventEmitter {
   /**
    * Parse raw message into structured format
    */
-  async parseMessage(rawMessage) {
+  parseMessage(rawMessage) {
+    if (!rawMessage || typeof rawMessage !== 'object') {
+      throw new Error('Invalid message payload');
+    }
+
+    const resolvedText = rawMessage.body || rawMessage.text || '';
     const message = {
       id: this.generateId(),
       timestamp: rawMessage.timestamp || Date.now(),
       from: rawMessage.from,
       isGroup: rawMessage.isGroup || false,
       sender: rawMessage.author || rawMessage.from,
-      text: rawMessage.body || '',
+      text: resolvedText,
       raw: rawMessage
     };
 
@@ -70,7 +79,7 @@ class MessageHandler extends EventEmitter {
       message.isCommand = message.text.startsWith(this.commandPrefix);
       message.command = message.isCommand
         ? message.text.split(' ')[0].slice(1).toLowerCase()
-        : null;
+        : undefined;
       message.args = message.isCommand
         ? message.text.split(' ').slice(1)
         : [];
@@ -185,6 +194,11 @@ class MessageHandler extends EventEmitter {
   validate(message) {
     const errors = [];
 
+    if (!message || typeof message !== 'object') {
+      errors.push('Invalid message object');
+      return { valid: false, errors };
+    }
+
     // Check required fields
     if (!message.from) errors.push('Missing "from" field');
     if (!message.timestamp) errors.push('Missing "timestamp" field');
@@ -209,7 +223,8 @@ class MessageHandler extends EventEmitter {
    * Simple spam detection
    */
   isSpam(message) {
-    const text = message.text.toLowerCase();
+    const textRaw = message?.text || '';
+    const text = textRaw.toLowerCase();
 
     // Too many mentions
     if ((message.entities?.mentions?.length || 0) > 5) return true;
@@ -220,8 +235,15 @@ class MessageHandler extends EventEmitter {
     // Repeated characters (spamspamspam)
     if (/(.)\1{9,}/.test(text)) return true;
 
+    // Repeated words/tokens (e.g., "SPAM SPAM SPAM ...")
+    const tokens = text.split(/\s+/).filter(Boolean);
+    if (tokens.length >= 8) {
+      const uniq = new Set(tokens);
+      if (uniq.size <= 2) return true;
+    }
+
     // All caps (unless short message)
-    if (text === text.toUpperCase() && text.length > 10) return true;
+    if (textRaw === textRaw.toUpperCase() && textRaw.length > 10) return true;
 
     return false;
   }

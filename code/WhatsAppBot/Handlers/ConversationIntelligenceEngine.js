@@ -17,7 +17,8 @@
  * Phase: 6 M2 Module 1
  */
 
-const logger = require('../Integration/Google/utils/logger');
+const loggerModule = require('../../Integration/Google/utils/logger.js');
+const logger = loggerModule?.logger || loggerModule?.default || loggerModule;
 
 class ConversationIntelligenceEngine {
   constructor(options = {}) {

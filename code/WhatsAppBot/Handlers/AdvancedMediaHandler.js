@@ -20,7 +20,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const logger = require('../Integration/Google/utils/logger');
+const loggerModule = require('../../Integration/Google/utils/logger.js');
+const logger = loggerModule?.logger || loggerModule?.default || loggerModule;
 
 class AdvancedMediaHandler {
   constructor(options = {}) {
