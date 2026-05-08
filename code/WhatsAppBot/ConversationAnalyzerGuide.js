@@ -334,7 +334,7 @@ export const ANALYZER_GUIDE = {
     '🎥 Video',
     '📄 Document',
     '🎵 Audio',
-    '🎤 Voice'.Message',
+    '🎤 Voice Message',
     '📍 Location',
     '👤 Contact',
     '🎭 Sticker',

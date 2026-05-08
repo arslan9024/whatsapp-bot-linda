@@ -25,13 +25,11 @@ export async function killBrowserProcesses() {
     console.log('🧹 Killing browser processes...');
     
     if (process.platform === 'win32') {
-      // Windows
-      await execAsync('taskkill /F /IM node.exe 2>nul', { windowsHide: true }).catch(() => {});
+      // Windows — kill only Chrome/Chromium, NOT node.exe (that would kill the bot itself)
       await execAsync('taskkill /F /IM chrome.exe 2>nul', { windowsHide: true }).catch(() => {});
       await execAsync('taskkill /F /IM chromium.exe 2>nul', { windowsHide: true }).catch(() => {});
     } else {
-      // Linux/Mac
-      await execAsync('pkill -9 node').catch(() => {});
+      // Linux/Mac — kill only Chrome/Chromium, NOT node
       await execAsync('pkill -9 chrome').catch(() => {});
       await execAsync('pkill -9 chromium').catch(() => {});
     }

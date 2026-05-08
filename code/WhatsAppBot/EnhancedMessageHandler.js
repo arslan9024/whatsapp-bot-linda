@@ -36,6 +36,7 @@ import { getMessageAnalyzerWithContext } from "./MessageAnalyzerWithContext.js";
 import { getConversationAnalyzer } from "./ConversationAnalyzer.js";
 import { logMessageTypeCompact } from "../utils/messageTypeLogger.js";
 import { phase17Orchestrator } from "../utils/Phase17Orchestrator.js";
+import { logger } from "../utils/Logger.js";
 
 // Import existing modules for TODO implementations
 import { CreatingNewWhatsAppClientLucy } from "./CreatingNewWhatsAppClientLucy.js";
@@ -53,7 +54,7 @@ class EnhancedMessageHandler {
     // Initialize media handler for media processing
     this.mediaHandler = new AdvancedMediaHandler();
     this.mediaHandler.initialize().catch(err => {
-      console.warn('⚠️  Media handler initialization warning:', err.message);
+      logger.warn('⚠️  Media handler initialization warning:', err.message);
     });
     
     // Initialize contact lookup
@@ -117,7 +118,7 @@ class EnhancedMessageHandler {
         );
 
         if (enriched.error) {
-          console.warn(`⚠️  Enrichment error: ${enriched.error}`);
+          logger.warn(`⚠️  Enrichment error: ${enriched.error}`);
         }
       }
 
@@ -132,8 +133,8 @@ class EnhancedMessageHandler {
 
       console.log("=".repeat(60));
     } catch (error) {
-      console.error("❌ Error in message processing:", error.message);
-      console.error(error.stack);
+      logger.error("❌ Error in message processing:", error.message);
+      logger.error(error.stack);
     }
   }
 
@@ -145,7 +146,7 @@ class EnhancedMessageHandler {
   writeBackAsync(msg, enriched) {
     // Fire and forget - don't wait for completion
     this.enricher.writeBackInteractionToSheet(msg, enriched).catch((error) => {
-      console.error("❌ Async write-back error:", error.message);
+      logger.error("❌ Async write-back error:", error.message);
     });
   }
 
@@ -284,7 +285,7 @@ class EnhancedMessageHandler {
         await msg.reply(`❌ No property found with municipality number: ${municipalityNumber}`);
       }
     } catch (error) {
-      console.error('❌ Error handling municipality number:', error);
+      logger.error('❌ Error handling municipality number:', error);
       await msg.reply("❌ An error occurred while processing your request.");
     }
   }
@@ -330,7 +331,7 @@ class EnhancedMessageHandler {
         await msg.reply(`❌ No owner information found for unit: ${unitNumber}`);
       }
     } catch (error) {
-      console.error('❌ Error handling owner number request:', error);
+      logger.error('❌ Error handling owner number request:', error);
       await msg.reply("❌ An error occurred while processing your request.");
     }
   }
@@ -365,7 +366,7 @@ class EnhancedMessageHandler {
         await msg.reply("❌ Failed to initialize agent registration. Please try again later.");
       }
     } catch (error) {
-      console.error('❌ Error handling Lucy agent registration:', error);
+      logger.error('❌ Error handling Lucy agent registration:', error);
       await msg.reply("❌ An error occurred during agent registration.");
     }
   }
@@ -395,7 +396,7 @@ class EnhancedMessageHandler {
         "Example: `!register John Smith, DAMAC Properties, Sales`"
       );
     } catch (error) {
-      console.error('❌ Error handling agent registration:', error);
+      logger.error('❌ Error handling agent registration:', error);
       await msg.reply("❌ An error occurred during agent registration.");
     }
   }
@@ -417,7 +418,7 @@ class EnhancedMessageHandler {
       const downloadResult = await this.mediaHandler.downloadMedia(msg, { client: msg.client });
       
       if (!downloadResult.success) {
-        console.warn('⚠️  Image download failed:', downloadResult.errorMessage);
+        logger.warn('⚠️  Image download failed:', downloadResult.errorMessage);
         await msg.reply("⚠️ Image received but could not be processed.");
         return;
       }
@@ -433,7 +434,7 @@ class EnhancedMessageHandler {
       
       await msg.reply("✅ Image received and processed successfully.");
     } catch (error) {
-      console.error('❌ Error handling image message:', error);
+      logger.error('❌ Error handling image message:', error);
       await msg.reply("❌ An error occurred while processing the image.");
     }
   }
@@ -455,7 +456,7 @@ class EnhancedMessageHandler {
       const downloadResult = await this.mediaHandler.downloadMedia(msg, { client: msg.client });
       
       if (!downloadResult.success) {
-        console.warn('⚠️  Document download failed:', downloadResult.errorMessage);
+        logger.warn('⚠️  Document download failed:', downloadResult.errorMessage);
         await msg.reply("⚠️ Document received but could not be processed.");
         return;
       }
@@ -476,7 +477,7 @@ class EnhancedMessageHandler {
       
       await msg.reply("✅ Document received and processed successfully.");
     } catch (error) {
-      console.error('❌ Error handling document message:', error);
+      logger.error('❌ Error handling document message:', error);
       await msg.reply("❌ An error occurred while processing the document.");
     }
   }
@@ -498,7 +499,7 @@ class EnhancedMessageHandler {
       const downloadResult = await this.mediaHandler.downloadMedia(msg, { client: msg.client });
       
       if (!downloadResult.success) {
-        console.warn('⚠️  Video download failed:', downloadResult.errorMessage);
+        logger.warn('⚠️  Video download failed:', downloadResult.errorMessage);
         await msg.reply("⚠️ Video received but could not be processed.");
         return;
       }
@@ -514,7 +515,7 @@ class EnhancedMessageHandler {
       
       await msg.reply("✅ Video received and processed successfully.");
     } catch (error) {
-      console.error('❌ Error handling video message:', error);
+      logger.error('❌ Error handling video message:', error);
       await msg.reply("❌ An error occurred while processing the video.");
     }
   }
@@ -536,7 +537,7 @@ class EnhancedMessageHandler {
       const downloadResult = await this.mediaHandler.downloadMedia(msg, { client: msg.client });
       
       if (!downloadResult.success) {
-        console.warn('⚠️  Audio download failed:', downloadResult.errorMessage);
+        logger.warn('⚠️  Audio download failed:', downloadResult.errorMessage);
         await msg.reply("⚠️ Audio received but could not be processed.");
         return;
       }
@@ -557,7 +558,7 @@ class EnhancedMessageHandler {
         await msg.reply("✅ Audio received and processed successfully.");
       }
     } catch (error) {
-      console.error('❌ Error handling audio message:', error);
+      logger.error('❌ Error handling audio message:', error);
       await msg.reply("❌ An error occurred while processing the audio.");
     }
   }
@@ -578,7 +579,7 @@ class EnhancedMessageHandler {
       console.log(`🔍 Searching for municipality number: ${municipalityNumber}`);
       return null;
     } catch (error) {
-      console.error('Error finding property:', error);
+      logger.error('Error finding property:', error);
       return null;
     }
   }
@@ -594,7 +595,7 @@ class EnhancedMessageHandler {
       
       return null;
     } catch (error) {
-      console.error('Error finding owner:', error);
+      logger.error('Error finding owner:', error);
       return null;
     }
   }
@@ -607,7 +608,7 @@ class EnhancedMessageHandler {
       console.log(`🔐 Checking agent authorization: ${phoneNumber}`);
       return false;
     } catch (error) {
-      console.error('Error checking authorization:', error);
+      logger.error('Error checking authorization:', error);
       return false;
     }
   }
@@ -634,7 +635,7 @@ class EnhancedMessageHandler {
       
       console.log(`🚀 ${agentType} agent client initialized for: ${agentId}`);
     } catch (error) {
-      console.error(`Error initializing ${agentType} agent:`, error);
+      logger.error(`Error initializing ${agentType} agent:`, error);
     }
   }
 
@@ -652,7 +653,7 @@ class EnhancedMessageHandler {
       
       return result;
     } catch (error) {
-      console.error('❌ Error handling message action:', error.message);
+      logger.error('❌ Error handling message action:', error.message);
       return null;
     }
   }

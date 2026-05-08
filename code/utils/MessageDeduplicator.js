@@ -15,6 +15,13 @@ export class MessageDeduplicator {
     this.ttlMs = ttlMs;  // 5 minutes default
     this.hashes = new Map();  // hash -> { timestamp, count }
     this.hashQueue = [];  // FIFO queue for LRU eviction
+
+    // Auto-cleanup: proactively evict expired entries every 2× TTL.
+    // Without this, entries only expire when checked (lookup-lazy eviction)
+    // which causes unbounded Map growth in high-volume environments.
+    this._cleanupInterval = setInterval(() => this.cleanup(), Math.max(ttlMs * 2, 60_000));
+    // Don't hold the event loop open just for cleanup
+    if (this._cleanupInterval.unref) this._cleanupInterval.unref();
   }
 
   /**
@@ -89,23 +96,26 @@ export class MessageDeduplicator {
   cleanup() {
     try {
       const now = Date.now();
-      const toDelete = [];
-      
+      const toDelete = new Set();
+
       for (const [hash, entry] of this.hashes) {
         if (now - entry.timestamp > this.ttlMs) {
-          toDelete.push(hash);
+          toDelete.add(hash);
         }
       }
-      
-      toDelete.forEach(hash => {
+
+      for (const hash of toDelete) {
         this.hashes.delete(hash);
-      });
-      
-      if (toDelete.length > 0) {
-        console.log(`✅ Deduplicator: Cleaned ${toDelete.length} expired entries`);
       }
-      
-      return toDelete.length;
+
+      // Also prune hashQueue so it doesn't hold stale references that
+      // make the window-size eviction check (hashQueue.length > windowSize)
+      // fire too early on legitimate new messages.
+      if (toDelete.size > 0) {
+        this.hashQueue = this.hashQueue.filter((h) => !toDelete.has(h));
+      }
+
+      return toDelete.size;
     } catch (error) {
       console.error('❌ Deduplicator cleanup error:', error.message);
       return 0;
@@ -130,6 +140,17 @@ export class MessageDeduplicator {
   clear() {
     this.hashes.clear();
     this.hashQueue = [];
+  }
+
+  /**
+   * Stop the periodic cleanup interval (useful for tests / shutdown).
+   */
+  destroy() {
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
+    this.clear();
   }
 }
 

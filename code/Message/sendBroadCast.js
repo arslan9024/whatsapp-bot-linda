@@ -25,6 +25,13 @@ export async function sendBroadcast(MNumbers, Project, newChatsOnly = true) {
             // console.log(`The campaign day is \u001b[32m${diffDays}\u001b[0m`);
             // console.log(`"The iterantion is ", ${i} and the remainder will be${i%InputOne.Agents}`)
 
+            // Guard: bot client must be available before sending
+            if (!WhatsAppBotClient) {
+                console.warn(`⚠️  No WhatsApp client for agent ${AgentForIteration} — skipping ${validatedContact}`);
+                fails++;
+                continue;
+            }
+
             const validatedChatResult = await findAndCheckChat(validatedContact, i, InputOne, WhatsAppBotClient);
             if (newChatsOnly) {
                 if (validatedChatResult?.timestamp) {
@@ -37,8 +44,7 @@ export async function sendBroadcast(MNumbers, Project, newChatsOnly = true) {
             successes++;
           CampaignResult(SendReport, Project, successes, skipped, fails, numbers, i);
         } catch (error) {
-            console.log(error);
-            console.log(num, ' failed');
+            console.error(`❌ Failed to send to ${num}:`, error.message);
             fails++;
         }
     }

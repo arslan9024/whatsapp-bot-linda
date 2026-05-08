@@ -164,6 +164,9 @@ class EnhancedQRCodeDisplayV2 {
    * Start countdown timer display
    */
   startCountdown(timeout) {
+    // Always clear any existing countdown before starting a new one
+    this.clearCountdown();
+
     let remainingMs = timeout;
     
     this.countdownInterval = setInterval(() => {

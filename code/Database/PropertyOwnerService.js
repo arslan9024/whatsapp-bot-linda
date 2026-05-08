@@ -20,6 +20,7 @@ import PropertyContact from './PropertyContactSchema.js';
 import PropertyOwnerProperties from './PropertyOwnerPropertiesSchema.js';
 import PropertyOwnerAuditLog from './PropertyOwnerAuditLogSchema.js';
 import crypto from 'crypto';
+import { logger } from '../utils/Logger.js';
 
 // ========================================================================
 // UTILITY FUNCTIONS
@@ -91,7 +92,7 @@ export const PropertyOwnerService = {
 
       return saved;
     } catch (error) {
-      console.error('Error creating owner:', error);
+      logger.error('Error creating owner:', error);
       throw error;
     }
   },
@@ -128,7 +129,7 @@ export const PropertyOwnerService = {
         successRate: Math.round((owners.length / ownersData.length) * 100)
       };
     } catch (error) {
-      console.error('Error creating owners batch:', error);
+      logger.error('Error creating owners batch:', error);
       throw error;
     }
   },
@@ -162,7 +163,7 @@ export const PropertyOwnerService = {
 
       return saved;
     } catch (error) {
-      console.error('Error creating contact:', error);
+      logger.error('Error creating contact:', error);
       throw error;
     }
   },
@@ -215,7 +216,7 @@ export const PropertyOwnerService = {
 
       return saved;
     } catch (error) {
-      console.error('Error linking owner to property:', error);
+      logger.error('Error linking owner to property:', error);
       throw error;
     }
   },
@@ -231,7 +232,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwner.findOne({ ownerId });
     } catch (error) {
-      console.error('Error getting owner:', error);
+      logger.error('Error getting owner:', error);
       throw error;
     }
   },
@@ -243,7 +244,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwner.findByPhone(phone);
     } catch (error) {
-      console.error('Error getting owner by phone:', error);
+      logger.error('Error getting owner by phone:', error);
       throw error;
     }
   },
@@ -255,7 +256,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwner.findByEmail(email);
     } catch (error) {
-      console.error('Error getting owner by email:', error);
+      logger.error('Error getting owner by email:', error);
       throw error;
     }
   },
@@ -270,7 +271,7 @@ export const PropertyOwnerService = {
         .limit(limit)
         .sort({ createdAt: -1 });
     } catch (error) {
-      console.error('Error getting active owners:', error);
+      logger.error('Error getting active owners:', error);
       throw error;
     }
   },
@@ -288,7 +289,7 @@ export const PropertyOwnerService = {
         .skip(skip)
         .limit(limit);
     } catch (error) {
-      console.error('Error searching owners:', error);
+      logger.error('Error searching owners:', error);
       throw error;
     }
   },
@@ -300,7 +301,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyContact.findOne({ contactId });
     } catch (error) {
-      console.error('Error getting contact:', error);
+      logger.error('Error getting contact:', error);
       throw error;
     }
   },
@@ -312,7 +313,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyContact.findByPhone(phone);
     } catch (error) {
-      console.error('Error getting contact by phone:', error);
+      logger.error('Error getting contact by phone:', error);
       throw error;
     }
   },
@@ -327,7 +328,7 @@ export const PropertyOwnerService = {
         .limit(limit)
         .sort({ createdAt: -1 });
     } catch (error) {
-      console.error('Error getting contacts by type:', error);
+      logger.error('Error getting contacts by type:', error);
       throw error;
     }
   },
@@ -342,7 +343,7 @@ export const PropertyOwnerService = {
         .limit(limit)
         .sort({ acquisitionDate: -1 });
     } catch (error) {
-      console.error('Error getting owner properties:', error);
+      logger.error('Error getting owner properties:', error);
       throw error;
     }
   },
@@ -354,7 +355,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwnerProperties.findByProperty(propertyId);
     } catch (error) {
-      console.error('Error getting property owners:', error);
+      logger.error('Error getting property owners:', error);
       throw error;
     }
   },
@@ -399,7 +400,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error updating owner:', error);
+      logger.error('Error updating owner:', error);
       throw error;
     }
   },
@@ -439,7 +440,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error updating contact:', error);
+      logger.error('Error updating contact:', error);
       throw error;
     }
   },
@@ -479,7 +480,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error updating property link:', error);
+      logger.error('Error updating property link:', error);
       throw error;
     }
   },
@@ -510,7 +511,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error archiving owner:', error);
+      logger.error('Error archiving owner:', error);
       throw error;
     }
   },
@@ -536,7 +537,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error archiving contact:', error);
+      logger.error('Error archiving contact:', error);
       throw error;
     }
   },
@@ -576,7 +577,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error unlinking property:', error);
+      logger.error('Error unlinking property:', error);
       throw error;
     }
   },
@@ -608,7 +609,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error verifying owner:', error);
+      logger.error('Error verifying owner:', error);
       throw error;
     }
   },
@@ -636,7 +637,7 @@ export const PropertyOwnerService = {
 
       return updated;
     } catch (error) {
-      console.error('Error verifying contact:', error);
+      logger.error('Error verifying contact:', error);
       throw error;
     }
   },
@@ -652,7 +653,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwner.getStatistics();
     } catch (error) {
-      console.error('Error getting owner statistics:', error);
+      logger.error('Error getting owner statistics:', error);
       throw error;
     }
   },
@@ -664,7 +665,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyContact.getStatistics();
     } catch (error) {
-      console.error('Error getting contact statistics:', error);
+      logger.error('Error getting contact statistics:', error);
       throw error;
     }
   },
@@ -676,7 +677,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwnerProperties.getPortfolioStats(ownerId);
     } catch (error) {
-      console.error('Error getting portfolio stats:', error);
+      logger.error('Error getting portfolio stats:', error);
       throw error;
     }
   },
@@ -692,7 +693,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwnerAuditLog.getRecordHistory(recordId);
     } catch (error) {
-      console.error('Error getting audit trail:', error);
+      logger.error('Error getting audit trail:', error);
       throw error;
     }
   },
@@ -704,7 +705,7 @@ export const PropertyOwnerService = {
     try {
       return await PropertyOwnerAuditLog.getRecentChanges(days);
     } catch (error) {
-      console.error('Error getting recent changes:', error);
+      logger.error('Error getting recent changes:', error);
       throw error;
     }
   }

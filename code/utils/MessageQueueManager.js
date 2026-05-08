@@ -18,6 +18,7 @@
  */
 
 import mongoose from "mongoose";
+import { logger } from './Logger.js';
 
 // Message Queue Mongoose Schema
 const messageQueueSchema = new mongoose.Schema(
@@ -126,7 +127,7 @@ class MessageQueueManager {
       this.initialized = true;
       return true;
     } catch (error) {
-      console.error(`❌ MessageQueueManager initialization failed: ${error.message}`);
+      logger.error(`❌ MessageQueueManager initialization failed: ${error.message}`);
       return false;
     }
   }
@@ -165,7 +166,7 @@ class MessageQueueManager {
           console.log(`📤 Message queued in DB: ${messageId.slice(0, 8)}...`);
           return messageId;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to save to MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to save to MongoDB: ${dbError.message}. Using fallback.`);
           // Fall through to in-memory queue
         }
       }
@@ -178,7 +179,7 @@ class MessageQueueManager {
       console.log(`📤 Message queued in memory: ${messageId.slice(0, 8)}...`);
       return messageId;
     } catch (error) {
-      console.error(`❌ Error enqueueing message: ${error.message}`);
+      logger.error(`❌ Error enqueueing message: ${error.message}`);
       return null;
     }
   }
@@ -207,7 +208,7 @@ class MessageQueueManager {
 
           return messages;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to fetch from MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to fetch from MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -230,7 +231,7 @@ class MessageQueueManager {
 
       return pending;
     } catch (error) {
-      console.error(`❌ Error fetching pending messages: ${error.message}`);
+      logger.error(`❌ Error fetching pending messages: ${error.message}`);
       return [];
     }
   }
@@ -253,7 +254,7 @@ class MessageQueueManager {
           );
           return true;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -267,7 +268,7 @@ class MessageQueueManager {
 
       return false;
     } catch (error) {
-      console.error(`❌ Error marking message as sent: ${error.message}`);
+      logger.error(`❌ Error marking message as sent: ${error.message}`);
       return false;
     }
   }
@@ -290,7 +291,7 @@ class MessageQueueManager {
           );
           return true;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -304,7 +305,7 @@ class MessageQueueManager {
 
       return false;
     } catch (error) {
-      console.error(`❌ Error marking message as delivered: ${error.message}`);
+      logger.error(`❌ Error marking message as delivered: ${error.message}`);
       return false;
     }
   }
@@ -322,7 +323,7 @@ class MessageQueueManager {
           const message = await MessageQueueModel.findOne({ messageId });
 
           if (!message) {
-            console.warn(`⚠️ Message not found: ${messageId}`);
+            logger.warn(`⚠️ Message not found: ${messageId}`);
             return false;
           }
 
@@ -338,7 +339,7 @@ class MessageQueueManager {
                 sendAttempts: nextAttempt,
               }
             );
-            console.error(`❌ Message failed after ${message.maxAttempts} attempts: ${messageId}`);
+            logger.error(`❌ Message failed after ${message.maxAttempts} attempts: ${messageId}`);
           } else {
             // Schedule retry with exponential backoff
             const delayMs = 1000 * Math.pow(2, nextAttempt - 1); // 1s, 2s, 4s
@@ -358,7 +359,7 @@ class MessageQueueManager {
 
           return true;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to update MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -384,7 +385,7 @@ class MessageQueueManager {
 
       return false;
     } catch (error) {
-      console.error(`❌ Error marking message as failed: ${error.message}`);
+      logger.error(`❌ Error marking message as failed: ${error.message}`);
       return false;
     }
   }
@@ -423,7 +424,7 @@ class MessageQueueManager {
 
           return result;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to get stats from MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to get stats from MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -445,7 +446,7 @@ class MessageQueueManager {
 
       return result;
     } catch (error) {
-      console.error(`❌ Error getting queue stats: ${error.message}`);
+      logger.error(`❌ Error getting queue stats: ${error.message}`);
       return { queued: 0, sent: 0, delivered: 0, failed: 0, total: 0 };
     }
   }
@@ -472,7 +473,7 @@ class MessageQueueManager {
           console.log(`🧹 Cleaned ${cleanedCount} old messages from database`);
           return cleanedCount;
         } catch (dbError) {
-          console.warn(`⚠️ Failed to clean MongoDB: ${dbError.message}. Using fallback.`);
+          logger.warn(`⚠️ Failed to clean MongoDB: ${dbError.message}. Using fallback.`);
         }
       }
 
@@ -492,7 +493,7 @@ class MessageQueueManager {
       console.log(`🧹 Cleaned ${cleanedCount} old messages from memory`);
       return cleanedCount;
     } catch (error) {
-      console.error(`❌ Error cleaning up messages: ${error.message}`);
+      logger.error(`❌ Error cleaning up messages: ${error.message}`);
       return 0;
     }
   }

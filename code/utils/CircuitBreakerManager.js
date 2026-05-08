@@ -51,8 +51,13 @@ class CircuitBreakerManager {
 
   /**
    * Initialize circuit breaker for an account
+   * @param {string} phone - Phone number / endpoint key
    */
   initializeCircuit(phone) {
+    if (!phone || typeof phone !== 'string') {
+      console.warn('[CircuitBreaker] initializeCircuit called with invalid phone:', phone);
+      return;
+    }
     if (!this.circuits.has(phone)) {
       this.circuits.set(phone, {
         state: this.STATES.CLOSED,
@@ -68,8 +73,10 @@ class CircuitBreakerManager {
 
   /**
    * Record a successful operation
+   * @param {string} phone
    */
   recordSuccess(phone) {
+    if (!phone || typeof phone !== 'string') return;
     this.initializeCircuit(phone);
     const circuit = this.circuits.get(phone);
 
@@ -81,6 +88,11 @@ class CircuitBreakerManager {
       console.log(`[CircuitBreaker] ✅ ${phone}: Recovery successful - closing circuit`);
       circuit.state = this.STATES.CLOSED;
       circuit.failures = 0;
+      // Clear the pending reset timer to prevent ghost half-open transitions
+      if (circuit.resetTimer) {
+        clearTimeout(circuit.resetTimer);
+        circuit.resetTimer = null;
+      }
       this.stats.totalCircuitResets++;
       this.stats.currentOpenCircuits = Array.from(this.circuits.values())
         .filter(c => c.state === this.STATES.OPEN).length;
@@ -97,8 +109,10 @@ class CircuitBreakerManager {
 
   /**
    * Record a failure
+   * @param {string} phone
    */
   recordFailure(phone) {
+    if (!phone || typeof phone !== 'string') return;
     this.initializeCircuit(phone);
     const circuit = this.circuits.get(phone);
 

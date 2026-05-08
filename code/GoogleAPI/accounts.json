@@ -2,25 +2,35 @@
   "accounts": {
     "PowerAgent": {
       "id": "poweragent",
-      "name": "arslanpoweragent@gmail.com",
+      "name": "serviceman11@heroic-artifact-414519.iam.gserviceaccount.com",
+      "displayName": "PowerAgent (Arslan)",
+      "project": "heroic-artifact-414519",
       "type": "service_account",
-      "description": "Service account for Google Sheets and Drive",
+      "description": "Primary service account for Google Sheets and Drive (Arslan Malik)",
       "keyPath": "keys.json",
+      "enabled": true,
       "scopes": [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
       ],
       "status": "active",
       "createdAt": "2024-01-01",
-      "lastUsed": "2026-02-08"
+      "lastUsed": "2026-02-08",
+      "capabilities": {
+        "sheets": true,
+        "drive": true,
+        "contacts": false
+      }
     },
     "GorahaBot": {
       "id": "gorahabot",
       "name": "gorahabot@white-caves-fb-486818.iam.gserviceaccount.com",
-      "displayName": "goraha.properties@gmail.com",
+      "displayName": "GorahaBot (goraha.properties)",
+      "project": "white-caves-fb-486818",
       "type": "service_account",
-      "description": "Service account for Google Contacts management (goraha.properties)",
+      "description": "Service account for Google Contacts management (goraha.properties@gmail.com)",
       "keyPath": "keys-goraha.json",
+      "enabled": true,
       "scopes": [
         "https://www.googleapis.com/auth/contacts",
         "https://www.googleapis.com/auth/spreadsheets",
@@ -37,13 +47,13 @@
     }
   },
   "default": "PowerAgent",
-  "version": "1.0",
+  "version": "1.1",
   "format": "Multi-Account Google Services Registry",
-  "notes": "Update status to 'active' after OAuth2 setup for GorahaBot",
+  "notes": "Both accounts use service_account type. Keys stored in code/GoogleAPI/. PowerAgent=heroic-artifact project, GorahaBot=white-caves-fb project.",
   "metadata": {
     "totalAccounts": 2,
-    "serviceAccounts": 1,
-    "oauthAccounts": 1,
-    "lastModified": "2026-02-08T12:00:00Z"
+    "serviceAccounts": 2,
+    "oauthAccounts": 0,
+    "lastModified": "2026-02-21T00:00:00Z"
   }
 }

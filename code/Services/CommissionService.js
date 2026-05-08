@@ -15,6 +15,7 @@
  * @since Phase 20 - February 17, 2026
  */
 
+import { logger } from '../utils/Logger.js';
 import {
   Commission,
   Payment,
@@ -55,7 +56,7 @@ class CommissionService {
         message: 'Commission created successfully'
       };
     } catch (error) {
-      console.error('CommissionService: createCommission error:', error.message);
+      logger.error('CommissionService: createCommission error:', error.message);
       return {
         success: false,
         error: error.message
@@ -72,7 +73,7 @@ class CommissionService {
     try {
       return await Commission.findOne({ commissionId });
     } catch (error) {
-      console.error('CommissionService: getCommissionById error:', error.message);
+      logger.error('CommissionService: getCommissionById error:', error.message);
       return null;
     }
   }
@@ -103,7 +104,7 @@ class CommissionService {
         .limit(options.limit || 100)
         .skip(options.skip || 0);
     } catch (error) {
-      console.error('CommissionService: getCommissionsByAgent error:', error.message);
+      logger.error('CommissionService: getCommissionsByAgent error:', error.message);
       return [];
     }
   }
@@ -132,7 +133,7 @@ class CommissionService {
         message: commission ? 'Commission updated' : 'Commission not found'
       };
     } catch (error) {
-      console.error('CommissionService: updateCommission error:', error.message);
+      logger.error('CommissionService: updateCommission error:', error.message);
       return {
         success: false,
         error: error.message
@@ -205,7 +206,7 @@ class CommissionService {
       
       return result[0]?.total || 0;
     } catch (error) {
-      console.error('CommissionService: getEarnings error:', error.message);
+      logger.error('CommissionService: getEarnings error:', error.message);
       return 0;
     }
   }
@@ -229,7 +230,7 @@ class CommissionService {
       
       return result[0]?.total || 0;
     } catch (error) {
-      console.error('CommissionService: getPendingEarnings error:', error.message);
+      logger.error('CommissionService: getPendingEarnings error:', error.message);
       return 0;
     }
   }
@@ -307,7 +308,7 @@ class CommissionService {
       
       return metrics;
     } catch (error) {
-      console.error('CommissionService: updateAgentMetrics error:', error.message);
+      logger.error('CommissionService: updateAgentMetrics error:', error.message);
       return null;
     }
   }
@@ -321,7 +322,7 @@ class CommissionService {
     try {
       return await AgentMetrics.findOne({ agentPhone });
     } catch (error) {
-      console.error('CommissionService: getAgentMetrics error:', error.message);
+      logger.error('CommissionService: getAgentMetrics error:', error.message);
       return null;
     }
   }
@@ -353,7 +354,7 @@ class CommissionService {
         message: 'Payment created'
       };
     } catch (error) {
-      console.error('CommissionService: createPayment error:', error.message);
+      logger.error('CommissionService: createPayment error:', error.message);
       return {
         success: false,
         error: error.message
@@ -380,7 +381,7 @@ class CommissionService {
         .limit(options.limit || 50)
         .skip(options.skip || 0);
     } catch (error) {
-      console.error('CommissionService: getPaymentHistory error:', error.message);
+      logger.error('CommissionService: getPaymentHistory error:', error.message);
       return [];
     }
   }
@@ -416,7 +417,7 @@ class CommissionService {
         payment: payment?.toObject()
       };
     } catch (error) {
-      console.error('CommissionService: completePayment error:', error.message);
+      logger.error('CommissionService: completePayment error:', error.message);
       return {
         success: false,
         error: error.message
@@ -453,7 +454,7 @@ class CommissionService {
         message: 'Deal created'
       };
     } catch (error) {
-      console.error('CommissionService: createDeal error:', error.message);
+      logger.error('CommissionService: createDeal error:', error.message);
       return {
         success: false,
         error: error.message
@@ -496,7 +497,7 @@ class CommissionService {
         deal: deal?.toObject()
       };
     } catch (error) {
-      console.error('CommissionService: updateDealStatus error:', error.message);
+      logger.error('CommissionService: updateDealStatus error:', error.message);
       return {
         success: false,
         error: error.message
@@ -523,7 +524,7 @@ class CommissionService {
         .limit(options.limit || 50)
         .skip(options.skip || 0);
     } catch (error) {
-      console.error('CommissionService: getDealsByAgent error:', error.message);
+      logger.error('CommissionService: getDealsByAgent error:', error.message);
       return [];
     }
   }
@@ -582,7 +583,7 @@ class CommissionService {
         message: 'Deal closed and commission generated'
       };
     } catch (error) {
-      console.error('CommissionService: closeDealAndGenerateCommission error:', error.message);
+      logger.error('CommissionService: closeDealAndGenerateCommission error:', error.message);
       return {
         success: false,
         error: error.message
@@ -631,7 +632,7 @@ class CommissionService {
         generatedAt: new Date()
       };
     } catch (error) {
-      console.error('CommissionService: generateCommissionReport error:', error.message);
+      logger.error('CommissionService: generateCommissionReport error:', error.message);
       return {
         success: false,
         error: error.message

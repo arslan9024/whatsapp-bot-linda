@@ -111,8 +111,15 @@ export class WhatsAppCommandBridge {
         this.logBot(`📱 Primary master phone: ${masterPhone}`, 'info');
         
         if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
-          this.logBot('⚠️ Primary master not linked, attempting auto-recovery...', 'warn');
-          await this.autoRecoverPrimaryMaster();
+          // Only attempt auto-recovery if a session has previously existed
+          // (i.e. there's a session folder). If never linked, skip silently.
+          const hasExistingSession = SessionManager.hasSessionArtifacts(masterPhone);
+          if (hasExistingSession) {
+            this.logBot('⚠️ Primary master not linked, attempting auto-recovery...', 'warn');
+            await this.autoRecoverPrimaryMaster();
+          } else {
+            this.logBot('ℹ️  No previous session — waiting for manual linking (type: link master)', 'info');
+          }
         } else {
           botActive = true;
           this.logBot('✅ Primary master is linked - Command Bridge active', 'success');
@@ -138,23 +145,32 @@ export class WhatsAppCommandBridge {
    * @private
    */
   startRecoveryPolling() {
-    // Check every 30 seconds if primary master is still connected
+    // Poll every 60 seconds to check if primary master is still connected
     this.pollingInterval = setInterval(async () => {
-      const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
-      if (!masterPhone || this.recoveryInProgress) return;
-      
-      // Check if still linked
-      if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
-        this.logBot('⚠️ Polling detected primary master disconnected - attempting recovery...', 'warn');
-        await this.autoRecoverPrimaryMaster();
-      } else if (!botActive) {
-        // Mark as active if linked
-        botActive = true;
-        this.logBot('✅ Primary master reconnected - Bot active', 'success');
+      try {
+        const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
+        if (!masterPhone || this.recoveryInProgress) return;
+
+        // Skip polling entirely if the account has never been linked (no session folder)
+        const hasExistingSession = SessionManager.hasSessionArtifacts(masterPhone);
+        if (!hasExistingSession) return; // Silently skip — waiting for manual link
+
+        // Check if still linked
+        if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
+          this.logBot('⚠️ Polling detected primary master disconnected - attempting recovery...', 'warn');
+          await this.autoRecoverPrimaryMaster();
+        } else if (!botActive) {
+          // Mark as active if linked
+          botActive = true;
+          this.logBot('✅ Primary master reconnected - Bot active', 'success');
+        }
+      } catch (pollingError) {
+        // Never let a polling error kill the interval — just log it
+        this.logBot(`⚠️ Recovery polling error (will retry): ${pollingError.message}`, 'warn');
       }
-    }, 30000); // 30 seconds
-    
-    this.logBot('🔄 Recovery polling started (30s interval)', 'info');
+    }, 60000); // 60 seconds
+
+    this.logBot('🔄 Recovery polling started (60s interval, session-aware)', 'info');
   }
 
   /**

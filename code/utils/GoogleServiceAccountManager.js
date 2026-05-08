@@ -61,6 +61,43 @@ class GoogleServiceAccountManager {
   }
 
   /**
+   * Normalize and decode base64 credentials from environment variable.
+   * Handles common formatting mistakes:
+   * - surrounding quotes
+   * - whitespace/newlines inserted by editors
+   * - extra trailing characters after valid JSON
+   *
+   * @param {string} rawBase64
+   * @returns {object}
+   * @throws {Error}
+   */
+  decodeCredentialsFromEnv(rawBase64) {
+    if (!rawBase64 || typeof rawBase64 !== 'string') {
+      throw new Error('Empty credentials payload');
+    }
+
+    // Remove wrapping quotes and whitespace/newlines often introduced in .env files
+    const normalizedBase64 = rawBase64.trim().replace(/^['"]|['"]$/g, '').replace(/\s+/g, '');
+    const jsonString = Buffer.from(normalizedBase64, 'base64').toString('utf-8').trim();
+
+    // First try: strict parse
+    try {
+      return JSON.parse(jsonString);
+    } catch {
+      // Fallback: try extracting the first JSON object in case of trailing garbage
+      const firstBrace = jsonString.indexOf('{');
+      const lastBrace = jsonString.lastIndexOf('}');
+
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+        throw new Error('Decoded payload does not contain valid JSON object boundaries');
+      }
+
+      const trimmedJson = jsonString.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(trimmedJson);
+    }
+  }
+
+  /**
    * Get credentials for a specific Google account
    * Tries multiple sources in order:
    * 1. Environment variable (base64-encoded JSON)
@@ -91,8 +128,7 @@ class GoogleServiceAccountManager {
 
     if (base64Creds) {
       try {
-        const jsonString = Buffer.from(base64Creds, 'base64').toString('utf-8');
-        const credentials = JSON.parse(jsonString);
+        const credentials = this.decodeCredentialsFromEnv(base64Creds);
         
         // Validate credentials
         if (this.validateCredentials(credentials, normalizedName)) {
@@ -101,7 +137,8 @@ class GoogleServiceAccountManager {
           return credentials;
         }
       } catch (error) {
-        this.logger.error(`Failed to decode/parse ${envVarName}: ${error.message}`);
+        this.logger.warn(`Failed to decode/parse ${envVarName}: ${error.message}`);
+        this.logger.warn(`Falling back to legacy credential file path for ${normalizedName} (if available)`);
       }
     }
 

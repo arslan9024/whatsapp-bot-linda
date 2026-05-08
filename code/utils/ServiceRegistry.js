@@ -17,17 +17,24 @@
  *   - Singleton (default export) so every import points to the same Map.
  *   - get() returns null for unregistered keys (no throw), matching the
  *     existing `global.XXX?.method()` optional-chaining pattern.
+ *   - getOrThrow() for mandatory dependencies — throws clearly if missing.
  *   - has() for explicit checks.
+ *   - snapshot() returns a human-readable registry dump for `npm run doctor`.
  *   - Backward-compat: the `Lion0` / `Linda` aliases continue to work
  *     via `services.get('Lion0')`.
  *
  * @since Phase 11 – February 14, 2026
+ * @upgraded May 2026 – getOrThrow, snapshot, registeredAt tracking
  */
 
 class ServiceRegistry {
   constructor() {
     /** @type {Map<string, any>} */
     this._services = new Map();
+    /** @type {Map<string, Date>} */
+    this._registeredAt = new Map();
+    /** @type {Date} */
+    this._createdAt = new Date();
   }
 
   /**
@@ -38,6 +45,7 @@ class ServiceRegistry {
    */
   register(name, instance) {
     this._services.set(name, instance);
+    this._registeredAt.set(name, new Date());
     return this;
   }
 
@@ -48,6 +56,26 @@ class ServiceRegistry {
    */
   get(name) {
     return this._services.get(name) ?? null;
+  }
+
+  /**
+   * Retrieve a required service.  Throws a descriptive error when missing,
+   * so callers get an actionable message instead of a silent null.
+   *
+   * @param {string} name
+   * @returns {any}
+   * @throws {Error}  if the service has not been registered
+   */
+  getOrThrow(name) {
+    const svc = this._services.get(name);
+    if (svc === undefined) {
+      const registered = this.list().join(', ') || '(none)';
+      throw new Error(
+        `[ServiceRegistry] Required service "${name}" is not registered.\n` +
+        `Currently registered: ${registered}`
+      );
+    }
+    return svc;
   }
 
   /**
@@ -65,6 +93,7 @@ class ServiceRegistry {
    * @returns {boolean}  true if the service existed and was removed.
    */
   unregister(name) {
+    this._registeredAt.delete(name);
     return this._services.delete(name);
   }
 
@@ -73,6 +102,7 @@ class ServiceRegistry {
    */
   clear() {
     this._services.clear();
+    this._registeredAt.clear();
   }
 
   /**
@@ -81,6 +111,32 @@ class ServiceRegistry {
    */
   list() {
     return [...this._services.keys()];
+  }
+
+  /**
+   * Return a structured snapshot of the registry — useful for `npm run doctor`
+   * and runtime diagnostics.
+   *
+   * @returns {{
+   *   createdAt: string,
+   *   count: number,
+   *   services: Array<{ name: string, type: string, registeredAt: string }>
+   * }}
+   */
+  snapshot() {
+    const services = [];
+    for (const [name, instance] of this._services) {
+      services.push({
+        name,
+        type: instance?.constructor?.name ?? typeof instance,
+        registeredAt: (this._registeredAt.get(name) ?? new Date()).toISOString(),
+      });
+    }
+    return {
+      createdAt: this._createdAt.toISOString(),
+      count: services.length,
+      services,
+    };
   }
 
   /**

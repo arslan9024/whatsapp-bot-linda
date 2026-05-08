@@ -464,13 +464,28 @@ class AccountHealthMonitor {
         console.log(`\n🔗 GOOGLE ACCOUNTS STATUS:`);
         console.log(`${'─'.repeat(60)}`);
         
+        // Support both array and object formats for registry.accounts
+        let accountList = [];
         if (registry.accounts && Array.isArray(registry.accounts)) {
-          registry.accounts.forEach((account, index) => {
-            const status = account.enabled !== false ? "✅ Connected" : "⚠️  Disabled";
+          accountList = registry.accounts;
+        } else if (registry.accounts && typeof registry.accounts === 'object') {
+          accountList = Object.entries(registry.accounts).map(([key, val]) => ({
+            ...val,
+            id: val.id || key,
+            displayName: val.displayName || val.name || key,
+          }));
+        }
+
+        if (accountList.length > 0) {
+          accountList.forEach((account, index) => {
+            const isActive = account.status === 'active' || account.enabled !== false;
+            const status = isActive ? "✅ Active" : "⚠️  Inactive";
             const accountName = account.displayName || account.name || `Account ${index + 1}`;
             const services = account.scopes ? account.scopes.length : 0;
-            console.log(`  ${accountName.padEnd(30)} ${status.padEnd(15)} (${services} services)`);
+            const keySource = account.keyPath ? ` [${account.keyPath}]` : '';
+            console.log(`  ${accountName.padEnd(35)} ${status.padEnd(15)} (${services} scopes)${keySource}`);
           });
+          console.log(`\n  📊 Total: ${accountList.length} Google account(s) configured`);
         } else {
           console.log(`  No Google accounts configured`);
         }

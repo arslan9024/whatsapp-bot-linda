@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs/promises";
 import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
+import { logger } from './Logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "../../");
@@ -71,7 +72,7 @@ export class SessionManager {
 
       return false;
     } catch (error) {
-      console.error(`❌ Error cleaning session: ${error.message}`);
+      logger.error(`❌ Error cleaning session: ${error.message}`);
       return false;
     }
   }
@@ -96,7 +97,7 @@ export class SessionManager {
 
       return true;
     } catch (error) {
-      console.error(`❌ Error during cleanup: ${error.message}`);
+      logger.error(`❌ Error during cleanup: ${error.message}`);
       return false;
     }
   }
@@ -116,7 +117,7 @@ export class SessionManager {
       console.log(`✅ Fresh session created: ${masterNumber}\n`);
       return true;
     } catch (error) {
-      console.error(`❌ Error creating fresh session: ${error.message}`);
+      logger.error(`❌ Error creating fresh session: ${error.message}`);
       return false;
     }
   }
@@ -194,7 +195,7 @@ export class SessionManager {
 
       console.log();
     } catch (error) {
-      console.error(`❌ Error listing sessions: ${error.message}`);
+      logger.error(`❌ Error listing sessions: ${error.message}`);
     }
   }
 
@@ -248,7 +249,7 @@ export class SessionManager {
       console.log(`✅ Session state saved for ${masterNumber}`);
       return true;
     } catch (error) {
-      console.error(`⚠️  Failed to save session state: ${error.message}`);
+      logger.error(`⚠️  Failed to save session state: ${error.message}`);
       return false;
     }
   }
@@ -263,7 +264,7 @@ export class SessionManager {
         return state;
       }
     } catch (error) {
-      console.error(`⚠️  Failed to load session state: ${error.message}`);
+      logger.error(`⚠️  Failed to load session state: ${error.message}`);
     }
     return null;
   }
@@ -297,7 +298,29 @@ export class SessionManager {
       console.log(`✅ Session can be restored for ${masterNumber}`);
       return true;
     } catch (error) {
-      console.error(`❌ Session restoration check failed: ${error.message}`);
+      logger.error(`❌ Session restoration check failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Quiet check for whether a session artifact exists for a phone number.
+   * Unlike canRestoreSession(), this method NEVER logs warnings/errors,
+   * making it safe for startup/polling guards.
+   *
+   * @param {string} masterNumber
+   * @returns {boolean}
+   */
+  static hasSessionArtifacts(masterNumber) {
+    try {
+      if (!masterNumber) return false;
+
+      const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const defaultDir = path.join(sessionFolder, 'Default');
+      const sessionFile = path.join(defaultDir, 'Session');
+
+      return existsSync(sessionFolder) && existsSync(defaultDir) && existsSync(sessionFile);
+    } catch {
       return false;
     }
   }
@@ -332,7 +355,7 @@ export class SessionManager {
 
       return validSessions;
     } catch (error) {
-      console.error(`⚠️  Error reading saved sessions: ${error.message}`);
+      logger.error(`⚠️  Error reading saved sessions: ${error.message}`);
       return [];
     }
   }
@@ -357,7 +380,7 @@ export class SessionManager {
       console.log(`✅ Session backup created for ${masterNumber} at ${backupFolder}`);
       return true;
     } catch (error) {
-      console.error(`⚠️  Failed to backup session: ${error.message}`);
+      logger.error(`⚠️  Failed to backup session: ${error.message}`);
       return false;
     }
   }
@@ -396,7 +419,7 @@ export class SessionManager {
       console.log(`✅ Session restored from backup for ${masterNumber}`);
       return true;
     } catch (error) {
-      console.error(`❌ Failed to restore from backup: ${error.message}`);
+      logger.error(`❌ Failed to restore from backup: ${error.message}`);
       return false;
     }
   }
@@ -441,7 +464,7 @@ export class SessionManager {
         }
       });
     } catch (error) {
-      console.error(`⚠️  Cleanup failed: ${error.message}`);
+      logger.error(`⚠️  Cleanup failed: ${error.message}`);
     }
   }
 
@@ -511,7 +534,7 @@ export class SessionManager {
 
     } catch (error) {
       result.issues.push(`Error: ${error.message}`);
-      console.error(`❌ Session validation error: ${error.message}`);
+      logger.error(`❌ Session validation error: ${error.message}`);
       return result;
     }
   }
@@ -628,7 +651,7 @@ export class SessionManager {
       return accountState;
 
     } catch (error) {
-      console.error(`⚠️  Failed to record recovery attempt: ${error.message}`);
+      logger.error(`⚠️  Failed to record recovery attempt: ${error.message}`);
       return null;
     }
   }
@@ -653,7 +676,7 @@ export class SessionManager {
 
       return true;
     } catch (error) {
-      console.error(`⚠️  Failed to clear recovery state: ${error.message}`);
+      logger.error(`⚠️  Failed to clear recovery state: ${error.message}`);
       return false;
     }
   }
@@ -697,7 +720,7 @@ export class SessionManager {
 
       return null;
     } catch (error) {
-      console.error(`⚠️  Error finding session: ${error.message}`);
+      logger.error(`⚠️  Error finding session: ${error.message}`);
       return null;
     }
   }
@@ -724,7 +747,7 @@ export class SessionManager {
 
       return { created: false, path: sessionPath };
     } catch (error) {
-      console.error(`❌ Failed to create session directory: ${error.message}`);
+      logger.error(`❌ Failed to create session directory: ${error.message}`);
       return { created: false, error: error.message };
     }
   }

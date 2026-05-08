@@ -1,28 +1,43 @@
 import { google } from 'googleapis';
 import { getPowerAgent, initializeGoogleAuth } from "../GoogleAPI/main.js";
+import { Logger } from '../utils/Logger.js';
 
+const log = new Logger('GoogleSheet');
+
+/**
+ * Fetch a Google Sheet by Project config.
+ * @param {{ ProjectSheetID: string, ProjectName?: string }} Project
+ * @returns {Promise<object>} The sheets API response
+ * @throws {Error} If auth is unavailable or the API call fails
+ */
 export async function getGoogleSheet(Project) {
+    if (!Project?.ProjectSheetID) {
+        throw new Error('getGoogleSheet: Project.ProjectSheetID is required');
+    }
+
     // Initialize Google auth if not already done
     await initializeGoogleAuth();
-    
+
     // Get the authenticated PowerAgent
     const PowerAgent = await getPowerAgent();
-    
+
     if (!PowerAgent) {
-        console.error('❌ Google Sheets is not connected. Please fix credentials.');
-        return null;
+        throw new Error('getGoogleSheet: Google Sheets not connected — check credentials');
     }
-    
-    let sheetData;
+
     const gsapi = google.sheets({ version: 'v4', auth: PowerAgent });
     const opt = {
         spreadsheetId: Project.ProjectSheetID,
-        range: "Sheet1"
+        range: 'Sheet1'
     };
+
     try {
-        sheetData = await gsapi.spreadsheets.values.get(opt);
+        const sheetData = await gsapi.spreadsheets.values.get(opt);
+        return sheetData;
     } catch (error) {
-        console.log(error);
+        // Throw so the caller knows the fetch failed — returning undefined silently
+        // caused downstream callers to crash on .data.values access.
+        log.error(`Failed to fetch sheet "${Project.ProjectName || Project.ProjectSheetID}": ${error.message}`);
+        throw error;
     }
-    return sheetData;
 }

@@ -232,7 +232,10 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     if (isRestore) {
       logBot(`Session restore failed for ${phoneNumber}: ${msg}`, 'error');
       logBot('Falling back to new QR code authentication...', 'warn');
-      // Re-enter this function in QR mode
+      // Remove all existing listeners before re-entering — otherwise
+      // each auth_failure retry adds a duplicate set of on() listeners,
+      // leaking 2-5 MB per cycle and causing duplicate event handling.
+      client.removeAllListeners();
       try {
         setupClientFlow(client, phoneNumber, botId, { isRestore: false, displayName }, deps);
       } catch (error) {

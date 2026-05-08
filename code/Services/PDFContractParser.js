@@ -28,7 +28,7 @@ class PDFContractParser {
     // Date patterns to search for in contract text
     this.datePatterns = {
       // Common date formats: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-      standard: /(\d{1,2})[\/-\.](\d{1,2})[\/-\.](\d{4})/g,
+      standard: /(\d{1,2})[/.\ -](\d{1,2})[/.\ -](\d{4})/g,
       // Text dates: 15th January 2025, 15 January 2025
       textDate: /(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/gi,
       // ISO format: 2025-01-15

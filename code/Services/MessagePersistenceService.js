@@ -13,6 +13,7 @@ import {
   MessageAction,
 } from '../Database/MessageSchema.js';
 import crypto from 'crypto';
+import { logger } from '../utils/Logger.js';
 
 export class MessagePersistenceService {
   constructor() {
@@ -35,13 +36,13 @@ export class MessagePersistenceService {
         this.isConnected = true;
         console.log('✅ MessagePersistenceService initialized (MongoDB connected)');
       } else {
-        console.warn('⚠️ MessagePersistenceService: MongoDB not available, using fallback cache');
+        logger.warn('⚠️ MessagePersistenceService: MongoDB not available, using fallback cache');
       }
       
       this.startBatchFlush();
       return true;
     } catch (error) {
-      console.error('❌ MessagePersistenceService init error:', error.message);
+      logger.error('❌ MessagePersistenceService init error:', error.message);
       return false;
     }
   }
@@ -52,7 +53,7 @@ export class MessagePersistenceService {
   async saveMessage(msgObj) {
     try {
       if (!msgObj.messageId || !msgObj.fromNumber || !msgObj.timestamp) {
-        console.warn('⚠️ Invalid message object for persistence');
+        logger.warn('⚠️ Invalid message object for persistence');
         return { success: false, reason: 'invalid_message' };
       }
 
@@ -78,7 +79,7 @@ export class MessagePersistenceService {
         return { success: true, persisted: 'memory' };
       }
     } catch (error) {
-      console.error('❌ Error saving message:', error.message);
+      logger.error('❌ Error saving message:', error.message);
       return { success: false, reason: error.message };
     }
   }
@@ -101,10 +102,10 @@ export class MessagePersistenceService {
         return true;
       } catch (error) {
         if (attempt < this.retryAttempts - 1) {
-          console.warn(`⚠️ Batch save attempt ${attempt + 1} failed, retrying...`);
+          logger.warn(`⚠️ Batch save attempt ${attempt + 1} failed, retrying...`);
           await this.sleep(this.retryDelayMs * (attempt + 1));
         } else {
-          console.error('❌ Batch save failed after retries:', error.message);
+          logger.error('❌ Batch save failed after retries:', error.message);
           this.batchQueue.push(...messages);
           return false;
         }
@@ -130,7 +131,7 @@ export class MessagePersistenceService {
         return cached.slice(-limit).reverse();
       }
     } catch (error) {
-      console.error('❌ Error fetching conversation history:', error.message);
+      logger.error('❌ Error fetching conversation history:', error.message);
       return [];
     }
   }
@@ -141,7 +142,7 @@ export class MessagePersistenceService {
   async queryMessages(criteria, options = {}) {
     try {
       if (!this.isConnected) {
-        console.warn('⚠️ MongoDB not available, cannot query');
+        logger.warn('⚠️ MongoDB not available, cannot query');
         return [];
       }
 
@@ -156,7 +157,7 @@ export class MessagePersistenceService {
 
       return await query.exec();
     } catch (error) {
-      console.error('❌ Query error:', error.message);
+      logger.error('❌ Query error:', error.message);
       return [];
     }
   }
@@ -167,7 +168,7 @@ export class MessagePersistenceService {
   async updateMessage(messageId, updates) {
     try {
       if (!this.isConnected) {
-        console.warn('⚠️ MongoDB not available, cannot update');
+        logger.warn('⚠️ MongoDB not available, cannot update');
         return false;
       }
 
@@ -178,7 +179,7 @@ export class MessagePersistenceService {
 
       return result.modifiedCount > 0;
     } catch (error) {
-      console.error('❌ Update message error:', error.message);
+      logger.error('❌ Update message error:', error.message);
       return false;
     }
   }
@@ -189,7 +190,7 @@ export class MessagePersistenceService {
   async saveAction(actionObj) {
     try {
       if (!this.isConnected) {
-        console.warn('⚠️ MongoDB not available, cannot save action');
+        logger.warn('⚠️ MongoDB not available, cannot save action');
         return false;
       }
 
@@ -198,7 +199,7 @@ export class MessagePersistenceService {
       
       return true;
     } catch (error) {
-      console.error('❌ Error saving action:', error.message);
+      logger.error('❌ Error saving action:', error.message);
       return false;
     }
   }
@@ -214,7 +215,7 @@ export class MessagePersistenceService {
         messageId,
       }).sort({ timestamp: -1 }).lean();
     } catch (error) {
-      console.error('❌ Error fetching actions:', error.message);
+      logger.error('❌ Error fetching actions:', error.message);
       return [];
     }
   }
@@ -265,7 +266,7 @@ export class MessagePersistenceService {
         );
       }
     } catch (error) {
-      console.error('❌ Error updating conversation metadata:', error.message);
+      logger.error('❌ Error updating conversation metadata:', error.message);
     }
   }
 
@@ -284,7 +285,7 @@ export class MessagePersistenceService {
       }
       console.log('✅ Fallback cache pruned');
     } catch (error) {
-      console.error('❌ Error pruning cache:', error.message);
+      logger.error('❌ Error pruning cache:', error.message);
     }
   }
 
