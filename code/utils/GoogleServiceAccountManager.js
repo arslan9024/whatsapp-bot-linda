@@ -84,15 +84,60 @@ class GoogleServiceAccountManager {
     try {
       return JSON.parse(jsonString);
     } catch {
-      // Fallback: try extracting the first JSON object in case of trailing garbage
+      // Fallback: extract ONLY the first complete JSON object in case of trailing garbage
+      // or accidental concatenation in .env values.
       const firstBrace = jsonString.indexOf('{');
-      const lastBrace = jsonString.lastIndexOf('}');
-
-      if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-        throw new Error('Decoded payload does not contain valid JSON object boundaries');
+      if (firstBrace === -1) {
+        throw new Error('Decoded payload does not contain a JSON object');
       }
 
-      const trimmedJson = jsonString.slice(firstBrace, lastBrace + 1);
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let endIndex = -1;
+
+      for (let i = firstBrace; i < jsonString.length; i++) {
+        const ch = jsonString[i];
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            escaped = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (ch === '"') {
+          inString = true;
+          continue;
+        }
+
+        if (ch === '{') {
+          depth++;
+          continue;
+        }
+
+        if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            endIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (endIndex === -1) {
+        throw new Error('Could not locate end of first JSON object in decoded payload');
+      }
+
+      const trimmedJson = jsonString.slice(firstBrace, endIndex + 1);
       return JSON.parse(trimmedJson);
     }
   }

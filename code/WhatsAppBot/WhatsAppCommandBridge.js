@@ -77,6 +77,15 @@ export class WhatsAppCommandBridge {
     this.recoveryInProgress = false;
     this.pollingInterval = null;
     this.lastRecoveryAttempt = 0;
+    // Backward-compatible command stats (used by test suite and bridge diagnostics)
+    this.stats = {
+      totalCommands: 0,
+      errors: 0,
+      lastCommand: null,
+      lastCommandTime: null,
+      commandsByName: {},
+    };
+    this.logBot('✅ WhatsApp Command Bridge initialized', 'info');
   }
 
   /**
@@ -375,7 +384,7 @@ export class WhatsAppCommandBridge {
    * Check if message should be handled
    */
   shouldHandle(msg, phoneNumber) {
-    if (!botActive) {
+    if (!botActive && this.deviceLinkedManager) {
       // If bot is inactive, prompt for relink/restore
       if (msg && msg.reply) {
         msg.reply('❌ Bot inactive. Please use "linda relink master <phone>" or "linda restore" to activate primary master WhatsApp account.');
@@ -398,53 +407,112 @@ export class WhatsAppCommandBridge {
    * Handle incoming message
    */
   async handleMessage(msg) {
-    const body = (msg.body || '').trim();
-    const afterPrefix = body.substring(this.prefix.length).trim();
-    if (!afterPrefix) {
-      await this.handleMenu(msg);
-      return true;
-    }
-    const parts = afterPrefix.split(/\s+/);
-    const command = parts[0].toLowerCase();
-    const args = parts.slice(1);
+    try {
+      const body = (msg.body || '').trim();
+      const lower = body.toLowerCase();
 
-    // Menu/group selection
-    if (command === 'menu') {
-      await this.handleMenu(msg);
-      return true;
-    }
-    if (['1','2','3','4'].includes(command)) {
-      await this.handleGroupCommands(msg, command);
-      return true;
-    }
+      // Accept both "linda" and "Linda" etc.
+      if (lower === this.prefix) {
+        this._trackCommand('help');
+        await msg.reply(this.getHelpText());
+        return true;
+      }
 
-    // Recovery commands
-    if (command === 'recover' || command === 'restore') {
-      await this.handleRecover(msg);
+      const afterPrefix = body.substring(this.prefix.length).trim();
+      if (!afterPrefix) {
+        this._trackCommand('help');
+        await msg.reply(this.getHelpText());
+        return true;
+      }
+
+      const parts = afterPrefix.split(/\s+/);
+      const command = (parts[0] || '').toLowerCase();
+      const args = parts.slice(1);
+      this._trackCommand(command || 'help');
+
+      switch (command) {
+        case 'help':
+          await msg.reply(this.getHelpText());
+          return true;
+        case 'menu':
+          await this.handleMenu(msg);
+          return true;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+          await this.handleGroupCommands(msg, command);
+          return true;
+        case 'recover':
+          await this.handleRecover(msg, args);
+          return true;
+        case 'restore':
+          await this.handleRestore(msg, services.get('terminalCallbacks'));
+          return true;
+        case 'status':
+          await this.handleStatus(msg);
+          return true;
+        case 'health':
+          await this.handleHealthStatus(msg, args);
+          return true;
+        case 'accounts':
+          await this.handleAccounts(msg);
+          return true;
+        case 'stats':
+          await this.handleStats(msg, args);
+          return true;
+        case 'relink':
+          await this.handleRelink(msg, args, services.get('terminalCallbacks'));
+          return true;
+        case 'goraha':
+          await this.handleGoraha(msg, args, services.get('terminalCallbacks'));
+          return true;
+        case 'analytics':
+          await this.handleAnalytics(msg, args, services.get('terminalCallbacks'));
+          return true;
+        case 'sheets':
+          await this.handleSheets(msg, args, services.get('terminalCallbacks'));
+          return true;
+        case 'link':
+          await this.handleLink(msg, args, services.get('terminalCallbacks'));
+          return true;
+        case 'list':
+          await this.handleList(msg);
+          return true;
+        case 'device':
+          await this.handleDevice(msg, args);
+          return true;
+        case 'bridge-stats':
+          await this.handleBridgeStats(msg);
+          return true;
+        default:
+          await msg.reply(`❌ Unknown command: ${command}. Send \"linda help\" for command list.`);
+          return true;
+      }
+    } catch (error) {
+      this.stats.errors++;
+      await msg.reply(`❌ Command error: ${error.message}`);
       return true;
     }
-
-    // Status command
-    if (command === 'status' || command === 'health') {
-      await this.handleStatus(msg);
-      return true;
-    }
-
-    // ...existing command switch...
-    // ...existing code...
   }
 
   /**
    * Handle recovery command
    */
-  async handleRecover(msg) {
-    msg.reply('🔄 Starting manual recovery...');
-    const success = await this.autoRecoverPrimaryMaster();
-    if (success) {
-      msg.reply('✅ Primary master recovered successfully!');
-    } else {
-      msg.reply('❌ Recovery failed. Please check terminal for details or run "link master <phone>".');
+  async handleRecover(msg, args = []) {
+    if (!args.length) {
+      await msg.reply('Usage: linda recover <+phone>');
+      return;
     }
+    const phone = args[0];
+    const device = this.deviceLinkedManager?.getDevice?.(phone);
+    if (!device) {
+      await msg.reply(`❌ Device not found: ${phone}`);
+      return;
+    }
+    await msg.reply(`🔄 Recovery requested for ${phone}`);
+    const success = await this.autoRecoverPrimaryMaster();
+    await msg.reply(success ? '✅ Recovery completed.' : '⚠️ Recovery attempted. Check terminal for details.');
   }
 
   /**
@@ -510,20 +578,388 @@ export class WhatsAppCommandBridge {
     msg.reply(`📁 ${groupInfo.name}:\n${commands}`);
   }
 
+  normalizePhone(value) {
+    if (!value) return '';
+    return String(value)
+      .replace('@c.us', '')
+      .replace('@s.whatsapp.net', '')
+      .replace(/[^\d+]/g, '')
+      .replace(/^\+/, '');
+  }
+
+  _trackCommand(command) {
+    this.stats.totalCommands += 1;
+    this.stats.lastCommand = command;
+    this.stats.lastCommandTime = new Date();
+    this.stats.commandsByName[command] = (this.stats.commandsByName[command] || 0) + 1;
+  }
+
+  async captureOutput(fn) {
+    const originalLog = console.log;
+    const originalClear = console.clear;
+    const lines = [];
+    console.log = (...args) => {
+      const text = args.map((a) => String(a)).join(' ');
+      // Strip ANSI escape codes
+      lines.push(text.replace(/\x1B\[[0-9;]*m/g, ''));
+    };
+    console.clear = () => {};
+    try {
+      await fn();
+      const output = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      return output;
+    } finally {
+      console.log = originalLog;
+      console.clear = originalClear;
+    }
+  }
+
+  async sendOutput(msg, output, fallback = 'No output') {
+    if (!output || typeof output !== 'string' || !output.trim()) {
+      await msg.reply(fallback);
+      return;
+    }
+    const chunkSize = 4000;
+    if (output.length <= chunkSize) {
+      await msg.reply(output);
+      return;
+    }
+    const chunks = [];
+    for (let i = 0; i < output.length; i += chunkSize) {
+      chunks.push(output.slice(i, i + chunkSize));
+    }
+    for (let i = 0; i < chunks.length; i++) {
+      await msg.reply(`(${i + 1}/${chunks.length}) ${chunks[i]}`);
+    }
+  }
+
+  _calculateHealthScore(device) {
+    if (!device) return 0;
+    let score = 0;
+    if (device.isOnline) score += 40;
+    if (device.status === 'linked') score += 30;
+    if (device.lastHeartbeat) {
+      const age = Date.now() - new Date(device.lastHeartbeat).getTime();
+      if (age <= 60_000) score += 30;
+      else if (age <= 300_000) score += 10;
+      else score += 10; // stale heartbeat still indicates prior liveness
+    }
+    return Math.min(100, score);
+  }
+
+  async handleHealthStatus(msg, args = []) {
+    if (args.length) {
+      if (!this.deviceLinkedManager?.getDevice) {
+        await msg.reply('❌ Device health not available (device manager missing).');
+        return;
+      }
+      const phone = args[0];
+      const device = this.deviceLinkedManager.getDevice(phone);
+      if (!device) {
+        await msg.reply(`❌ Device not found: ${phone}`);
+        return;
+      }
+      const score = this._calculateHealthScore(device);
+      await msg.reply(`📊 Health for ${phone}\nOnline: ${device.isOnline ? 'Yes' : 'No'}\nStatus: ${device.status || 'unknown'}\nScore: ${score}/100`);
+      return;
+    }
+    if (this.terminalHealthDashboard?.displayHealthDashboard) {
+      const out = await this.captureOutput(() => this.terminalHealthDashboard.displayHealthDashboard());
+      await this.sendOutput(msg, out, 'HEALTH DASHBOARD unavailable');
+      return;
+    }
+    await msg.reply('❌ Health dashboard not available.');
+  }
+
+  async handleAccounts(msg) {
+    if (!this.accountConfigManager?.getAllAccounts) {
+      await msg.reply('❌ Account configuration not available.');
+      return;
+    }
+    const accounts = this.accountConfigManager.getAllAccounts() || [];
+    if (!accounts.length) {
+      await msg.reply('ℹ️ No accounts configured.');
+      return;
+    }
+    const lines = accounts.map((a) => {
+      const device = this.deviceLinkedManager?.getDevice?.(a.phoneNumber);
+      const icon = device?.isOnline ? '🟢' : '🔴';
+      return `${icon} ${a.displayName} (${a.phoneNumber}) [${a.role || 'unknown'}]`;
+    });
+    await msg.reply(`📱 Accounts (${accounts.length})\n${lines.join('\n')}`);
+  }
+
+  _formatUptime(ms = 0) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const d = Math.floor(total / 86400);
+    const h = Math.floor((total % 86400) / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  async handleStats(msg, args = []) {
+    if (!args.length) {
+      await msg.reply('Usage: linda stats <+phone>');
+      return;
+    }
+    const phone = args[0];
+    const device = this.deviceLinkedManager?.getDevice?.(phone);
+    if (!device) {
+      await msg.reply(`❌ Device not found: ${phone}`);
+      return;
+    }
+    await msg.reply(
+      `📈 Stats for ${phone}\n` +
+      `Status: ${device.isOnline ? 'Online' : 'Offline'}\n` +
+      `Uptime: ${this._formatUptime(device.uptime || 0)}\n` +
+      `Heartbeats: ${device.heartbeatCount || 0}\n` +
+      `Attempts: ${device.linkAttempts || 0}/${device.maxLinkAttempts || 5}`
+    );
+  }
+
+  async handleRelink(msg, args = [], callbacks = null) {
+    if (!callbacks) {
+      await msg.reply('❌ Relink command not available (callbacks missing).');
+      return;
+    }
+    if (!args.length) {
+      await msg.reply('Usage: linda relink master [phone] | linda relink servant <phone> | linda relink <phone>');
+      return;
+    }
+    const [target, maybePhone] = args;
+    if (target === 'master') {
+      await callbacks.onRelinkMaster?.(maybePhone);
+      await msg.reply('✅ Relink master requested.');
+      return;
+    }
+    if (target === 'servant') {
+      if (!maybePhone) {
+        await msg.reply('Usage: linda relink servant <+phone>');
+        return;
+      }
+      await callbacks.onRelinkServant?.(maybePhone);
+      await msg.reply(`✅ Relink servant requested for ${maybePhone}.`);
+      return;
+    }
+    if (String(target).startsWith('+')) {
+      await callbacks.onRelinkDevice?.(target);
+      await msg.reply(`✅ Relink requested for ${target}.`);
+      return;
+    }
+    await msg.reply('Usage: linda relink master [phone] | linda relink servant <phone> | linda relink <phone>');
+  }
+
+  async handleGoraha(msg, args = [], callbacks = null) {
+    if (!callbacks || !callbacks.onGorahaStatusRequested) {
+      await msg.reply('❌ Goraha command not available (callbacks missing).');
+      return;
+    }
+    const sub = (args[0] || 'status').toLowerCase();
+    if (sub === 'verify') {
+      await callbacks.onGorahaStatusRequested(true);
+      await msg.reply('✅ Goraha verification requested.');
+      return;
+    }
+    if (sub === 'filter') {
+      const q = args.slice(1).join(' ').trim();
+      if (!q) {
+        await msg.reply('Usage: linda goraha filter <text>');
+        return;
+      }
+      await callbacks.onGorahaFilterRequested?.(q);
+      await msg.reply(`✅ Goraha filter requested: ${q}`);
+      return;
+    }
+    if (sub === 'contacts') {
+      await msg.reply('📇 Goraha contacts command accepted.');
+      return;
+    }
+    await callbacks.onGorahaStatusRequested(false);
+    await msg.reply('✅ Goraha status requested.');
+  }
+
+  async handleAnalytics(msg, args = [], callbacks = null) {
+    if (!callbacks || !callbacks.onAnalyticsReportRequested) {
+      await msg.reply('❌ Analytics command not available (callbacks missing).');
+      return;
+    }
+    const type = (args[0] || 'realtime').toLowerCase();
+    if (type === 'account') {
+      const phone = args[1];
+      if (!phone) {
+        await msg.reply('Usage: linda analytics account <+phone>');
+        return;
+      }
+      await callbacks.onAnalyticsReportRequested('account', phone);
+      await msg.reply(`✅ Analytics requested for account ${phone}.`);
+      return;
+    }
+    await callbacks.onAnalyticsReportRequested(type);
+    await msg.reply(`✅ Analytics requested: ${type}`);
+  }
+
+  async handleSheets(msg, args = [], callbacks = null) {
+    if (!args.length) {
+      await msg.reply('📄 Google Sheets usage: read|add|update|delete|search|info');
+      return;
+    }
+    const [sub, ...rest] = args;
+    const lower = sub.toLowerCase();
+    if (!callbacks) {
+      await msg.reply('❌ Google Sheets command not available (callbacks missing).');
+      return;
+    }
+    if (lower === 'read') {
+      if (!rest[0]) return msg.reply('Usage: linda sheets read <spreadsheetId>');
+      if (!callbacks.onGoogleSheetsRead) return msg.reply('❌ Google Sheets read not available (callback missing).');
+      await callbacks.onGoogleSheetsRead?.(...rest);
+      return msg.reply('✅ Sheets read requested.');
+    }
+    if (lower === 'add') {
+      if (!callbacks.onGoogleSheetsCreate) return msg.reply('❌ Google Sheets add not available (callback missing).');
+      await callbacks.onGoogleSheetsCreate(...rest);
+      return msg.reply('✅ Sheets add requested.');
+    }
+    if (lower === 'update') {
+      if (!callbacks.onGoogleSheetsUpdate) return msg.reply('❌ Google Sheets update not available (callback missing).');
+      await callbacks.onGoogleSheetsUpdate(...rest);
+      return msg.reply('✅ Sheets update requested.');
+    }
+    if (lower === 'delete') {
+      if (!callbacks.onGoogleSheetsDelete) return msg.reply('❌ Google Sheets delete not available (callback missing).');
+      await callbacks.onGoogleSheetsDelete(...rest);
+      return msg.reply('✅ Sheets delete requested.');
+    }
+    if (lower === 'search') {
+      if (!callbacks.onGoogleSheetsSearch) return msg.reply('❌ Google Sheets search not available (callback missing).');
+      await callbacks.onGoogleSheetsSearch(...rest);
+      return msg.reply('✅ Sheets search requested.');
+    }
+    if (lower === 'info' || lower === 'metadata') {
+      if (!callbacks.onGoogleSheetsMetadata) return msg.reply('❌ Google Sheets metadata not available (callback missing).');
+      await callbacks.onGoogleSheetsMetadata(...rest);
+      return msg.reply('✅ Sheets metadata requested.');
+    }
+    return msg.reply(`❌ Unknown sheets sub-command: ${sub}`);
+  }
+
+  async handleLink(msg, args = [], callbacks = null) {
+    if (!callbacks) {
+      await msg.reply('❌ Link command not available (callbacks missing).');
+      return;
+    }
+    const [target, phone, ...nameParts] = args;
+    if (target === 'master' && phone) {
+      await callbacks.onAddNewMaster?.(phone, nameParts.join(' '));
+      await msg.reply(`✅ Add master requested for ${phone}.`);
+      return;
+    }
+    if (target === 'master') {
+      await callbacks.onLinkMaster?.();
+      await msg.reply('✅ Link master requested.');
+      return;
+    }
+    await msg.reply('Usage: linda link master [<+phone> <name>]');
+  }
+
+  async handleList(msg) {
+    if (!this.terminalHealthDashboard?.listAllDevices) {
+      await msg.reply('❌ Device list not available.');
+      return;
+    }
+    const out = await this.captureOutput(() => this.terminalHealthDashboard.listAllDevices());
+    await this.sendOutput(msg, out, 'Device list unavailable');
+  }
+
+  async handleDevice(msg, args = []) {
+    if (!args.length) {
+      await msg.reply('Usage: linda device <+phone>');
+      return;
+    }
+    const phone = args[0];
+    if (!this.terminalHealthDashboard?.displayDeviceDetails) {
+      await msg.reply('❌ Device details not available.');
+      return;
+    }
+    const out = await this.captureOutput(() => this.terminalHealthDashboard.displayDeviceDetails(phone));
+    await this.sendOutput(msg, out, `No device details for ${phone}`);
+  }
+
+  async handleBridgeStats(msg) {
+    const topCommands = Object.entries(this.stats.commandsByName)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => `${name}: ${count}`)
+      .join(', ') || 'none';
+
+    await msg.reply(
+      `📊 Bridge Stats\n` +
+      `Total commands: ${this.stats.totalCommands}\n` +
+      `Errors: ${this.stats.errors}\n` +
+      `Last command: ${this.stats.lastCommand || 'none'}\n` +
+      `Top commands: ${topCommands}`
+    );
+  }
+
+  async handleRestore(msg, callbacks = null) {
+    if (!callbacks || !callbacks.onRestoreAllSessions) {
+      await msg.reply('❌ Restore command not available (callbacks missing).');
+      return;
+    }
+    await callbacks.onRestoreAllSessions();
+    await msg.reply('✅ Restore-all-sessions requested.');
+  }
+
   /**
    * Get help text
    */
   getHelpText() {
-    return 'ℹ️ Send "linda menu" to see command groups.';
+    return `
+🤖 Linda WhatsApp Bridge
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Monitoring:
+• linda health [phone]
+• linda status
+• linda stats <phone>
+
+Account Management:
+• linda accounts
+• linda link master [phone name]
+• linda relink master|servant <phone>
+• linda recover <phone>
+
+Goraha:
+• linda goraha [verify|contacts|filter <text>]
+
+Analytics:
+• linda analytics [realtime|report|uptime|account <phone>]
+
+Google Sheets:
+• linda sheets read|add|update|delete|search|info ...
+
+Diagnostics:
+• linda bridge-stats
+• linda help
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
   }
 
   /**
    * Check if sender is authorized
    */
   isAuthorizedSender(senderJid) {
-    // Implement authorization logic
-    // For now, allow all
-    return true;
+    const acm = this.accountConfigManager || services.get('accountConfigManager');
+    if (!acm?.getAllAccounts || !acm?.getMasterPhoneNumber) return false;
+
+    const sender = this.normalizePhone(senderJid);
+    const master = this.normalizePhone(acm.getMasterPhoneNumber());
+    if (!sender || !master) return false;
+    if (sender === master) return false;
+
+    const accounts = acm.getAllAccounts() || [];
+    return accounts.some((a) => this.normalizePhone(a.phoneNumber) === sender);
   }
 
   /**

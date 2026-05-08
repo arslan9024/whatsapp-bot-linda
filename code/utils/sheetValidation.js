@@ -194,15 +194,14 @@ export async function quickValidateSheet(sheetId) {
 
     // Fail fast if critical checks fail
     if (!validation.hasReadAccess) {
-      console.error('\n❌ FATAL: Cannot read from organized sheet');
-      console.error('   serviceman11 read access failed');
-      console.error('   Bot will start in FALLBACK MODE (legacy sheets only)\n');
+      console.warn('\n⚠️  Organized sheet read access unavailable');
+      console.warn('   Startup will continue in FALLBACK MODE (legacy sheets only).');
+      console.warn('   Configure valid organized-sheet credentials to re-enable this path.\n');
       return false;
     }
 
     if (!validation.hasWriteAccess) {
       console.warn('\n⚠️  WARNING: Cannot write to organized sheet');
-      console.warn('   serviceman11 write access failed');
       console.warn('   Bot will run in READ-ONLY mode (no new data saves)\n');
       // Don't fail - allow read-only operation
     }
