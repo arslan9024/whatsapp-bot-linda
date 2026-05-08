@@ -32,6 +32,7 @@ These are non-negotiable rules set by the author. Every AI suggestion **must** c
 8. **Manual linking by default** — Accounts do NOT auto-link on startup. User must explicitly run `link master` in terminal or send `!link-master` via WhatsApp.
 9. **Crash dump security** — Crash dump files must be created with `chmod 0o600` (owner-read only).
 10. **No secrets in git** — Google credentials go in `.env` as base64. Never commit `keys.json` or credential files. `.gitignore` covers: `sessions/`, `logs/`, `.env*`, `session-state.json`.
+11. **⚠️ CRITICAL — WhatsApp/Meta Policy Compliance (ZERO TOLERANCE)** — Every feature that sends WhatsApp messages **must** be designed and reviewed against current Meta/WhatsApp Business policies. Any bulk campaign, broadcast, automation, or bot-initiated message that violates Meta policy is a hard block — do not implement it. Before adding any new messaging feature, research and confirm compliance. Violations risk permanent account ban. See the full "WhatsApp/Meta Policy Compliance" section below.
 
 ---
 
@@ -215,3 +216,172 @@ Runs 12 automated checks:
 12. Logger exports
 
 All 12 must pass before deployment.
+
+---
+
+## Codebase Structure — Five-Layer Architecture
+
+Think of the codebase as five vertical layers:
+
+```
+1. Transport / Input
+   WhatsApp clients, Express routes, webhooks
+   └─ code/WhatsAppBot/   code/Routes/   bot/WebhookServer.js
+
+2. Routing / Commands
+   Message routing, Linda AI command system (56 commands)
+   └─ code/WhatsAppBot/MessageRouter.js
+      code/WhatsAppBot/EnhancedMessageHandler.js
+      code/Commands/
+
+3. Domain Services
+   Business logic for property, tenancy, commission, invoices, analytics, campaigns
+   └─ code/Services/
+
+4. Persistence / Integrations
+   MongoDB schemas + data access, Google Sheets/API
+   └─ code/Database/   code/GoogleAPI/   code/GoogleSheet/
+
+5. Operational Reliability
+   Health monitoring, session management, auto-reconnect,
+   circuit breakers, rate limiting, logging, dashboards
+   └─ code/utils/
+```
+
+### Main Source Tree (`code/`)
+
+```
+code/
+├── WhatsAppBot/      # Client lifecycle, message router/handlers, session restore, command bridge
+├── Commands/         # LindaCommandHandler, LindaCommandRegistry + 9 domain command files
+├── Routes/           # Express route modules (13 route files, 94+ endpoints)
+├── Services/         # Business logic layer (60+ service files)
+├── Database/         # Mongoose schemas, DB config, data migration scripts (16 models)
+├── utils/            # Shared infra — Logger, RateLimiter, ServiceRegistry, CircuitBreaker,
+│                     # ConnectionManager, SessionManager, HealthMonitor, Dashboards, …
+├── GoogleAPI/        # Google OAuth + service account credential management
+├── GoogleSheet/      # Google Sheets read/write helpers
+├── Campaigns/        # Bulk messaging campaign builders
+├── Analytics/        # Real-time analytics helpers
+├── Contacts/         # Contact validation and linking
+├── Message/          # Message sending utilities
+├── AI/               # AI context integration and response generation
+└── middleware/       # Express middleware (rate limiting, auth, …)
+```
+
+### Data Flow — Incoming Message
+
+```
+WhatsApp Client  →  MessageRouter  →  EnhancedMessageHandler
+    ↓ MessageDeduplicator (skip duplicate)
+    ↓ MessageAnalyzerWithContext (entity extraction)
+    ↓ ConversationAnalyzer (intent / sentiment)
+    ↓ Phase17Orchestrator (persist + normalise)
+    ↓ LindaCommandHandler (if ! command)
+    ↓ WhatsAppCommandBridge (if !terminal command)
+    ↓ Auto-reply or manual routing
+```
+
+### Data Flow — Outgoing Campaign Message
+
+```
+CampaignScheduler → ContactFilterService → RateLimiter.acquire(phone)
+    → sendBroadCast.js / SendMessage.js
+    → WhatsApp Client .sendMessage()
+    → MessagePersistenceService (log)
+    → CampaignService (update status)
+```
+
+### Secondary Bot Framework (`bot/`)
+
+An additional modular abstraction layer providing:
+- `CustomBotEngine` — engine lifecycle management
+- `BotConnection` — hybrid connection modes (browser / websocket / Twilio)
+- `MessageHandler` — message processing pipeline
+- `SessionManager` — session CRUD with expiry
+- `WebhookServer` — Twilio/payment/admin webhook receiver
+- `CommandRouter` — command routing to API client
+- `DamacApiClient` — HTTP client for the property management API
+- `BotIntegration` — orchestrates all of the above; primary entry via `bot-main.js`
+
+---
+
+## ⚠️ WhatsApp/Meta Policy Compliance — STRICTLY ENFORCED
+
+> **This section is a non-negotiable constraint on every messaging feature.**  
+> Violating Meta/WhatsApp Business policies risks **permanent account ban**.  
+> Every developer and AI agent working on this project must read, understand, and follow these rules before implementing any messaging feature.
+
+### Why This Matters
+
+`whatsapp-web.js` uses the WhatsApp Web browser automation approach (unofficial API).  
+Meta actively detects and bans accounts that misuse the platform — including bulk senders, spammers, and accounts that violate consent rules.  
+Account bans are often **irreversible** and affect all session-linked phone numbers.
+
+### 🔴 Hard Rules (Never Violate)
+
+| # | Rule | Consequence of Violation |
+|---|------|--------------------------|
+| 1 | **Explicit opt-in required** — Never send any bot-initiated message to a contact who has not explicitly consented to receive messages from this business. Consent must be documented. | Immediate account flag / ban |
+| 2 | **No purchased/scraped contact lists** — All contacts must come from legitimate sources (own CRM, Google Sheets synced from verified sources, user-initiated chat). | Account ban |
+| 3 | **No spam or unsolicited promotions** — Do not send bulk promotional content to contacts without prior opt-in and clear business context. | Quality degradation → ban |
+| 4 | **Provide easy opt-out** — Every campaign or bulk message must include a clear opt-out instruction (e.g., "Reply STOP to unsubscribe"). Opt-out requests must be processed **immediately** and automatically. | Policy violation |
+| 5 | **Rate limiting is mandatory** — Never exceed 1 msg/s per contact or 60 msg/min globally. Exceeding limits triggers spam detection. | Temporary/permanent ban |
+| 6 | **No prohibited content** — Never send: illegal content, misinformation, content involving prohibited goods/services, adult content, or anything violating Meta Community Standards. | Immediate ban |
+| 7 | **Never impersonate another business or person** — All messages must clearly identify the sending business (DAMAC Hills 2 / Goraha). | Policy violation + legal risk |
+| 8 | **No message flooding to the same contact** — Do not send the same contact multiple messages in a short window unless they have explicitly requested follow-up. | Block/report spike → ban |
+| 9 | **Honour user blocks and reports** — If a contact blocks the bot or reports spam, remove them from all campaign lists immediately. Do not attempt to re-add them. | Account quality degradation |
+| 10 | **Never use multiple accounts to circumvent limits** — Do not distribute spam across PowerAgent and GorahaBot to bypass rate limits. | Both accounts banned |
+
+### 🟡 Quality & Compliance Best Practices
+
+- **Monitor quality score** — WhatsApp assigns a quality rating based on block/report rates. If quality drops to "Low", immediately pause all campaigns and review contact lists.
+- **Use message templates for campaigns** — For the official WhatsApp Business API, all business-initiated messages require pre-approved templates. Even for the web-based approach, design messages as if they are template messages (consistent, relevant, non-spammy).
+- **Personalize messages** — Generic broadcast blasts trigger higher block rates. Use contact names and relevant property data to make messages relevant.
+- **Timing matters** — Do not send messages at night or unusual hours (respect UAE timezone, +4 UTC). Prefer business hours: 9 AM–7 PM GST.
+- **Campaign frequency limits** — Do not send more than 1–2 campaign messages per contact per week.
+- **Record-keeping** — Maintain opt-in logs in the database (`CampaignSchema`, `CommunicationLogSchema`) for audit purposes.
+
+### 🟢 Policy Research Feature (Planned)
+
+> **This is a planned feature for Linda — high priority.**
+
+Linda must be able to **research and validate** that any new messaging workflow is compliant before execution. This means:
+
+1. **Pre-send compliance check** — Before any campaign is scheduled or sent, a `PolicyComplianceService` validates:
+   - All contacts are opted-in (`optInStatus: true` in DB)
+   - No contacts on opt-out/blocklist
+   - Message content does not violate keyword filters (spam keywords, prohibited content)
+   - Rate limits are within bounds
+   - Sending time is within business hours
+
+2. **AI-assisted policy research** — Linda should be able to, on demand (`!policy check` command), query the latest Meta/WhatsApp Business policies via:
+   - Fetching the official Meta policy pages (`https://www.whatsapp.com/legal/business-policy/`)
+   - Summarising recent policy changes using AI
+   - Alerting the operator if new restrictions affect current campaign configurations
+
+3. **Opt-in/Opt-out management** — All contacts must have an `optInStatus` and `optOutDate` field in their schema. The `!optout` bot command and STOP keyword handler must update this immediately.
+
+4. **Compliance audit command** — `!compliance audit` should produce a report of:
+   - Total opted-in vs opted-out contacts
+   - Contacts who blocked or reported in the past 30 days
+   - Campaign quality scores
+   - Any pending policy violations
+
+### Official Policy References
+
+| Document | URL |
+|----------|-----|
+| WhatsApp Business Policy | https://www.whatsapp.com/legal/business-policy/ |
+| Meta Platform Terms | https://developers.facebook.com/terms/ |
+| WhatsApp Commerce Policy | https://www.whatsapp.com/legal/commerce-policy/ |
+| WhatsApp Messaging Guidelines | https://developers.facebook.com/docs/whatsapp/overview/getting-opt-in |
+
+> **Action for developers:** Before shipping any new campaign feature or messaging automation, open the official policy links above and confirm compliance. Document your review in the PR description.
+
+---
+
+## Last Updated
+
+**May 2026** — Arslan Malik  
+Sections added: Codebase five-layer architecture, data flows, WhatsApp/Meta Policy Compliance (Strict Rule #11).
