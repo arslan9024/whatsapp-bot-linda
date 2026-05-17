@@ -1,5 +1,6 @@
 class ConversationMetadataSheetsRecorder {
   static MAX_SHEET_NAME_LENGTH = 95;
+  static MAX_ACCOUNT_SUFFIX_LENGTH = 24;
 
   constructor({
     googleSheetsManager,
@@ -299,7 +300,9 @@ class ConversationMetadataSheetsRecorder {
   }
 
   _buildSheetName(accountPhone) {
-    const suffix = String(accountPhone || 'unknown').replace(/[\\/?*:\[\]]/g, '-').slice(-24);
+    const suffix = String(accountPhone || 'unknown')
+      .replace(/[\\/?*:\[\]]/g, '-')
+      .slice(-ConversationMetadataSheetsRecorder.MAX_ACCOUNT_SUFFIX_LENGTH);
     return `${this.sheetPrefix}-${suffix}`.slice(0, ConversationMetadataSheetsRecorder.MAX_SHEET_NAME_LENGTH);
   }
 
