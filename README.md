@@ -17,6 +17,7 @@
 - [Bot Commands](#-bot-commands)
 - [Testing](#-testing)
 - [Configuration](#-configuration)
+- [Policy Compliance](#-policy-compliance)
 - [Documentation](#-documentation)
 
 ---
@@ -168,6 +169,15 @@ PORT=3000
 
 ---
 
+## 🛡️ Policy Compliance
+
+For future development and operations, WhatsApp/Meta policy rules are documented in:
+
+- `COPILOT_CONTEXT.md` → **WhatsApp/Meta Policy Compliance — STRICTLY ENFORCED**
+- `docs/guides/WHATSAPP_POLICY_COMPLIANCE.md` → actionable policy checklist for implementation/review
+
+---
+
 ## 🔌 API Endpoints
 
 Start the API server:
@@ -266,4 +276,3 @@ ISC License — See LICENSE file for details.
 ## 👤 Author
 
 **Arslan Malik** — Built for 24/7 production real estate operations in Dubai/UAE.
-

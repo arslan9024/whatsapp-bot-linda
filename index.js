@@ -118,6 +118,7 @@ import UptimeTracker from "./code/utils/UptimeTracker.js";
 import ReportGenerator from "./code/utils/ReportGenerator.js";
 import MetricsDashboard from "./code/utils/MetricsDashboard.js";
 import GoogleSheetsManager from "./code/utils/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
+import ConversationMetadataSheetsRecorder from "./code/utils/ConversationMetadataSheetsRecorder.js";
 
 // PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
 // Allows master accounts to send "linda <command>" messages to primary master
@@ -181,6 +182,7 @@ let uptimeTracker = null;  // Uptime monitoring with SLA compliance (NEW - Phase
 let reportGenerator = null;  // Multi-format report generation (NEW - Phase 29e)
 let metricsDashboard = null;  // Terminal-based metrics display (NEW - Phase 29e)
 let googleSheetsManager = null;  // Google Sheets CRUD operations (NEW - Phase 30)
+let conversationMetadataRecorder = null;  // Conversation metadata → Google Sheets (NEW)
 let commandBridge = null;  // WhatsApp Command Bridge (NEW - Phase 31)
 
 // Feature handlers (ref containers for DI)
@@ -278,6 +280,7 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
     commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
+    conversationMetadataRecorder,   // NEW: Conversation metadata tracking/export
   });
 }
 
@@ -751,6 +754,24 @@ async function initializeBot() {
       logBot("   - Use command: 'sheets read <id>', 'sheets add <id> <sheet> <values>', etc.", "info");
     }
 
+    if (!conversationMetadataRecorder) {
+      const conversationMetadataSheetId = process.env.GOOGLE_CONVERSATION_METADATA_SHEET_ID || process.env.GOOGLE_SHEET_ID || null;
+      conversationMetadataRecorder = new ConversationMetadataSheetsRecorder({
+        googleSheetsManager,
+        spreadsheetId: conversationMetadataSheetId,
+        flushIntervalMs: Number(process.env.GOOGLE_CONVERSATION_METADATA_FLUSH_MS || 300000),
+        sheetPrefix: process.env.GOOGLE_CONVERSATION_METADATA_SHEET_PREFIX || 'Conversations',
+        logBot,
+      });
+      conversationMetadataRecorder.startAutoSync();
+      services.register('conversationMetadataRecorder', conversationMetadataRecorder);
+      if (conversationMetadataSheetId) {
+        logBot("✅ Conversation metadata recorder initialized (per-account Google Sheets export)", "success");
+      } else {
+        logBot("⚠️  Conversation metadata recorder initialized without spreadsheet ID (set GOOGLE_CONVERSATION_METADATA_SHEET_ID)", "warn");
+      }
+    }
+
     logBot("", "info");
     logBot("⏳ Waiting for user command to initiate linking...", "info");
     logBot("", "info");
@@ -908,6 +929,7 @@ async function initializeBot() {
       analyticsManager,      // NEW: Analytics metrics (Phase 29e)
       reportGenerator,       // NEW: Report generation (Phase 29e)
       googleSheetsManager,   // NEW: Google Sheets CRUD operations (Phase 30)
+      conversationMetadataRecorder, // NEW: Conversation metadata export
     });
     logBot("📊 Terminal dashboard ready - Press Ctrl+D or 'dashboard' to view health status", "info");
     logBot("   Available commands: 'dashboard' | 'health' | 'relink' | 'status' | 'quit' | 'link master'", "info");

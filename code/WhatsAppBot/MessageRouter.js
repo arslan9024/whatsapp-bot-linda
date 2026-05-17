@@ -36,6 +36,7 @@ import services from '../utils/ServiceRegistry.js';
  * @property {object|null}    reportGenerator          - ReportGenerator for exports (Phase 29e)
  * @property {object|null}    metricsDashboard         - MetricsDashboard for display (Phase 29e)
  * @property {object|null}    commandBridge            - WhatsAppCommandBridge for chat commands (Phase 31)
+ * @property {object|null}    conversationMetadataRecorder - Conversation metadata tracker/exporter
  */
 
 /**
@@ -66,10 +67,11 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
     commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
+    conversationMetadataRecorder,   // NEW: Conversation metadata tracking/export
   } = deps;
 
   // ═══ LISTENER CLEANUP (Phase 10) ═══
-  const messageEvents = ['message', 'message_reaction', 'group_update', 'group_join', 'group_leave'];
+  const messageEvents = ['message', 'message_create', 'message_ack', 'message_reaction', 'group_update', 'group_join', 'group_leave'];
   for (const event of messageEvents) {
     try { client.removeAllListeners(event); } catch (_) { /* best effort */ }
   }
@@ -79,6 +81,23 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
   if (connManager) {
     client.on('message', () => connManager.recordActivity());
   }
+
+  // ─── Outgoing + ack tracking for conversation metadata ────────────
+  client.on('message_create', (msg) => {
+    try {
+      if (conversationMetadataRecorder && msg?.fromMe) {
+        conversationMetadataRecorder.recordOutgoing(phoneNumber, msg);
+      }
+    } catch (_) { /* best effort */ }
+  });
+
+  client.on('message_ack', (msg, ack) => {
+    try {
+      if (conversationMetadataRecorder) {
+        conversationMetadataRecorder.recordAck(phoneNumber, msg, ack);
+      }
+    } catch (_) { /* best effort */ }
+  });
 
   // ─── Phase 1 Event Handlers (singletons) ───────────────────────────
   const reactionHandlerInstance = services.get('reactionHandler') || new ReactionHandler(null);
@@ -129,6 +148,11 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
     // Keep-alive activity
     if (keepAliveManager) keepAliveManager.updateLastActivity(phoneNumber);
+
+    // Conversation metadata tracking (incoming direct messages)
+    if (conversationMetadataRecorder && !msg.fromMe && !msg.from?.includes('@g.us')) {
+      conversationMetadataRecorder.recordIncoming(phoneNumber, msg);
+    }
 
     // NEW: Record message metric (Phase 29e)
     if (analyticsManager) {

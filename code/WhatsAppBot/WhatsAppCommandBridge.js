@@ -802,7 +802,7 @@ export class WhatsAppCommandBridge {
 
   async handleSheets(msg, args = [], callbacks = null) {
     if (!args.length) {
-      await msg.reply('📄 Google Sheets usage: read|add|update|delete|search|info');
+      await msg.reply('📄 Google Sheets usage: read|add|update|delete|search|info|conversations');
       return;
     }
     const [sub, ...rest] = args;
@@ -841,6 +841,11 @@ export class WhatsAppCommandBridge {
       if (!callbacks.onGoogleSheetsMetadata) return msg.reply('❌ Google Sheets metadata not available (callback missing).');
       await callbacks.onGoogleSheetsMetadata(...rest);
       return msg.reply('✅ Sheets metadata requested.');
+    }
+    if (lower === 'conversations' || lower === 'conversation-meta') {
+      if (!callbacks.onConversationMetadataExport) return msg.reply('❌ Conversation metadata export not available (callback missing).');
+      await callbacks.onConversationMetadataExport(...rest);
+      return msg.reply('✅ Conversation metadata export requested.');
     }
     return msg.reply(`❌ Unknown sheets sub-command: ${sub}`);
   }
@@ -937,7 +942,7 @@ Analytics:
 • linda analytics [realtime|report|uptime|account <phone>]
 
 Google Sheets:
-• linda sheets read|add|update|delete|search|info ...
+• linda sheets read|add|update|delete|search|info|conversations ...
 
 Diagnostics:
 • linda bridge-stats

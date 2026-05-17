@@ -25,6 +25,7 @@ import services from './ServiceRegistry.js';
  * @param {object|null} opts.analyticsManager - NEW: Analytics metrics (Phase 29e)
  * @param {object|null} opts.reportGenerator - NEW: Report generation (Phase 29e)
  * @param {object|null} opts.googleSheetsManager - NEW: Google Sheets CRUD operations (Phase 30)
+ * @param {object|null} opts.conversationMetadataRecorder - NEW: Conversation metadata export
  */
 export function setupTerminalInputListener(opts) {
   const {
@@ -42,6 +43,7 @@ export function setupTerminalInputListener(opts) {
     analyticsManager,      // NEW: Analytics metrics (Phase 29e)
     reportGenerator,       // NEW: Report generation (Phase 29e)
     googleSheetsManager,   // NEW: Google Sheets CRUD (Phase 30)
+    conversationMetadataRecorder, // NEW: Conversation metadata export
   } = opts;
 
   try {
@@ -813,6 +815,43 @@ export function setupTerminalInputListener(opts) {
             console.log(`     ID: ${sheet.id}`);
             console.log(`     Size: ${sheet.rowCount} rows × ${sheet.columnCount} columns\n`);
           });
+        } catch (error) {
+          console.log(`\n❌ Error: ${error.message}\n`);
+        }
+      },
+
+      onConversationMetadataExport: async (spreadsheetId = null, accountPhone = null) => {
+        try {
+          if (!conversationMetadataRecorder) {
+            logBot('❌ Conversation metadata recorder not initialized', 'error');
+            console.log('\n❌ Conversation metadata service is not available\n');
+            return;
+          }
+
+          const targetSheetId = spreadsheetId || process.env.GOOGLE_CONVERSATION_METADATA_SHEET_ID || process.env.GOOGLE_SHEET_ID || null;
+          if (!targetSheetId) {
+            console.log('\n❌ Missing spreadsheet ID. Set GOOGLE_CONVERSATION_METADATA_SHEET_ID or pass one in command.\n');
+            return;
+          }
+
+          if (accountPhone) {
+            console.log(`\n📊 Exporting conversation metadata for account: ${accountPhone}...`);
+            const result = await conversationMetadataRecorder.exportAccountSummary(accountPhone, targetSheetId);
+            if (!result.success) {
+              console.log(`\n❌ Error: ${result.error}\n`);
+              return;
+            }
+            console.log(`\n✅ Exported account ${result.accountPhone} → sheet "${result.sheetName}" (${result.rows} rows)\n`);
+            return;
+          }
+
+          console.log(`\n📊 Exporting conversation metadata for all tracked accounts...`);
+          const result = await conversationMetadataRecorder.exportAllSummaries(targetSheetId);
+          if (!result.success) {
+            console.log(`\n❌ Error: ${result.error}\n`);
+            return;
+          }
+          console.log(`\n✅ Export complete: ${result.exported} successful, ${result.failed || 0} failed\n`);
         } catch (error) {
           console.log(`\n❌ Error: ${error.message}\n`);
         }

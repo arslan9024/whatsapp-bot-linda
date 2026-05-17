@@ -439,6 +439,7 @@ class TerminalHealthDashboard {
       onGoogleSheetsDelete,  // NEW: Google Sheets delete (Phase 30)
       onGoogleSheetsSearch,  // NEW: Google Sheets search (Phase 30)
       onGoogleSheetsMetadata,  // NEW: Google Sheets metadata (Phase 30)
+      onConversationMetadataExport, // NEW: Conversation metadata export
     } = callbacks;
 
     console.log(`\n${'═'.repeat(60)}`);
@@ -1093,6 +1094,14 @@ class TerminalHealthDashboard {
               console.log(`\n⚠️  Usage: 'sheets info <spreadsheet-id>'`);
               console.log(`     Example: 'sheets info 1A2B3C4D5E6F7G8H'\n`);
             }
+          } else if (parts[1] === 'conversations' || parts[1] === 'conversation-meta') {
+            const sheetId = parts[2] || null;
+            const accountPhone = parts[3] || null;
+            if (onConversationMetadataExport) {
+              await onConversationMetadataExport(sheetId, accountPhone);
+            } else {
+              console.log(`\n⚠️  Conversation metadata export callback is not configured\n`);
+            }
           } else {
             console.log(`\n📊 Google Sheets Operations (Phase 30):`);
             console.log(`   sheets read <id> [range]                → Read sheet data`);
@@ -1101,6 +1110,7 @@ class TerminalHealthDashboard {
             console.log(`   sheets delete <id> <sheet> [row]        → Delete row`);
             console.log(`   sheets search <id> [range] <text>       → Search for value`);
             console.log(`   sheets info <id>                        → Get sheet metadata\n`);
+            console.log(`   sheets conversations [id] [account]     → Export conversation metadata\n`);
           }
           break;
 
@@ -1132,6 +1142,7 @@ class TerminalHealthDashboard {
           console.log(`    sheets delete <id> <sheet> [row]        → Delete row`);
           console.log(`    sheets search <id> [range] <text>       → Search for value`);
           console.log(`    sheets info <id>                        → Get sheet metadata`);
+          console.log(`    sheets conversations [id] [account]     → Export conversation metadata`);
           console.log(`\n  DEVICE MANAGEMENT:`);
           console.log(`    status / health           → Display full dashboard`);
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);
