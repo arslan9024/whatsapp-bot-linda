@@ -67,7 +67,7 @@ class ConversationMetadataSheetsRecorder {
     store.lastAck = ack;
 
     const messageId = this._extractMessageId(msg);
-    if (messageId && ack < 3 && !store.pendingUnreadMessageIds.has(messageId)) {
+    if (messageId && ack <= 2 && !store.pendingUnreadMessageIds.has(messageId)) {
       store.pendingUnreadMessageIds.add(messageId);
       store.pendingUnreadCount += 1;
     }
@@ -87,7 +87,7 @@ class ConversationMetadataSheetsRecorder {
     if (ack >= 3 && store.pendingUnreadMessageIds.has(messageId)) {
       store.pendingUnreadMessageIds.delete(messageId);
       store.pendingUnreadCount = Math.max(0, store.pendingUnreadCount - 1);
-    } else if (ack < 3 && !store.pendingUnreadMessageIds.has(messageId)) {
+    } else if (ack <= 2 && !store.pendingUnreadMessageIds.has(messageId)) {
       store.pendingUnreadMessageIds.add(messageId);
       store.pendingUnreadCount += 1;
     }
