@@ -125,6 +125,10 @@ import ConversationMetadataSheetsRecorder from "./code/utils/ConversationMetadat
 // for remote command execution with console output capture
 import { WhatsAppCommandBridge } from "./code/WhatsAppBot/WhatsAppCommandBridge.js";
 
+// WAVE 2: MEMORY GUARD (May 2026)
+// Proactive heap monitoring with graduated warn/high/critical thresholds + GC requests
+import memoryGuard from "./code/utils/MemoryGuard.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -820,6 +824,11 @@ async function initializeBot() {
     services.register('healthMonitor', accountHealthMonitor);
     services.register('clientHealthMonitor', clientHealthMonitor);
     logBot("✅ Client health monitor registered (Frame detachment & heartbeat recovery)", "success");
+
+    // WAVE 2: Start memory guard (proactive heap monitoring)
+    memoryGuard.start();
+    services.register('memoryGuard', memoryGuard);
+    logBot("✅ MemoryGuard started (heap monitoring active)", "success");
 
     // ============================================
     // STEP 6.5: Initialize Linda AI Command System

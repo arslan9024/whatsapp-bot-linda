@@ -17,6 +17,7 @@
  * Status: Production Ready - Workstream 1
  */
 
+import crypto from 'crypto';
 import mongoose from "mongoose";
 import { logger } from './Logger.js';
 
@@ -509,7 +510,6 @@ class MessageQueueManager {
    * PRIVATE: Hash content for deduplication
    */
   _hashContent(content) {
-    const crypto = require("crypto");
     return crypto.createHash("sha256").update(content).digest("hex");
   }
 }

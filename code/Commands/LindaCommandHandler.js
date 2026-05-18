@@ -21,6 +21,7 @@ import LindaCommandRegistry from './LindaCommandRegistry.js';
 import LindaConversationLearner from './LindaConversationLearner.js';
 import services from '../utils/ServiceRegistry.js';
 import CampaignCommands from './CampaignCommands.js';
+import PolicyCommands from './PolicyCommands.js';
 
 export class LindaCommandHandler {
   constructor(logBotFn) {
@@ -139,6 +140,13 @@ export class LindaCommandHandler {
     this.registerHandler('list-campaigns', this.handleListCampaigns.bind(this));
     this.registerHandler('campaign-stats', this.handleCampaignStats.bind(this));
     this.registerHandler('campaign-schedule', this.handleCampaignSchedule.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // WAVE 3: POLICY & COMPLIANCE COMMANDS (May 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this._policyCommands = new PolicyCommands(this.logBot);
+    this.registerHandler('policy',     this.handlePolicy.bind(this));
+    this.registerHandler('compliance', this.handleCompliance.bind(this));
   }
 
   /**
@@ -1408,6 +1416,30 @@ export class LindaCommandHandler {
     if (result.reply) {
       await msg.reply(result.reply);
     }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // WAVE 3: POLICY & COMPLIANCE HANDLERS
+  // ════════════════════════════════════════════════════════════════════════
+
+  /**
+   * !policy <sub> [args]
+   * Manage opt-in/out status and view compliance reports.
+   */
+  async handlePolicy({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._policyCommands.handlePolicy(sub, rest, msg);
+    await msg.reply(reply);
+  }
+
+  /**
+   * !compliance <sub> [args]
+   * View audit logs and campaign pre-flight guidance.
+   */
+  async handleCompliance({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._policyCommands.handleCompliance(sub, rest, msg);
+    await msg.reply(reply);
   }
 }
 

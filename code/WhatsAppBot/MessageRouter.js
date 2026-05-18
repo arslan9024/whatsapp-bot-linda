@@ -15,6 +15,7 @@ import { ReactionHandler } from './Handlers/ReactionHandler.js';
 import { GroupEventHandler } from './Handlers/GroupEventHandler.js';
 import GorahaContactVerificationService from './GorahaContactVerificationService.js';
 import services from '../utils/ServiceRegistry.js';
+import policyCompliance from '../Services/PolicyComplianceService.js';
 
 /**
  * @typedef {Object} MessageRouterDeps
@@ -148,6 +149,23 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
     // Keep-alive activity
     if (keepAliveManager) keepAliveManager.updateLastActivity(phoneNumber);
+
+    // WAVE 3: Auto-detect opt-out / opt-in keywords (policy compliance)
+    if (!msg.fromMe && !msg.from?.includes('@g.us')) {
+      try {
+        const action = await policyCompliance.detectAndRecord(msg.from, msg.body);
+        if (action === 'opted_out') {
+          // Immediately acknowledge the opt-out and stop processing
+          try {
+            await msg.reply(
+              '✅ You have been unsubscribed. You will no longer receive messages from us.\n' +
+              'Reply START at any time to re-subscribe.'
+            );
+          } catch (_) { /* best effort */ }
+          return; // Do NOT process further
+        }
+      } catch (_) { /* best effort — never block message flow */ }
+    }
 
     // Conversation metadata tracking (incoming direct messages)
     if (conversationMetadataRecorder && !msg.fromMe && !msg.from?.includes('@g.us')) {
