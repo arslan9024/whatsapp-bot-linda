@@ -129,6 +129,15 @@ import { WhatsAppCommandBridge } from "./code/WhatsAppBot/WhatsAppCommandBridge.
 // Proactive heap monitoring with graduated warn/high/critical thresholds + GC requests
 import memoryGuard from "./code/utils/MemoryGuard.js";
 
+// WAVE 3: POLICY COMPLIANCE (May 2026)
+import policyCompliance from "./code/Services/PolicyComplianceService.js";
+
+// WAVE 4: FEATURE EXPANSION (May 2026)
+import leadQualification from "./code/Services/LeadQualificationService.js";
+import appointmentScheduler from "./code/Services/AppointmentSchedulerService.js";
+import propertyMatcher from "./code/Services/PropertyMatcherService.js";
+import salesPipeline from "./code/Services/SalesPipelineService.js";
+
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
 let accountClients = new Map(); // Map: phoneNumber → client instance
@@ -829,6 +838,17 @@ async function initializeBot() {
     memoryGuard.start();
     services.register('memoryGuard', memoryGuard);
     logBot("✅ MemoryGuard started (heap monitoring active)", "success");
+
+    // WAVE 3: Register PolicyComplianceService
+    services.register('policyCompliance', policyCompliance);
+    logBot("✅ PolicyComplianceService registered (opt-in/out enforcement active)", "success");
+
+    // WAVE 4: Register feature expansion services
+    services.register('leadQualification', leadQualification);
+    services.register('appointmentScheduler', appointmentScheduler);
+    services.register('propertyMatcher', propertyMatcher);
+    services.register('salesPipeline', salesPipeline);
+    logBot("✅ Wave 4 services registered: LeadQualification, AppointmentScheduler, PropertyMatcher, SalesPipeline", "success");
 
     // ============================================
     // STEP 6.5: Initialize Linda AI Command System

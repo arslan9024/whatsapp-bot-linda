@@ -22,6 +22,7 @@ import LindaConversationLearner from './LindaConversationLearner.js';
 import services from '../utils/ServiceRegistry.js';
 import CampaignCommands from './CampaignCommands.js';
 import PolicyCommands from './PolicyCommands.js';
+import Wave4Commands from './Wave4Commands.js';
 
 export class LindaCommandHandler {
   constructor(logBotFn) {
@@ -147,6 +148,15 @@ export class LindaCommandHandler {
     this._policyCommands = new PolicyCommands(this.logBot);
     this.registerHandler('policy',     this.handlePolicy.bind(this));
     this.registerHandler('compliance', this.handleCompliance.bind(this));
+
+    // ════════════════════════════════════════════════════════════════════════
+    // WAVE 4: FEATURE EXPANSION COMMANDS (May 2026)
+    // ════════════════════════════════════════════════════════════════════════
+    this._wave4 = new Wave4Commands(this.logBot);
+    this.registerHandler('lead',        this.handleLeadCmd.bind(this));
+    this.registerHandler('appointment', this.handleAppointmentCmd.bind(this));
+    this.registerHandler('match',       this.handleMatchCmd.bind(this));
+    this.registerHandler('pipeline',    this.handlePipelineCmd.bind(this));
   }
 
   /**
@@ -1422,23 +1432,43 @@ export class LindaCommandHandler {
   // WAVE 3: POLICY & COMPLIANCE HANDLERS
   // ════════════════════════════════════════════════════════════════════════
 
-  /**
-   * !policy <sub> [args]
-   * Manage opt-in/out status and view compliance reports.
-   */
   async handlePolicy({ msg, args }) {
     const [sub, ...rest] = args;
     const reply = await this._policyCommands.handlePolicy(sub, rest, msg);
     await msg.reply(reply);
   }
 
-  /**
-   * !compliance <sub> [args]
-   * View audit logs and campaign pre-flight guidance.
-   */
   async handleCompliance({ msg, args }) {
     const [sub, ...rest] = args;
     const reply = await this._policyCommands.handleCompliance(sub, rest, msg);
+    await msg.reply(reply);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // WAVE 4: FEATURE EXPANSION HANDLERS
+  // ════════════════════════════════════════════════════════════════════════
+
+  async handleLeadCmd({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._wave4.handleLead(sub, rest, msg);
+    await msg.reply(reply);
+  }
+
+  async handleAppointmentCmd({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._wave4.handleAppointment(sub, rest, msg);
+    await msg.reply(reply);
+  }
+
+  async handleMatchCmd({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._wave4.handleMatch(sub, rest, msg);
+    await msg.reply(reply);
+  }
+
+  async handlePipelineCmd({ msg, args }) {
+    const [sub, ...rest] = args;
+    const reply = await this._wave4.handlePipeline(sub, rest, msg);
     await msg.reply(reply);
   }
 }

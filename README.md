@@ -40,10 +40,33 @@
 - **🧾 Payment & Invoicing** — Invoice generation, payment recording, aging reports & overdue tracking (25 endpoints, 12 commands)
 - **🔔 Automated Notifications** — Contract expiry alerts, payment reminders, maintenance schedules & escalation chains (22 endpoints, 13 commands)
 
+### 🚀 4-Wave Upgrade (May 2026)
+
+**Wave 1 — Dependency Upgrades**
+- `googleapis` upgraded to v144 (latest)
+- `eslint` upgraded to v9
+- All other packages at latest semver-compatible versions
+
+**Wave 2 — Reliability & Performance**
+- **MemoryGuard** (`code/utils/MemoryGuard.js`) — proactive heap monitoring with warn/high/critical thresholds + automatic GC requests when `--expose-gc` is active
+- **ESM crypto fix** in `MessageQueueManager.js` — removed `require()` call that would crash in production
+
+**Wave 3 — Policy & Security Compliance**
+- **PolicyComplianceService** (`code/Services/PolicyComplianceService.js`) — opt-in/opt-out registry, campaign pre-flight audit, timestamped audit log, MongoDB persistence
+- **Auto opt-out detection** — STOP, UNSUBSCRIBE, and 10+ keyword variants auto-processed and immediately acknowledged; message processing halted
+- **New bot commands**: `!policy check|optin|optout|report`, `!compliance audit|stats|campaign`
+
+**Wave 4 — Feature Expansion (research-driven)**
+- **LeadQualificationService** — AI-powered 5-step buyer qualification chatbot (intent → budget → bedrooms → location → timeline), lead scoring 0-100, tier assignment (Hot/Warm/Cold), automatic escalation
+- **AppointmentSchedulerService** — Book/cancel/view property viewings via WhatsApp, time-slot conflict detection, automated tomorrow-reminders, agent assignment
+- **PropertyMatcherService** — Match buyer preferences to property listings using a 4-factor weighted scoring algorithm (budget 35%, bedrooms 25%, location 25%, type 15%), push new-listing alerts
+- **SalesPipelineService** — Full deal lifecycle tracker (New Lead → Qualified → Viewing → Offer → Negotiating → Contracted → Completed), stale-deal detection, per-agent pipeline views, funnel reports
+- **New bot commands**: `!lead`, `!appointment`, `!match`, `!pipeline`
+
 ### Database
-- **16 Mongoose Models** — Normalized, relational schema for properties, tenants, contracts, payments, commissions, and more
+- **16+ Mongoose Models** — Normalized, relational schema for properties, tenants, contracts, payments, commissions, leads, appointments, deals, and more
 - **94 RESTful API Endpoints** — Full CRUD across all entities
-- **56 WhatsApp Bot Commands** — Natural language property management via chat
+- **66+ WhatsApp Bot Commands** — Natural language property management via chat
 
 ---
 

@@ -16,6 +16,7 @@ import { GroupEventHandler } from './Handlers/GroupEventHandler.js';
 import GorahaContactVerificationService from './GorahaContactVerificationService.js';
 import services from '../utils/ServiceRegistry.js';
 import policyCompliance from '../Services/PolicyComplianceService.js';
+import leadQualification from '../Services/LeadQualificationService.js';
 
 /**
  * @typedef {Object} MessageRouterDeps
@@ -285,6 +286,18 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
         if (msg.body === '!verify-goraha') {
           await handleGorahaVerification(msg, client, gorahaRef, logBot);
         }
+      }
+
+      // ── WAVE 4: Lead Qualification (inbound inquiry detection) ───
+      // Runs for all non-command, non-group inbound messages
+      if (!msg.fromMe && !msg.from?.includes('@g.us') && !msg.body?.startsWith('!')) {
+        try {
+          const handled = await leadQualification.handleMessage(msg.from, msg.body, client);
+          if (handled) {
+            logBot(`🏠 Lead qualification flow handled for ${msg.from}`, 'info');
+            return;
+          }
+        } catch (_) { /* best effort — never block message flow */ }
       }
     } catch (error) {
       logBot(`Error processing message: ${error.message}`, 'error');
