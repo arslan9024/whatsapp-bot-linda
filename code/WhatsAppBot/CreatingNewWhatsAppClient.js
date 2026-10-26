@@ -1,10 +1,7 @@
 import pkg from "whatsapp-web.js";
-import { createRequire } from 'module';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-const execAsync = promisify(exec);
+import { SESSIONS_DIR, WEB_CACHE_DIR } from '../utils/SessionManager.js';
 const { LocalAuth, Client } = pkg;
 
 /**
@@ -12,42 +9,6 @@ const { LocalAuth, Client } = pkg;
  */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Kill orphaned Chrome/Chromium processes that might be locking the session.
- * SAFETY: Never kills node.exe (would kill the running bot!)
- * Only kills browser processes, not the application itself.
- */
-async function cleanupBrowserLocks() {
-  try {
-    if (process.platform === 'win32') {
-      // SAFETY: Only kill Chrome/Chromium - NEVER kill node.exe
-      await execAsync('taskkill /F /IM chrome.exe 2>nul', { windowsHide: true }).catch(() => {});
-      await execAsync('taskkill /F /IM chromium.exe 2>nul', { windowsHide: true }).catch(() => {});
-    } else {
-      await execAsync('pkill -9 chrome 2>/dev/null', { shell: '/bin/bash' }).catch(() => {});
-      await execAsync('pkill -9 chromium 2>/dev/null', { shell: '/bin/bash' }).catch(() => {});
-    }
-    
-    // Also clean lock files in session directories
-    const sessionsDir = path.join(process.cwd(), 'sessions');
-    if (fs.existsSync(sessionsDir)) {
-      const lockPatterns = ['.lock', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-      const entries = fs.readdirSync(sessionsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        for (const lockName of lockPatterns) {
-          const lockPath = path.join(sessionsDir, entry.name, lockName);
-          try { if (fs.existsSync(lockPath)) fs.unlinkSync(lockPath); } catch (_) {}
-        }
-      }
-    }
-    
-    console.log('🧹 Browser locks cleaned (safe mode - node.exe preserved)');
-  } catch (error) {
-    // Silently fail - this is best effort cleanup
-  }
 }
 
 /**
@@ -154,13 +115,13 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
     const RegisteredAgentWAClient = new Client({
       authStrategy: new LocalAuth({
         clientId: sanitizedClientID,  // Use sanitized ID without + or special chars
-        dataPath: "sessions"
+        dataPath: SESSIONS_DIR
       }),
       restartOnAuthFail: true,
       puppeteer: puppeteerArgs,
       webVersionCache: {
         type: "local",
-        path: ".wwebjs_cache"
+        path: WEB_CACHE_DIR
       },
       // FIX: Increased timeouts and page load patience for stability
       qrTimeoutMs: 300000,  // 240 seconds (4 min) for QR scan - gives more time for WhatsApp Web load
@@ -220,8 +181,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       console.warn(`⚠️  Chrome connection error detected: ${errorMsg.substring(0, 80)}`);
       console.log(`🔄 Cleaning up and retrying in ${RETRY_DELAY}ms (Attempt ${retryCount + 2}/${MAX_RETRIES + 1})`);
       
-      // Clean up any locks and processes
-      await cleanupBrowserLocks();
+      console.warn('Saved session and browser locks are preserved; close only another bot instance using this profile if needed.');
       
       // Wait before retry
       await sleep(RETRY_DELAY);

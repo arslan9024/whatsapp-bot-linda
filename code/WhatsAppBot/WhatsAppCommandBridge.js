@@ -68,6 +68,8 @@ export class WhatsAppCommandBridge {
     this.accountConfigManager = opts.accountConfigManager || null;
     this.deviceLinkedManager = opts.deviceLinkedManager || null;
     this.sessionStateManager = opts.sessionStateManager || null; // Renamed for clarity
+    this.accountClients = opts.accountClients || null;
+    this.connectionManagers = opts.connectionManagers || null;
     this.adminPhone = opts.adminPhone || null;
     this.recoveryRetries = opts.recoveryRetries || 10; // Increased retries
     this.recoveryDelay = opts.recoveryDelay || 3000; // 3 seconds delay
@@ -77,6 +79,8 @@ export class WhatsAppCommandBridge {
     this.recoveryInProgress = false;
     this.pollingInterval = null;
     this.lastRecoveryAttempt = 0;
+    this.authenticationPrompt = null;
+    this.authenticationPromptAttempted = false;
     // Backward-compatible command stats (used by test suite and bridge diagnostics)
     this.stats = {
       totalCommands: 0,
@@ -94,6 +98,7 @@ export class WhatsAppCommandBridge {
    * @returns {Promise<boolean>} - Success status
    */
   async initializeBot() {
+    if (this.isInitialized) return true;
     try {
       this.logBot('🔧 Initializing WhatsApp Command Bridge...', 'info');
 
@@ -119,15 +124,14 @@ export class WhatsAppCommandBridge {
       if (masterPhone) {
         this.logBot(`📱 Primary master phone: ${masterPhone}`, 'info');
         
-        if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
+        if (!await this.isPrimaryMasterConnected(masterPhone)) {
           // Only attempt auto-recovery if a session has previously existed
           // (i.e. there's a session folder). If never linked, skip silently.
-          const hasExistingSession = SessionManager.hasSessionArtifacts(masterPhone);
-          if (hasExistingSession) {
+          if (this.canRestorePrimaryMasterSession(masterPhone)) {
             this.logBot('⚠️ Primary master not linked, attempting auto-recovery...', 'warn');
             await this.autoRecoverPrimaryMaster();
           } else {
-            this.logBot('ℹ️  No previous session — waiting for manual linking (type: link master)', 'info');
+            this.requestPrimaryMasterAuthentication(masterPhone);
           }
         } else {
           botActive = true;
@@ -154,18 +158,23 @@ export class WhatsAppCommandBridge {
    * @private
    */
   startRecoveryPolling() {
+    if (this.pollingInterval) return;
     // Poll every 60 seconds to check if primary master is still connected
     this.pollingInterval = setInterval(async () => {
       try {
         const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
         if (!masterPhone || this.recoveryInProgress) return;
 
-        // Skip polling entirely if the account has never been linked (no session folder)
-        const hasExistingSession = SessionManager.hasSessionArtifacts(masterPhone);
-        if (!hasExistingSession) return; // Silently skip — waiting for manual link
+        if (this.isLinkingInProgress(masterPhone)) return;
+        if (!this.canRestorePrimaryMasterSession(masterPhone)) {
+          if (!await this.isPrimaryMasterConnected(masterPhone)) {
+            this.requestPrimaryMasterAuthentication(masterPhone);
+          }
+          return;
+        }
 
         // Check if still linked
-        if (!isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager)) {
+        if (!await this.isPrimaryMasterConnected(masterPhone)) {
           this.logBot('⚠️ Polling detected primary master disconnected - attempting recovery...', 'warn');
           await this.autoRecoverPrimaryMaster();
         } else if (!botActive) {
@@ -205,37 +214,21 @@ export class WhatsAppCommandBridge {
 
     if (dm && dm.on) {
       // Listen for disconnection events
-      dm.on('disconnected', (phone, reason) => {
-        if (phone === masterPhone) {
-          this.logBot(`❌ Primary master disconnected: ${reason}`, 'error');
-          this.handleSessionLoss(masterPhone);
+      dm.on('device:unlinked', ({ phoneNumber, reason }) => {
+        if (phoneNumber !== masterPhone) return;
+        botActive = false;
+        if (/AUTH_FAILURE|LOGOUT/i.test(String(reason))) {
+          this.requestPrimaryMasterAuthentication(masterPhone);
+          return;
         }
-      });
-
-      // Listen for auth failure events
-      dm.on('auth_failure', (phone, reason) => {
-        if (phone === masterPhone) {
-          this.logBot(`❌ Primary master auth failure: ${reason}`, 'error');
-          this.handleSessionLoss(masterPhone);
-        }
-      });
-
-      // Listen for device state changes
-      dm.on('change_state', (phone, state) => {
-        this.logBot(`📡 Device state change: ${phone} -> ${state}`, 'info');
-        if (phone === masterPhone && state === 'CONNECTED') {
-          botActive = true;
-          this.logBot('✅ Primary master reconnected via event - Bot active', 'success');
-        } else if (phone === masterPhone && state === 'DISCONNECTED') {
-          botActive = false;
-          this.logBot('❌ Primary master disconnected via event', 'error');
-        }
+        this.logBot('Primary master disconnected; connection recovery is monitored by polling.', 'warn');
       });
 
       // Listen for successful linking
-      dm.on('linked', (phone, data) => {
-        if (phone === masterPhone) {
+      dm.on('device:linked', ({ phoneNumber }) => {
+        if (phoneNumber === masterPhone) {
           botActive = true;
+          this.authenticationPromptAttempted = false;
           this.logBot('✅ Primary master linked - Bot active', 'success');
           this.notifyAdmin('Primary master account restored! Linda bot is now active.');
         }
@@ -243,8 +236,92 @@ export class WhatsAppCommandBridge {
     }
   }
 
+  canRestorePrimaryMasterSession(masterPhone) {
+    const metadata = this.sessionStateManager?.getDeviceMetadata(masterPhone) || {};
+    const config = this.accountConfigManager?.getAllAccounts()
+      .find(account => account.phoneNumber === masterPhone);
+    const clientId = SessionManager.resolveClientId(masterPhone, metadata, config);
+    const statusApplies = !metadata.clientId || metadata.clientId === clientId;
+    const authBlocked = statusApplies && (this.connectionManagers?.get(masterPhone)?.authRequired ||
+      ['logged_out', 'auth_failed', 'auth_required'].includes(metadata.status));
+    return metadata.status !== 'paused' && !authBlocked && SessionManager.canRestoreSession(clientId);
+  }
+
+  requestPrimaryMasterAuthentication(masterPhone) {
+    const status = this.sessionStateManager?.getDeviceMetadata(masterPhone)?.status;
+    if (status === 'paused') {
+      this.logBot('Primary master is paused. Use recover or relink master to activate it.', 'info');
+      return false;
+    }
+    if (this.authenticationPrompt || this.authenticationPromptAttempted || this.isLinkingInProgress(masterPhone)) {
+      return false;
+    }
+    const callbacks = services.get('terminalCallbacks');
+    const relink = callbacks?.onRelinkMaster;
+    if (!relink) {
+      this.logBot('Primary master needs authentication. Use link-code or link-qr.', 'warn');
+      return false;
+    }
+    // One prompt per offline episode; a cancelled or timed-out prompt must not loop every poll.
+    this.authenticationPromptAttempted = true;
+    this.logBot('Primary master is linked but offline. Choose reconnect (no relink) or relink in the terminal.', 'warn');
+    const activate = async () => {
+      const status = this.sessionStateManager?.getDeviceMetadata(masterPhone)?.status;
+      if (['logged_out', 'auth_failed'].includes(status)) {
+        this.logBot('Primary master was logged out on the phone; relinking is required.', 'warn');
+        return relink(masterPhone);
+      }
+      const choose = this.terminalHealthDashboard?.selectMasterActivation;
+      const action = choose ? await choose.call(this.terminalHealthDashboard, masterPhone) : 'reconnect';
+      if (action !== 'reconnect') return relink(masterPhone, action);
+      if (!callbacks.onRestoreAccount) return relink(masterPhone);
+      try {
+        await callbacks.onRestoreAccount(masterPhone);
+      } catch (error) {
+        this.logBot(`Reconnect failed: ${error.message}`, 'warn');
+      }
+      if (await this.isPrimaryMasterConnected(masterPhone)) {
+        botActive = true;
+        this.logBot('✅ Primary master reconnected without relinking', 'success');
+        return undefined;
+      }
+      this.logBot('Saved linked session could not be reactivated. Relink with pairing code or QR:', 'warn');
+      return relink(masterPhone);
+    };
+    this.authenticationPrompt = Promise.resolve()
+      .then(activate)
+      .catch(error => this.logBot(`Primary master activation stopped: ${error.message}`, 'warn'))
+      .finally(() => {
+        this.authenticationPrompt = null;
+      });
+    return true;
+  }
+
+  isLinkingInProgress(masterPhone) {
+    const manager = this.connectionManagers?.get(masterPhone);
+    const linking = this.deviceLinkedManager?.getDevice(masterPhone)?.status === 'linking' &&
+      !['ERROR', 'DISCONNECTED', 'SUSPENDED'].includes(manager?.state);
+    return Boolean(manager?.isInitializing || manager?.isReconnecting || manager?.state === 'CONNECTING' || manager?.reconnectTimer ||
+      linking ||
+      this.terminalHealthDashboard?.isSelectingLinkingMethod ||
+      this.terminalHealthDashboard?.linkingChallenges?.has(masterPhone));
+  }
+
+  async isPrimaryMasterConnected(masterPhone) {
+    const client = this.accountClients?.get(masterPhone);
+    if (client?.getState) {
+      try {
+        return await client.getState() === 'CONNECTED';
+      } catch (error) {
+        this.logBot(`Could not read primary master connection: ${error.message}`, 'warn');
+        return false;
+      }
+    }
+    return Boolean(isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager));
+  }
+
   /**
-   * Automatic primary master recovery with multiple strategies
+   * Recover through the shared client flow without interrupting authentication.
    * @private
    */
   async autoRecoverPrimaryMaster() {
@@ -254,9 +331,7 @@ export class WhatsAppCommandBridge {
     }
 
     this.recoveryInProgress = true;
-    const acm = this.accountConfigManager;
-    const dm = this.deviceLinkedManager;
-    const masterPhone = acm?.getMasterPhoneNumber();
+    const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
     
     if (!masterPhone) {
       this.logBot('❌ No master phone configured for recovery', 'error');
@@ -264,79 +339,63 @@ export class WhatsAppCommandBridge {
       return false;
     }
 
-    this.logBot(`🔄 Starting auto-recovery for primary master: ${masterPhone}`, 'info');
-    this.lastRecoveryAttempt = Date.now();
-
-    let attempt = 0;
-
-    // Strategy 1: Try to restore from saved session files
-    while (attempt < this.recoveryRetries && !isPrimaryMasterLinked(acm, dm)) {
-      attempt++;
-      this.logBot(`🔄 Recovery attempt ${attempt}/${this.recoveryRetries}...`, 'info');
-      
-      // Check if session files exist and can be restored
-      const canRestore = SessionManager.canRestoreSession(masterPhone);
-      this.logBot(`📁 Session restore check: ${canRestore ? 'Available' : 'Not found'}`, 'info');
-      
-      if (canRestore) {
-        this.logBot('🔄 Attempting session restore...', 'info');
-        // The session will be restored by the main bot initialization
-        // We just need to wait for it to complete
-        try {
-          // Try to get the account client and initialize it
-          const accountClients = services.get('accountClients');
-          if (accountClients && accountClients.has(masterPhone)) {
-            const client = accountClients.get(masterPhone);
-            if (client && client.initialize) {
-              await client.initialize();
-              this.logBot('✅ Session restored via existing client', 'success');
-              botActive = true;
-              this.recoveryInProgress = false;
-              await this.notifyAdmin('Primary master session restored successfully!');
-              return true;
-            }
-          }
-        } catch (err) {
-          this.logBot(`⚠️ Session restore error: ${err.message}`, 'warn');
+    try {
+      for (let attempt = 0; attempt < this.recoveryRetries; attempt++) {
+        if (await this.isPrimaryMasterConnected(masterPhone)) {
+          botActive = true;
+          return true;
         }
-      }
-
-      // Strategy 2: Check if device manager has a way to reconnect
-      if (dm && dm.reconnectDevice) {
-        this.logBot('🔄 Attempting device reconnection...', 'info');
+        botActive = false;
+        if (this.isLinkingInProgress(masterPhone)) {
+          this.logBot('Primary master is connecting or awaiting QR/code linking; recovery deferred.', 'info');
+          return false;
+        }
+        if (!this.canRestorePrimaryMasterSession(masterPhone)) {
+          botActive = false;
+          this.requestPrimaryMasterAuthentication(masterPhone);
+          return false;
+        }
+        const restore = services.get('terminalCallbacks')?.onRestoreAccount;
+        if (!restore) {
+          this.logBot('Primary master recovery unavailable: session restore handler is not registered.', 'error');
+          return false;
+        }
+        this.lastRecoveryAttempt = Date.now();
+        this.logBot(`🔄 Recovery attempt ${attempt + 1}/${this.recoveryRetries}...`, 'info');
         try {
-          const reconnected = await dm.reconnectDevice(masterPhone);
-          if (reconnected) {
+          await restore(masterPhone);
+          if (await this.isPrimaryMasterConnected(masterPhone)) {
             botActive = true;
-            this.logBot('✅ Device reconnected successfully', 'success');
-            this.recoveryInProgress = false;
-            await this.notifyAdmin('Primary master reconnected!');
+            this.logBot('✅ Primary master session restored successfully', 'success');
             return true;
           }
-        } catch (err) {
-          this.logBot(`⚠️ Reconnection error: ${err.message}`, 'warn');
+        } catch (error) {
+          this.logBot(`Primary master restore failed: ${error.message}`, 'warn');
+        }
+        if (this.isLinkingInProgress(masterPhone)) {
+          this.logBot('Primary master restore is awaiting connection or QR/code linking; recovery deferred.', 'info');
+          return false;
+        }
+        if (!this.canRestorePrimaryMasterSession(masterPhone)) {
+          this.requestPrimaryMasterAuthentication(masterPhone);
+          return false;
+        }
+        if (attempt + 1 < this.recoveryRetries) {
+          this.logBot(`⏳ Waiting ${this.recoveryDelay}ms before next attempt...`, 'info');
+          await new Promise(resolve => setTimeout(resolve, this.recoveryDelay));
         }
       }
-
-      // Strategy 3: Wait and retry (polling approach)
-      this.logBot(`⏳ Waiting ${this.recoveryDelay}ms before next attempt...`, 'info');
-      await new Promise(res => setTimeout(res, this.recoveryDelay));
-      
-      // Check if linked after waiting
-      if (isPrimaryMasterLinked(acm, dm)) {
+      if (await this.isPrimaryMasterConnected(masterPhone)) {
         botActive = true;
-        this.logBot('✅ Primary master became available', 'success');
-        this.recoveryInProgress = false;
         return true;
       }
+      botActive = false;
+      this.logBot('❌ Primary master recovery failed after all retries', 'error');
+      await this.notifyAdmin('Primary master reconnect failed; saved session is preserved. Review the connection error in the terminal and retry recovery. Device linking is only needed if WhatsApp explicitly requires authentication.');
+      return false;
+    } finally {
+      this.recoveryInProgress = false;
     }
-
-    // All retries exhausted
-    botActive = false;
-    this.recoveryInProgress = false;
-    this.logBot('❌ Primary master recovery failed after all retries', 'error');
-    await this.notifyAdmin('Primary master recovery failed. Please run "link master <phone>" to manually link.');
-    return false;
   }
 
   /**

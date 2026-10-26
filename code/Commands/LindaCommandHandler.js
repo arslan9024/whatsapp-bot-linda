@@ -51,6 +51,9 @@ export class LindaCommandHandler {
     this.registerHandler('help', this.handleHelp.bind(this));
     this.registerHandler('list-devices', this.handleListDevices.bind(this));
     this.registerHandler('device-status', this.handleDeviceStatus.bind(this));
+    this.registerHandler('link-method', this.handleLinkMethod.bind(this));
+    this.registerHandler('link-code', this.handleDirectLink.bind(this));
+    this.registerHandler('link-qr', this.handleDirectLink.bind(this));
     
     // Learning Commands
     this.registerHandler('learn', this.handleLearn.bind(this));
@@ -283,6 +286,11 @@ export class LindaCommandHandler {
    * Validate command arguments
    */
   validateArguments(command, args, cmdInfo) {
+    if (['link-code', 'link-qr'].includes(command)) {
+      return args.length === 0
+        ? { valid: true }
+        : { valid: false, error: 'Use the direct linking command without arguments.' };
+    }
     // Basic validation - can be extended per command
     // This is a simple placeholder that most commands will override
 
@@ -304,6 +312,39 @@ export class LindaCommandHandler {
     }
 
     return { valid: true };
+  }
+
+  async handleLinkMethod({ msg }) {
+    await msg.reply('Linking preferences are no longer saved. Use !link-code or !link-qr to start master linking directly. Complete linking in the bot terminal.');
+  }
+
+  async handleDirectLink({ msg, cmdInfo }) {
+    const sender = msg.from?.endsWith('@g.us') ? msg.author : msg.from;
+    const masterPhone = services.get('accountConfigManager')?.getMasterPhoneNumber()?.replace(/^\+/, '');
+    let authorized = msg.fromMe === true || Boolean(masterPhone &&
+      [`${masterPhone}@c.us`, `${masterPhone}@s.whatsapp.net`].includes(sender));
+
+    if (!authorized && msg.from?.endsWith('@g.us')) {
+      const chat = await msg.getChat();
+      const participant = sender && chat.isGroup && chat.participants?.find(member =>
+        member.id?._serialized === sender
+      );
+      authorized = Boolean(participant && (participant.isAdmin || participant.isSuperAdmin));
+    }
+    if (!authorized) {
+      throw new Error('Only group admins or the master account can start device linking.');
+    }
+
+    const linking = services.getOrThrow('manualLinkingHandler');
+    if (linking.isLinking) {
+      throw new Error('Linking is already in progress. Complete the current attempt in the bot terminal.');
+    }
+    const method = cmdInfo.name === 'link-code' ? 'code' : 'qr';
+    await msg.reply(`Starting master linking with ${method === 'code' ? 'a pairing code' : 'a QR code'} for this attempt only. Complete linking in the bot terminal; nothing is saved as a preference.`);
+    const success = await linking.initiateMasterAccountLinking(method);
+    if (!success) {
+      throw new Error('Master linking failed. See the bot terminal for details.');
+    }
   }
 
   /**
@@ -1412,4 +1453,3 @@ export class LindaCommandHandler {
 }
 
 export default LindaCommandHandler;
-

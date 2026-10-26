@@ -14,8 +14,43 @@
 
 import CommunicationTemplate from './CommunicationTemplateSchema.js';
 import CommunicationLog from './CommunicationLogSchema.js';
+import { createHash } from 'node:crypto';
+import ContactConsentService from '../Services/ContactConsentService.js';
 
 class CommunicationService {
+  static _idempotencyIndexPromise = null;
+
+  static async _ensureIdempotencyIndex() {
+    if (!CommunicationService._idempotencyIndexPromise) {
+      CommunicationService._idempotencyIndexPromise = CommunicationLog.collection.createIndex(
+        { idempotencyKey: 1 },
+        { unique: true, sparse: true }
+      );
+    }
+    return CommunicationService._idempotencyIndexPromise;
+  }
+
+  static _validateIdempotencyKey(key) {
+    if (key === undefined) return null;
+    if (typeof key !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(key)) {
+      throw new Error('Idempotency-Key must contain 8-128 letters, numbers, dots, underscores, colons, or hyphens.');
+    }
+    return key;
+  }
+
+  static async _saveMessageLog(log) {
+    try {
+      await log.save();
+      return { log, duplicate: false };
+    } catch (error) {
+      if (error.code === 11000 && log.idempotencyKey) {
+        const existing = await CommunicationLog.findOne({ idempotencyKey: log.idempotencyKey });
+        if (existing) return { log: existing, duplicate: true };
+      }
+      throw error;
+    }
+  }
+
 
   // ============================================
   // TEMPLATE OPERATIONS
@@ -315,8 +350,22 @@ class CommunicationService {
         language,
         context = {},
         priority = 'normal',
-        sendFn
+        sendFn,
+        idempotencyKey
       } = options;
+
+      const normalizedKey = CommunicationService._validateIdempotencyKey(idempotencyKey);
+      if (normalizedKey) await CommunicationService._ensureIdempotencyIndex();
+      if (!(await ContactConsentService.hasConsent(recipientPhone))) {
+        return { success: false, error: 'Recipient consent is required before messaging.' };
+      }
+
+      if (normalizedKey) {
+        const existing = await CommunicationLog.findOne({ idempotencyKey: normalizedKey });
+        if (existing) {
+          return { success: existing.status !== 'failed', duplicate: true, log: existing.toObject(), message: 'Request already processed.' };
+        }
+      }
 
       // 1. Load template
       const template = await CommunicationTemplate.findOne({ templateId, status: 'active' });
@@ -352,10 +401,14 @@ class CommunicationService {
         variablesUsed: variables,
         status: 'queued',
         context,
-        priority
+        priority,
+        idempotencyKey: normalizedKey
       });
 
-      await log.save();
+      const saved = await CommunicationService._saveMessageLog(log);
+      if (saved.duplicate) {
+        return { success: saved.log.status !== 'failed', duplicate: true, log: saved.log.toObject(), message: 'Request already processed.' };
+      }
 
       // 5. Send message (if sendFn provided)
       if (sendFn) {
@@ -407,11 +460,24 @@ class CommunicationService {
         language = 'en',
         context = {},
         priority = 'normal',
-        sendFn
+        sendFn,
+        idempotencyKey
       } = options;
 
       if (!content || !recipientPhone) {
         return { success: false, error: 'Content and recipientPhone are required' };
+      }
+
+      const normalizedKey = CommunicationService._validateIdempotencyKey(idempotencyKey);
+      if (normalizedKey) await CommunicationService._ensureIdempotencyIndex();
+      if (!(await ContactConsentService.hasConsent(recipientPhone))) {
+        return { success: false, error: 'Recipient consent is required before messaging.' };
+      }
+      if (normalizedKey) {
+        const existing = await CommunicationLog.findOne({ idempotencyKey: normalizedKey });
+        if (existing) {
+          return { success: existing.status !== 'failed', duplicate: true, log: existing.toObject(), message: 'Request already processed.' };
+        }
       }
 
       const log = new CommunicationLog({
@@ -426,10 +492,14 @@ class CommunicationService {
         language,
         status: 'queued',
         context,
-        priority
+        priority,
+        idempotencyKey: normalizedKey
       });
 
-      await log.save();
+      const saved = await CommunicationService._saveMessageLog(log);
+      if (saved.duplicate) {
+        return { success: saved.log.status !== 'failed', duplicate: true, log: saved.log.toObject(), message: 'Request already processed.' };
+      }
 
       if (sendFn) {
         try {
@@ -470,9 +540,12 @@ class CommunicationService {
         language,
         context = {},
         sendFn,
-        delayMs = 1000
+        delayMs = 1000,
+        idempotencyKey
       } = options;
 
+      const normalizedKey = CommunicationService._validateIdempotencyKey(idempotencyKey);
+      if (normalizedKey) await CommunicationService._ensureIdempotencyIndex();
       if (!recipients || recipients.length === 0) {
         return { success: false, error: 'At least one recipient is required' };
       }
@@ -484,16 +557,39 @@ class CommunicationService {
       }
 
       // Generate bulk ID
-      const bulkId = `BULK-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      const bulkId = normalizedKey
+        ? `BULK-${createHash('sha256').update(normalizedKey).digest('hex').slice(0, 20).toUpperCase()}`
+        : `BULK-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
       const results = [];
       let sent = 0;
       let failed = 0;
       let queued = 0;
+      let skipped = 0;
 
       for (const recipient of recipients) {
+        if (!(await ContactConsentService.hasConsent(recipient.phone))) {
+          skipped++;
+          results.push({ phone: recipient.phone, status: 'skipped', reason: 'consent_required' });
+          continue;
+        }
+
         const vars = recipient.variables || {};
         const renderedContent = template.render(vars, language || template.language);
+        const recipientKey = normalizedKey
+          ? `${createHash('sha256').update(normalizedKey).digest('hex').slice(0, 24)}:${createHash('sha256').update(String(recipient.phone).replace(/\D/g, '')).digest('hex').slice(0, 32)}`
+          : null;
+
+        if (recipientKey) {
+          const existing = await CommunicationLog.findOne({ idempotencyKey: recipientKey });
+          if (existing) {
+            results.push({ phone: recipient.phone, status: existing.status, logId: existing.logId, duplicate: true });
+            if (existing.status === 'sent' || existing.status === 'delivered' || existing.status === 'read') sent++;
+            else if (existing.status === 'failed') failed++;
+            else queued++;
+            continue;
+          }
+        }
 
         const log = new CommunicationLog({
           logId: CommunicationLog.generateLogId(),
@@ -511,10 +607,15 @@ class CommunicationService {
           variablesUsed: vars,
           status: 'queued',
           context,
-          priority: 'normal'
+          priority: 'normal',
+          idempotencyKey: recipientKey
         });
 
-        await log.save();
+        const saved = await CommunicationService._saveMessageLog(log);
+        if (saved.duplicate) {
+          results.push({ phone: recipient.phone, status: saved.log.status, logId: saved.log.logId, duplicate: true });
+          continue;
+        }
 
         if (sendFn) {
           try {
@@ -552,6 +653,7 @@ class CommunicationService {
           sent,
           failed,
           queued,
+          skipped,
           deliveryRate: recipients.length > 0 ? ((sent / recipients.length) * 100).toFixed(1) : '0.0'
         },
         results,
@@ -589,6 +691,7 @@ class CommunicationService {
       });
 
       if (result.success && result.log) {
+        if (result.duplicate) return result;
         // Update schedule time
         await CommunicationLog.findOneAndUpdate(
           { logId: result.log.logId },
@@ -820,16 +923,24 @@ class CommunicationService {
 
       const results = [];
       let retried = 0;
+      let queued = 0;
       let stillFailed = 0;
 
       for (const msg of failedMessages) {
         try {
+          if (!(await ContactConsentService.hasConsent(msg.recipientPhone))) {
+            results.push({ logId: msg.logId, status: 'skipped_no_consent' });
+            continue;
+          }
           await msg.retry();
           if (sendFn) {
             await sendFn(msg.recipientPhone, msg.content);
             await msg.markSent();
             retried++;
             results.push({ logId: msg.logId, status: 'retried_successfully' });
+          } else {
+            queued++;
+            results.push({ logId: msg.logId, status: 'queued_for_retry' });
           }
         } catch (retryError) {
           await msg.markFailed(retryError.message, 'RETRY_FAILED');
@@ -840,7 +951,7 @@ class CommunicationService {
 
       return {
         success: true,
-        stats: { retried, stillFailed, total: failedMessages.length },
+        stats: { retried, queued, stillFailed, total: failedMessages.length },
         results
       };
     } catch (error) {
@@ -853,15 +964,31 @@ class CommunicationService {
    */
   static async processQueue(sendFn, limit = 50, delayMs = 1000) {
     try {
-      const queued = await CommunicationLog.getQueuedMessages(limit);
+      if (typeof sendFn !== 'function') {
+        return { success: false, error: 'A send function is required to process queued messages.' };
+      }
+      const candidates = await CommunicationLog.getQueuedMessages(limit);
 
       let sent = 0;
       let failed = 0;
+      let skipped = 0;
 
-      for (const msg of queued) {
+      for (const candidate of candidates) {
+        const msg = await CommunicationLog.findOneAndUpdate(
+          { _id: candidate._id, status: 'queued' },
+          { $set: { status: 'sending' } },
+          { new: true }
+        );
+        if (!msg) continue;
+
         try {
-          msg.status = 'sending';
-          await msg.save();
+          if (!(await ContactConsentService.hasConsent(msg.recipientPhone))) {
+            msg.status = 'cancelled';
+            msg.errorMessage = 'Recipient consent is absent or revoked.';
+            await msg.save();
+            skipped++;
+            continue;
+          }
 
           await sendFn(msg.recipientPhone, msg.content);
           await msg.markSent();
@@ -896,8 +1023,8 @@ class CommunicationService {
 
       return {
         success: true,
-        stats: { processed: queued.length, sent, failed },
-        message: `Queue processed: ${sent} sent, ${failed} failed out of ${queued.length}`
+        stats: { processed: candidates.length, sent, failed, skipped },
+        message: `Queue processed: ${sent} sent, ${failed} failed, ${skipped} skipped out of ${candidates.length}`
       };
     } catch (error) {
       return { success: false, error: error.message };

@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceStatus.js";
-import { fullCleanup, killBrowserProcesses, sleep } from "./code/utils/browserCleanup.js";
 import { SessionStateManager } from "./code/utils/SessionStateManager.js";
+import { acquireBotInstance } from "./code/utils/BotInstanceGuard.js";
+import { fileURLToPath } from "node:url";
 
 // PHASE 20: Secure Credential Management & Interactive Master Setup (February 18, 2026)
 // - GoogleServiceAccountManager: base64-encoded credentials in .env (no secrets in git)
@@ -63,6 +64,7 @@ import services from "./code/utils/ServiceRegistry.js";
 // PHASE 12: Extracted modules (Error Handlers, Shutdown, Diagnostics, Database)
 import { installProcessErrorHandlers } from "./code/utils/ProcessErrorHandlers.js";
 import { createGracefulShutdown, installShutdownHandlers } from "./code/utils/GracefulShutdown.js";
+import { getSessionRecovery } from "./code/utils/SessionRecoveryService.js";
 import { printStartupDiagnostics } from "./code/utils/StartupDiagnostics.js";
 import { initializeDatabase } from "./code/utils/DatabaseInitializer.js";
 
@@ -118,6 +120,7 @@ import UptimeTracker from "./code/utils/UptimeTracker.js";
 import ReportGenerator from "./code/utils/ReportGenerator.js";
 import MetricsDashboard from "./code/utils/MetricsDashboard.js";
 import GoogleSheetsManager from "./code/utils/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
+import { createTerminalCampaigns } from "./code/utils/CampaignWorkspaceSetup.js";
 
 // PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
 // Allows master accounts to send "linda <command>" messages to primary master
@@ -211,11 +214,13 @@ let lockFileDetector = null;
 
 // Phase 19: Campaign Manager instances
 let campaignService = null;
+let terminalCampaigns = null;
 let contactFilterService = null;
 let campaignScheduler = null;
 
 // Simple console logging without interactive prompts
 function logBot(msg, type = "info") {
+  if (terminalHealthDashboard.recordNotice(msg, type)) return;
   const timestamp = new Date().toLocaleTimeString();
   const prefix = {
     info: "ℹ️ ",
@@ -310,6 +315,7 @@ function getFlowDeps() {
 
 // Wire up sharedContext with mutable references (must be after const declaration)
 sharedContext.accountClients = accountClients;
+services.register('terminalHealthDashboard', terminalHealthDashboard);
 sharedContext.allInitializedAccounts = allInitializedAccounts;
 sharedContext.setupMessageListeners = setupMessageListeners;
 sharedContext.setMasterRef = (newClient) => {
@@ -317,6 +323,9 @@ sharedContext.setMasterRef = (newClient) => {
   services.register('Lion0', Lion0);
   services.register('Linda', Lion0);
 };
+getSessionRecovery({
+  getFlowDeps, setupClientFlow, createClient: CreatingNewWhatsAppClient, accountClients,
+});
 
 /**
  * Global Error Handlers (Phase 12 — extracted to ProcessErrorHandlers.js)
@@ -394,9 +403,11 @@ async function initializeBot() {
       accountConfigManager = new AccountConfigManager(logBot);
       logBot("✅ AccountConfigManager initialized", "success");
       services.register('accountConfigManager', accountConfigManager);
+      sharedContext.accountConfigManager = accountConfigManager;
       
       // NEW: Pass accountConfigManager to terminalHealthDashboard
       terminalHealthDashboard.setAccountConfigManager(accountConfigManager);
+      terminalHealthDashboard.setConnectionSources(accountClients, connectionManagers);
       
       // Validate master account configuration
       const masterPhone = accountConfigManager.getMasterPhoneNumber();
@@ -630,12 +641,15 @@ async function initializeBot() {
         
         // If all accounts were restored, skip the "waiting for user command" message
         if (restoreResult.failed === 0) {
-          logBot("✅ All accounts are now online and ready to use", "success");
+          logBot("✅ Saved sessions loaded; dashboard shows live connection status", "success");
           logBot("   No manual linking required on this restart", "info");
         } else {
-          logBot(`⚠️  ${restoreResult.failed} account(s) need manual re-linking`, "warn");
-          logBot("   Use: link master <+phone> or relink <+phone>", "info");
+          logBot(`⚠️  ${restoreResult.failed} account(s) need recovery attention`, "warn");
+          logBot("   Check each account's error; reconnect failures do not necessarily require linking", "info");
         }
+      } else if (restoreResult.failed > 0) {
+        logBot(`⚠️  Automatic session recovery could not load ${restoreResult.failed} account(s)`, "warn");
+        logBot("   Saved profiles are retained; check the recovery errors and dashboard", "info");
       } else {
         logBot("ℹ️  No previous sessions to restore - manual linking required", "info");
       }
@@ -894,6 +908,16 @@ async function initializeBot() {
     // STEP 8: Setup Interactive Terminal Dashboard (Phase 13 — extracted)
     // ============================================
     setupTerminalInputListener({
+      onOpenCampaigns: async () => {
+        if (!terminalCampaigns) {
+          terminalCampaigns = createTerminalCampaigns({
+            accountClients, connectionManagers, accountConfigManager, googleSheetsManager, logBot,
+          });
+        }
+        terminalCampaigns.open();
+      },
+      onCampaignInput: input => terminalCampaigns?.handleInput(input) ?? false,
+      isCampaignMenuActive: () => terminalCampaigns?.active === true,
       logBot,
       terminalHealthDashboard,
       accountConfigManager,
@@ -925,11 +949,20 @@ async function initializeBot() {
         accountConfigManager,
         terminalHealthDashboard,
         deviceLinkedManager,
+        accountClients,
+        connectionManagers,
+        sessionStateManager,
       });
       services.register('commandBridge', commandBridge);
       logBot("✅ Phase 31: WhatsApp Command Bridge initialized", "success");
       logBot("   - Send 'linda help' from any master account to primary master", "info");
       logBot("   - Bridges terminal commands to WhatsApp with output capture", "info");
+    }
+    if (!commandBridge.isInitialized) {
+      const bridgeInitialized = await commandBridge.initializeBot();
+      if (!bridgeInitialized) {
+        logBot("⚠️ WhatsApp Command Bridge failed to initialize; remote WhatsApp commands are unavailable.", "error");
+      }
     }
     logBot("", "info");
 
@@ -942,13 +975,11 @@ async function initializeBot() {
   } catch (error) {
     logBot(`Initialization Error: ${error.message}`, "error");
 
-    if (error.message.includes("browser is already running") && initAttempts < MAX_INIT_ATTEMPTS) {
-      logBot("Browser lock detected - cleaning up and retrying...", "warn");
-      await killBrowserProcesses();
-      await sleep(2000);
+    if (sessionStateManager?.loadFailed) {
       isInitializing = false;
-      return initializeBot();
-    } else if (initAttempts < MAX_INIT_ATTEMPTS) {
+      throw error;
+    }
+    if (initAttempts < MAX_INIT_ATTEMPTS) {
       logBot(`Retrying in 5 seconds... (Attempt ${initAttempts + 1}/${MAX_INIT_ATTEMPTS})`, "warn");
       isInitializing = false;
       return setTimeout(initializeBot, 5000);
@@ -979,8 +1010,10 @@ services.register('getConnectionDiagnostics', getAllConnectionDiagnostics);
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 const gracefulShutdown = createGracefulShutdown({
+  stopSessionRecovery: () => sharedContext.sessionRecovery.stop(),
+  closeCampaigns: () => terminalCampaigns?.close(),
   logBot,
-  sessionStateManager,
+  getSessionStateManager: () => sessionStateManager,
   accountHealthMonitor,
   connectionManagers,
   accountClients,
@@ -997,27 +1030,11 @@ installShutdownHandlers(gracefulShutdown);
 // installed above via installProcessErrorHandlers(). Do NOT duplicate them.
 
 // Start the bot
-logBot("Starting Linda WhatsApp Bot...", "info");
-initializeBot();
-
-// Initialize WhatsApp Command Bridge and enforce master linking
-async function setupCommandBridge() {
-  if (!commandBridge) {
-    commandBridge = new WhatsAppCommandBridge({
-      logBot,
-      accountConfigManager,
-      terminalHealthDashboard,
-      deviceLinkedManager,
-    });
-  }
-  if (commandBridge && !commandBridge.sessionStateManager && sessionStateManager) {
-    commandBridge.sessionStateManager = sessionStateManager;
-  }
-  if (commandBridge && !commandBridge.accountClients) {
-    commandBridge.accountClients = accountClients;
-  }
-  await commandBridge.initializeBot();
+try {
+  await acquireBotInstance(fileURLToPath(new URL('.', import.meta.url)));
+  logBot("Starting Linda WhatsApp Bot...", "info");
+  await initializeBot();
+} catch (error) {
+  logBot(`Bot startup stopped: ${error.message}`, 'error');
+  process.exit(1);
 }
-
-// Call setupCommandBridge after all managers are initialized
-initializeBot().then(setupCommandBridge);

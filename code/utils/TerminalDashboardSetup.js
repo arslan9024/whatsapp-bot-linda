@@ -9,6 +9,9 @@
  */
 
 import services from './ServiceRegistry.js';
+import { SessionManager } from './SessionManager.js';
+import { getSessionRecovery } from './SessionRecoveryService.js';
+import { TerminalConversationAnalysis } from './TerminalConversationAnalysis.js';
 
 /**
  * @param {Object} opts
@@ -42,12 +45,43 @@ export function setupTerminalInputListener(opts) {
     analyticsManager,      // NEW: Analytics metrics (Phase 29e)
     reportGenerator,       // NEW: Report generation (Phase 29e)
     googleSheetsManager,   // NEW: Google Sheets CRUD (Phase 30)
+    onOpenCampaigns,
+    onCampaignInput,
+    isCampaignMenuActive,
   } = opts;
 
   try {
+    const savedClientId = (phone) => SessionManager.resolveClientId(
+      phone, getFlowDeps().sessionStateManager.getDeviceMetadata(phone) || {},
+      accountConfigManager?.getAllAccounts().find(account => account.phoneNumber === phone)
+    );
+    const canRestoreSaved = phone => {
+      const metadata = getFlowDeps().sessionStateManager.getDeviceMetadata(phone) || {};
+      const clientId = savedClientId(phone);
+      // A status recorded for a different (empty) profile does not apply to the resolved login profile.
+      const statusApplies = !metadata.clientId || metadata.clientId === clientId;
+      return !(statusApplies && ['logged_out', 'auth_failed', 'auth_required'].includes(metadata.status)) &&
+        SessionManager.canRestoreSession(clientId);
+    };
+    const recovery = getSessionRecovery({
+      getFlowDeps, setupClientFlow, createClient, accountClients, accountConfigManager,
+    });
+    const stopAccountClient = phone => recovery.stopAccount(phone);
+    const restoreAccount = phone => recovery.recover(phone);
+    const conversationAnalysis = new TerminalConversationAnalysis({ accountClients, getFlowDeps });
     const callbacks = {
+      onCampaigns: onOpenCampaigns,
+      onCampaignInput,
+      isCampaignMenuActive,
+      onRestoreAccount: restoreAccount,
+      onDisconnectAccount: async phone => {
+        await recovery.disconnect(phone);
+        conversationAnalysis.clear(phone);
+      },
+      onListChats: (phone, page) => conversationAnalysis.list(phone, page),
+      onAnalyzeChat: (phone, number, limit) => conversationAnalysis.analyze(phone, number, limit),
       // NEW: Manual linking command (Phase 21)
-      onLinkMaster: async () => {
+      onLinkMaster: async (linkingMethod) => {
         if (!manualLinkingHandler) {
           logBot('❌ Manual linking handler not initialized', 'error');
           return;
@@ -57,7 +91,7 @@ export function setupTerminalInputListener(opts) {
         logBot('🔗 Initiating master account linking...', 'info');
         logBot('', 'info');
         
-        const success = await manualLinkingHandler.initiateMasterAccountLinking();
+        const success = await manualLinkingHandler.initiateMasterAccountLinking(linkingMethod);
         
         if (!success) {
           logBot('', 'info');
@@ -91,39 +125,16 @@ export function setupTerminalInputListener(opts) {
           // CRITICAL FIX: Check if session can be restored BEFORE showing QR code
           logBot(`  [1/5] Checking for existing session...`, 'info');
           
-          // Import SessionManager for session restoration check
-          const { SessionManager } = await import('./SessionManager.js');
-          const canRestore = SessionManager.canRestoreSession(phoneNumber);
+          const canRestore = canRestoreSaved(phoneNumber);
           
           if (canRestore) {
             logBot(`  ✅ Valid session found for ${phoneNumber}`, 'success');
             logBot(`  💡 Attempting to restore session instead of QR code...`, 'info');
             
-            // Update account status to 'linked' if session exists
-            if (accountConfigManager) {
-              const account = accountConfigManager.getAccountByPhone(phoneNumber);
-              if (account) {
-                await accountConfigManager.updateAccountStatus(account.id, 'linked');
-                logBot(`  ✅ Account status updated to 'linked'`, 'info');
-              }
-            }
-            
-            // Mark device as successfully linked
-            if (deviceLinkedManager) {
-              deviceLinkedManager.markDeviceLinked(phoneNumber, { 
-                authMethod: 'restore',
-                linkedAt: new Date().toISOString()
-              });
-              logBot(`  ✅ Device marked as linked in tracker`, 'info');
-            }
-            
-            logBot('', 'info');
-            logBot(`✅ Account ${phoneNumber} restored from existing session!`, 'success');
-            logBot('', 'info');
-            return; // Exit early - no QR code needed
+            return await restoreAccount(phoneNumber);
           }
           
-          logBot(`  ℹ️  No existing session found - QR code required`, 'info');
+          logBot(`  No existing session found - choose pairing code or QR code`, 'info');
 
           logBot(`  [2/5] Adding to configuration...`, 'info');
           const addResult = await accountConfigManager.addMasterAccount(phoneNumber, displayName);
@@ -136,31 +147,33 @@ export function setupTerminalInputListener(opts) {
 
           logBot(`  [3/5] Register in device manager...`, 'info');
           if (deviceLinkedManager) {
-            deviceLinkedManager.registerDevice(phoneNumber, {
+            deviceLinkedManager.addDevice(phoneNumber, {
               role: 'master',
-              displayName,
+              name: displayName,
               status: 'pending'
             });
           }
           logBot(`  ✅ Registered in device tracker`, 'info');
 
           logBot(`  [4/5] Creating WhatsApp client...`, 'info');
-          const newClient = await createClient(phoneNumber);
+          const newClient = await createClient(savedClientId(phoneNumber));
           accountClients.set(phoneNumber, newClient);
           logBot(`  ✅ Client created`, 'info');
 
-          logBot(`  [5/5] Initializing with QR code...`, 'info');
-          setupClientFlow(newClient, phoneNumber, 'master', { isRestore: false }, getFlowDeps());
+          logBot(`  [5/5] Choose a device linking method...`, 'info');
+          const flow = setupClientFlow(newClient, phoneNumber, 'master', { isRestore: false }, getFlowDeps());
 
           if (deviceLinkedManager) {
             deviceLinkedManager.startLinkingAttempt(phoneNumber);
           }
 
           logBot(`  Starting client initialization...\n`, 'info');
-          await newClient.initialize();
+          if (!await flow.initializationPromise) {
+            throw new Error('Client initialization failed; see linking error above');
+          }
 
           logBot('', 'info');
-          logBot(`✅ Master account added! Please scan the QR code above with WhatsApp.`, 'success');
+          logBot(`Master account configured. Complete linking on your phone using the selected method.`, 'info');
           logBot('', 'info');
 
         } catch (error) {
@@ -172,7 +185,7 @@ export function setupTerminalInputListener(opts) {
         }
       },
 
-      onRelinkMaster: async (masterPhone) => {
+      onRelinkMaster: async (masterPhone, linkingMethod) => {
         // NEW: Support phone number parameter for dynamic master account relinking
         if (!masterPhone && accountConfigManager) {
           masterPhone = accountConfigManager.getMasterPhoneNumber();
@@ -206,35 +219,19 @@ export function setupTerminalInputListener(opts) {
         logBot(`  [1/4] Checking for existing valid session...`, 'info');
         
         try {
-          // Import SessionManager for session restoration check
-          const { SessionManager } = await import('./SessionManager.js');
-          const canRestore = SessionManager.canRestoreSession(masterPhone);
+          const canRestore = !linkingMethod && canRestoreSaved(masterPhone);
           
           if (canRestore) {
             logBot(`  ✅ Valid session found for ${masterPhone}`, 'success');
             logBot(`  💡 Restoring session instead of showing new QR code...`, 'info');
             
-            // Get existing client or restored client
-            let existingClient = accountClients.get(masterPhone);
-            if (existingClient) {
-              logBot(`  ℹ️  Using existing client connection...`, 'info');
-              if (deviceLinkedManager) {
-                deviceLinkedManager.markDeviceLinked(masterPhone, { 
-                  authMethod: 'restore',
-                  linkedAt: new Date().toISOString()
-                });
-              }
-              logBot('', 'info');
-              logBot(`✅ Master account ${masterPhone} restored successfully!`, 'success');
-              logBot('', 'info');
-              return; // Exit early - session restored
-            }
+            return await restoreAccount(masterPhone);
           }
           
-          logBot(`  ℹ️  No valid session found - QR code will be displayed`, 'info');
+          logBot(`  No valid session found - choose pairing code or QR code`, 'info');
         } catch (sessionCheckError) {
-          logBot(`  ⚠️  Could not check session: ${sessionCheckError.message}`, 'warn');
-          logBot(`  ℹ️  Proceeding with QR code display...`, 'info');
+          logBot(`Could not restore master session: ${sessionCheckError.message}`, 'error');
+          return;
         }
 
         // CRITICAL FIX: Reset device status
@@ -244,26 +241,20 @@ export function setupTerminalInputListener(opts) {
         }
         logBot(`  ✅ Device state reset`, 'info');
 
-        // CRITICAL FIX: Destroy old client and create a fresh one to guarantee QR code display
-        const oldClient = accountClients.get(masterPhone);
-        if (oldClient) {
-          try {
-            logBot(`  [3/4] Clearing old session data...`, 'info');
-            await oldClient.destroy();
-            logBot(`  ✅ Old session cleared`, 'info');
-          } catch (destroyError) {
-            logBot(`  ⚠️  Warning: Could not cleanly destroy old session: ${destroyError.message}`, 'warn');
-          }
-        }
-
         try {
           // Create a fresh new client
-          logBot(`  [4/4] Creating new client for fresh QR code...`, 'info');
-          const newClient = await createClient(masterPhone);
+          logBot(`  [4/4] Creating client for pairing code or QR linking...`, 'info');
+          await stopAccountClient(masterPhone);
+          const newClient = await createClient(savedClientId(masterPhone));
           accountClients.set(masterPhone, newClient);
+          if (masterPhone === accountConfigManager?.getMasterPhoneNumber()) {
+            getFlowDeps().sharedContext.setMasterRef(newClient);
+          }
 
           // Set up the flow (this registers QR event listener)
-          setupClientFlow(newClient, masterPhone, 'master', { isRestore: false }, getFlowDeps());
+          const flow = setupClientFlow(newClient, masterPhone, 'master', {
+            isRestore: false, ...(linkingMethod ? { linkingMethod } : {}),
+          }, getFlowDeps());
 
           // Mark as linking
           if (deviceLinkedManager) {
@@ -271,8 +262,10 @@ export function setupTerminalInputListener(opts) {
           }
 
           // Initialize fresh client to display new QR code
-          logBot(`  Initializing fresh client - QR code will display below:\n`, 'info');
-          await newClient.initialize();
+          logBot(`  Choose your linking method below:\n`, 'info');
+          if (!await flow.initializationPromise) {
+            throw new Error('Client initialization failed; see linking error above');
+          }
 
         } catch (error) {
           logBot(`Failed to relink master account: ${error.message}`, 'error');
@@ -310,35 +303,20 @@ export function setupTerminalInputListener(opts) {
         logBot(`  [1/4] Checking for existing valid session...`, 'info');
         
         try {
-          // Import SessionManager for session restoration check
-          const { SessionManager } = await import('./SessionManager.js');
-          const canRestore = SessionManager.canRestoreSession(servantPhone);
+          const canRestore = canRestoreSaved(servantPhone);
           
           if (canRestore) {
             logBot(`  ✅ Valid session found for ${servantPhone}`, 'success');
             logBot(`  💡 Restoring session instead of showing new QR code...`, 'info');
             
             // Get existing client or use restored session
-            let existingClient = accountClients.get(servantPhone);
-            if (existingClient) {
-              logBot(`  ℹ️  Using existing client connection...`, 'info');
-              if (deviceLinkedManager) {
-                deviceLinkedManager.markDeviceLinked(servantPhone, { 
-                  authMethod: 'restore',
-                  linkedAt: new Date().toISOString()
-                });
-              }
-              logBot('', 'info');
-              logBot(`✅ Servant account ${servantPhone} restored successfully!`, 'success');
-              logBot('', 'info');
-              return; // Exit early - session restored
-            }
+            return await restoreAccount(servantPhone);
           }
           
-          logBot(`  ℹ️  No valid session found - QR code will be displayed`, 'info');
+          logBot(`  No valid session found - choose pairing code or QR code`, 'info');
         } catch (sessionCheckError) {
-          logBot(`  ⚠️  Could not check session: ${sessionCheckError.message}`, 'warn');
-          logBot(`  ℹ️  Proceeding with QR code display...`, 'info');
+          logBot(`Could not restore servant session: ${sessionCheckError.message}`, 'error');
+          return;
         }
 
         // CRITICAL FIX: Reset device status
@@ -348,30 +326,22 @@ export function setupTerminalInputListener(opts) {
         }
         logBot(`  ✅ Device state reset`, 'info');
 
-        const oldClient = accountClients.get(servantPhone);
-        if (oldClient) {
-          try {
-            logBot(`  [3/4] Clearing old session data...`, 'info');
-            await oldClient.destroy();
-            logBot(`  ✅ Old session cleared`, 'info');
-          } catch (destroyError) {
-            logBot(`  ⚠️  Warning: Could not cleanly destroy old session: ${destroyError.message}`, 'warn');
-          }
-        }
-
         try {
-          logBot(`  [4/4] Creating new client for fresh QR code...`, 'info');
-          const newClient = await createClient(servantPhone);
+          logBot(`  [4/4] Creating client for pairing code or QR linking...`, 'info');
+          await stopAccountClient(servantPhone);
+          const newClient = await createClient(savedClientId(servantPhone));
           accountClients.set(servantPhone, newClient);
 
-          setupClientFlow(newClient, servantPhone, 'servant', { isRestore: false }, getFlowDeps());
+          const flow = setupClientFlow(newClient, servantPhone, 'servant', { isRestore: false }, getFlowDeps());
 
           if (deviceLinkedManager) {
             deviceLinkedManager.startLinkingAttempt(servantPhone);
           }
 
-          logBot(`  Initializing fresh client - QR code will display below:\n`, 'info');
-          await newClient.initialize();
+          logBot(`  Choose your linking method below:\n`, 'info');
+          if (!await flow.initializationPromise) {
+            throw new Error('Client initialization failed; see linking error above');
+          }
 
         } catch (error) {
           logBot(`Failed to relink servant account: ${error.message}`, 'error');
@@ -382,15 +352,25 @@ export function setupTerminalInputListener(opts) {
       },
 
       onRelinkDevice: async (phoneNumber) => {
-        logBot(`Re-linking device: ${phoneNumber}`, 'info');
-        if (deviceLinkedManager) {
-          deviceLinkedManager.resetDeviceStatus(phoneNumber);
-        }
+        const config = accountConfigManager?.getAllAccounts().find(account => account.phoneNumber === phoneNumber);
+        return ['master', 'primary'].includes(config?.role)
+          ? callbacks.onRelinkMaster(phoneNumber) : callbacks.onRelinkServant(phoneNumber);
       },
 
       onSwitchTo6Digit: async (phoneNumber) => {
-        logBot(`6-digit auth requested for: ${phoneNumber}`, 'info');
-        logBot('6-digit code feature coming soon', 'warn');
+        const managers = getFlowDeps().connectionManagers;
+        const normalized = phoneNumber.replace(/^\+/, '');
+        const entry = [...managers.entries()].find(([phone]) => phone.replace(/^\+/, '') === normalized);
+        if (!entry?.[1].requestPairingCode) {
+          logBot("No active linking flow for that phone. Use 'link master' or 'relink master <phone>' first.", 'error');
+          return;
+        }
+        try {
+          await entry[1].requestPairingCode();
+        } catch (error) {
+          logBot(`Could not request pairing code: ${error.message}`, 'error');
+          return;
+        }
       },
 
       onShowDeviceDetails: (phoneNumber) => {
@@ -446,36 +426,23 @@ export function setupTerminalInputListener(opts) {
 
       // NEW: Restore all sessions callback (Phase 28)
       onRestoreAllSessions: async () => {
-        try {
-          console.log(`📱 Scanning saved sessions...\n`);
-          
-          // Get all saved sessions from SessionManager
-          const { SessionManager } = await import('./SessionManager.js');
-          const allSessions = SessionManager.getAllSavedSessions();
-
-          if (!allSessions || allSessions.length === 0) {
-            console.log(`  ⚠️  No saved sessions found\n`);
-            console.log(`  💡 Tip: Link accounts first using 'link-master' command\n`);
-            return;
+        const saved = getFlowDeps().sessionStateManager.state?.accounts || {};
+        const phones = new Set([
+          ...Object.keys(saved),
+          ...(accountConfigManager?.getAllAccounts() || []).map(account => account.phoneNumber),
+        ]);
+        let restored = 0;
+        let failed = 0;
+        for (const phone of phones) {
+          try {
+            await restoreAccount(phone);
+            restored++;
+          } catch (error) {
+            failed++;
+            logBot(`Restore ${phone}: ${error.message}`, 'error');
           }
-
-          console.log(`  ✅ Found ${allSessions.length} saved session(s):\n`);
-          allSessions.forEach(phone => console.log(`    • ${phone}`));
-
-          console.log(`\n📊 RESTORE OPTIONS:\n`);
-          console.log(`  1️⃣  Auto-restore: Restart the server (node index.js)`);
-          console.log(`     → Automatically restores all ${allSessions.length} session(s)\n`);
-          console.log(`  2️⃣  Manual restore: Relink specific accounts`);
-          console.log(`     • recover <+phone>     → Attempt restore for one account`);
-          console.log(`     • relink <+phone>      → Re-link with fresh QR code\n`);
-          console.log(`  3️⃣  Check status: Monitor restore progress`);
-          console.log(`     • health               → View all accounts`);
-          console.log(`     • accounts             → List accounts & details\n`);
-
-        } catch (error) {
-          logBot(`Error restoring all sessions: ${error.message}`, 'error');
-          console.log(`  ❌ Error scanning sessions: ${error.message}\n`);
         }
+        logBot(`Restore complete: ${restored} loaded/active, ${failed} need attention.`, failed ? 'warn' : 'success');
       },
 
       // NEW: Phase 29c - Auto-relinking command callback

@@ -11,6 +11,7 @@
  * Database: In-memory MongoDB with 200 test records
  */
 
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -18,15 +19,30 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  assertApiAccessToken,
+  getApiCorsOptions,
+  requireApiPermission,
+  requireApiRole,
+  requireApiToken,
+} from './code/middleware/apiSecurity.js';
+import { validateApiRequest } from './code/middleware/apiRequestValidation.js';
+import { createApiMetrics } from './code/middleware/apiMetrics.js';
+import { apiLimiter } from './code/middleware/rateLimit.js';
+import CommunicationLog from './code/Database/CommunicationLogSchema.js';
 
 // Import routes and services
 import damacApiRoutes from './code/Routes/damacApiRoutes.js';
+import communicationRoutes from './code/Routes/communication.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const apiMetrics = createApiMetrics();
 const PORT = process.env.EXPRESS_SERVER_PORT || 5000;
+
+assertApiAccessToken();
 
 // Color codes for logging
 const colors = {
@@ -155,9 +171,10 @@ async function loadTestData() {
 }
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors(getApiCorsOptions()));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(apiMetrics.middleware);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -167,6 +184,25 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     mode: 'in-memory-testing'
   });
+});
+
+app.get('/ready', (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    ready,
+    database: ready ? 'connected' : 'unavailable',
+    mode: 'in-memory-testing',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/metrics', apiLimiter, requireApiToken, requireApiRole('admin'), async (req, res, next) => {
+  try {
+    const queueDepth = await CommunicationLog.countDocuments({ status: 'queued' });
+    res.json({ ...apiMetrics.snapshot(), queueDepth });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // API Info endpoint
@@ -186,7 +222,9 @@ app.get('/info', (req, res) => {
 });
 
 // Mount DAMAC API routes
+app.use('/api/v1/damac', apiLimiter, requireApiToken, requireApiPermission, validateApiRequest);
 app.use('/api/v1/damac', damacApiRoutes);
+app.use('/api/v1/damac/communication', communicationRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -200,9 +238,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(`${colors.yellow}[ERROR]${colors.reset} ${err.message}`);
+  console.error(`${colors.yellow}[ERROR]${colors.reset} ${err.name || 'Error'}`);
+  if (process.env.NODE_ENV === 'development') console.error(err.message);
   res.status(500).json({
-    error: err.message,
+    error: 'Internal server error',
     status: 'SERVER_ERROR',
     timestamp: new Date().toISOString()
   });

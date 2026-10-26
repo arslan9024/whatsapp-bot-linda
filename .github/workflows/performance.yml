@@ -5,7 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - 'tests/performance/**'
-      - 'src/**'
+      - 'code/**'
   pull_request:
     branches: [main, develop]
 
@@ -16,12 +16,12 @@ jobs:
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24.x'
           cache: 'npm'
       
       - name: Install Dependencies
@@ -65,17 +65,12 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
-            const performanceComment = `## ⚡ Performance Test Results
-            
-- Message parsing: **0.001ms average** ✅
-- Database queries: **0.34ms average** ✅
-- Command execution: **< 0.1ms average** ✅
-- 100 concurrent ops: **34ms total** ✅
-- No regressions detected ✅
+            const performanceComment = [
+              '## ⚡ Performance Test Results',
+              '',
+              'Results are available in the performance-results artifact.',
+            ].join('\n');
 
-All performance benchmarks within acceptable ranges.`;
-            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -90,12 +85,12 @@ All performance benchmarks within acceptable ranges.`;
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24.x'
           cache: 'npm'
       
       - name: Install Dependencies
@@ -126,12 +121,12 @@ All performance benchmarks within acceptable ranges.`;
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24.x'
           cache: 'npm'
       
       - name: Install Dependencies

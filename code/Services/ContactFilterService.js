@@ -1,6 +1,6 @@
 import contactLookupHandler from '../WhatsAppBot/ContactLookupHandler.js';
 import { ContactReference } from '../Database/schemas.js';
-import { Logger } from '../utils/logger.js';
+import { Logger } from '../utils/Logger.js';
 
 const logger = new Logger('ContactFilterService');
 

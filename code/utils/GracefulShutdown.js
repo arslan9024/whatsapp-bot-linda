@@ -40,6 +40,7 @@ export function createGracefulShutdown(deps) {
   const {
     logBot,
     sessionStateManager,
+    getSessionStateManager = () => sessionStateManager,
     accountHealthMonitor,
     connectionManagers,
     accountClients,
@@ -48,6 +49,8 @@ export function createGracefulShutdown(deps) {
     browserProcessMonitor,
     lockFileDetector,
     clearAccounts,
+    closeCampaigns,
+    stopSessionRecovery,
   } = deps;
 
   return async function gracefulShutdown(signal = 'UNKNOWN') {
@@ -67,6 +70,21 @@ export function createGracefulShutdown(deps) {
     forceExitTimer.unref();
 
     try {
+      stopSessionRecovery?.();
+      // Finish any in-flight campaign recipient before closing its client.
+      await closeCampaigns?.();
+      await Promise.all([...connectionManagers.values()].map(manager => manager.persistenceQueue));
+      const stateManager = getSessionStateManager();
+      if (stateManager) {
+        for (const [phoneNumber, state] of Object.entries(stateManager.state?.accounts || {})) {
+          const saved = await stateManager.saveDeviceMetadata(phoneNumber, {
+            ...state, isActive: false,
+            status: ['logged_out', 'auth_failed'].includes(state.status) ? state.status : 'offline',
+          });
+          if (!saved) logBot(`Could not persist shutdown state for ${phoneNumber}`, 'error');
+        }
+      }
+
       // 0. Stop Phase 8 auto-recovery systems
       logBot('Stopping auto-recovery systems...', 'info');
       if (sessionCleanupManager) sessionCleanupManager.stop();
@@ -80,26 +98,23 @@ export function createGracefulShutdown(deps) {
       }
 
       // 0B. Destroy connection managers
+      const closedClients = new Set();
       logBot(`Destroying connection managers for ${connectionManagers.size} account(s)`, 'info');
       for (const [phoneNumber, manager] of connectionManagers.entries()) {
         try {
           logBot(`  Cleaning up ${phoneNumber}...`, 'info');
           await manager.destroy();
+          closedClients.add(manager.client);
         } catch (_) {
           logBot(`  Warning: Error destroying manager for ${phoneNumber}`, 'warn');
         }
       }
       connectionManagers.clear();
 
-      // 1. Save all account states
-      logBot(`Saving states for ${allInitializedAccounts.length} account(s)`, 'info');
-      for (const [accountId, state] of Object.entries(sessionStateManager.getAllAccountStates())) {
-        await sessionStateManager.saveAccountState(accountId, { ...state, isActive: false });
-      }
-
       // 2. Close all WhatsApp connections
       logBot(`Closing ${allInitializedAccounts.length} WhatsApp connection(s)`, 'info');
       for (const [phoneNumber, client] of accountClients.entries()) {
+        if (closedClients.has(client)) continue;
         try {
           logBot(`  Disconnecting ${phoneNumber}...`, 'info');
           client.removeAllListeners();
@@ -109,10 +124,6 @@ export function createGracefulShutdown(deps) {
         }
       }
       accountClients.clear();
-
-      // 3. Write safe point file
-      logBot('Writing session checkpoint', 'info');
-      await sessionStateManager.writeSafePointFile();
 
       // 4. Database cleanup
       logBot('Closing database connections', 'info');

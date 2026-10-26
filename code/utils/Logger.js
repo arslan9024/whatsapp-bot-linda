@@ -40,6 +40,16 @@ function resolveMinLevel() {
   return LEVELS[env] ?? LEVELS.info;
 }
 
+function redactSensitiveData(value) {
+  return String(value)
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [REDACTED]')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email redacted]')
+    .replace(/(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)/g, (match) => {
+      const digits = match.replace(/\D/g, '');
+      return digits.length >= 8 ? `***${digits.slice(-4)}` : match;
+    });
+}
+
 // ─── file writer (shared across all Logger instances) ─────────────────
 let _currentLogPath = null;
 let _lastDate = null;
@@ -91,13 +101,14 @@ class Logger {
   _log(level, message) {
     if (level > resolveMinLevel()) return;
 
+    const safeMessage = redactSensitiveData(message);
     const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
     const icon = LEVEL_ICONS[level];
     const label = LEVEL_LABELS[level];
     const prefix = `[${ts}] ${icon} [${this.name}]`;
 
     // Console output
-    const consoleLine = `${prefix} ${message}`;
+    const consoleLine = `${prefix} ${safeMessage}`;
     if (level === 0) {
       console.error(consoleLine);
     } else {
@@ -105,7 +116,7 @@ class Logger {
     }
 
     // File output (plain text, no emoji artifacts from some terminals)
-    const fileLine = `[${ts}] [${label}] [${this.name}] ${message}`;
+    const fileLine = `[${ts}] [${label}] [${this.name}] ${safeMessage}`;
     writeToFile(fileLine);
   }
 

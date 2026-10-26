@@ -1,12 +1,13 @@
-import campaignService from './CampaignService.js';
+import { campaignService } from './CampaignService.js';
 import contactFilterService from './ContactFilterService.js';
-import campaignRateLimiter from './CampaignRateLimiter.js';
+import { campaignRateLimiter } from './CampaignRateLimiter.js';
 import campaignMessageDelayer from './CampaignMessageDelayer.js';
 import contactLookupHandler from '../WhatsAppBot/ContactLookupHandler.js';
 import { sendMessageWithReport } from '../Message/sendMessageWithReport.js';
 import { SelectingBotForCampaign } from '../WhatsAppBot/SelectingBotForCampaign.js';
-import { Logger } from '../utils/logger.js';
+import { Logger } from '../utils/Logger.js';
 import { v4 as uuidv4 } from 'uuid';
+import ContactConsentService from './ContactConsentService.js';
 
 const logger = new Logger('CampaignExecutor');
 
@@ -85,7 +86,7 @@ class CampaignExecutor {
       logger.info(`[${this.executionId}] Starting campaign execution: ${campaignId}`);
       
       // ========== STEP 1: Load campaign ==========
-      const campaignResult = await CampaignService.getCampaignById(campaignId);
+      const campaignResult = await campaignService.getCampaignById(campaignId);
       if (!campaignResult.success) {
         throw new Error(`Campaign not found: ${campaignId}`);
       }
@@ -96,7 +97,7 @@ class CampaignExecutor {
       this._log(`Campaign loaded: ${campaign.name}`);
       
       // ========== STEP 2: Get daily limit tracker ==========
-      const limitResult = await CampaignService.getOrCreateDailyLimit(campaignId, accountPhone);
+      const limitResult = await campaignService.getOrCreateDailyLimit(campaignId, accountPhone);
       if (!limitResult.success) {
         throw new Error('Failed to retrieve daily limit');
       }
@@ -139,8 +140,14 @@ class CampaignExecutor {
         const contact = contacts[i];
         
         try {
+          if (!(await ContactConsentService.hasConsent(contact.phone))) {
+            this.results.skippedCount++;
+            this._log(`Skipped a contact without recorded messaging consent.`);
+            continue;
+          }
+
           // Check campaign & account rate limits
-          const rateCheckResult = await CampaignRateLimiter.canSendMessage(
+          const rateCheckResult = await campaignRateLimiter.canSendMessage(
             campaignId,
             accountPhone,
             maxMessages
@@ -177,8 +184,21 @@ class CampaignExecutor {
             messageTemplate.text,
             { name: contactName, phone: contact.phone, date: new Date() }
           );
-          
-          this._log(`Sending to ${contactName} (${contact.phone})...`);
+
+          const reservation = await campaignService.reserveCampaignMessage(
+            campaignId,
+            contact.phone,
+            contactName,
+            message,
+            accountPhone
+          );
+          if (!reservation.success || reservation.duplicate) {
+            this.results.skippedCount++;
+            this._log('Skipped a message already reserved or processed.');
+            continue;
+          }
+
+          this._log(`Sending to recipient ${maskPhone(contact.phone)}...`);
           
           // Send message
           const sendResult = await sendMessageWithReport(
@@ -189,17 +209,10 @@ class CampaignExecutor {
           
           if (sendResult?.success) {
             this.results.successCount++;
+            await campaignService.completeReservedCampaignMessage(reservation.log.messageId);
+            campaignRateLimiter.recordOutcome(accountPhone, true);
             
-            // Record in campaign service
-            await CampaignService.recordMessageSent(
-              campaignId,
-              contact.phone,
-              contactName,
-              message,
-              accountPhone
-            );
-            
-            this._log(`✓ Sent to ${contactName}`);
+            this._log(`✓ Sent to recipient ${maskPhone(contact.phone)}`);
             
             // Record agent assignment
             if (!this.results.agentAssignments[agentIndex]) {
@@ -212,7 +225,9 @@ class CampaignExecutor {
             
             // Record as failed for retry
             const failureReason = sendResult?.error?.message || 'Unknown error';
-            await CampaignService.recordMessageFailed(
+            await campaignService.failReservedCampaignMessage(reservation.log.messageId, failureReason);
+            campaignRateLimiter.recordOutcome(accountPhone, false);
+            await campaignService.recordMessageFailed(
               campaignId,
               accountPhone,
               contact.phone,
@@ -221,7 +236,7 @@ class CampaignExecutor {
               failureReason
             );
             
-            this._log(`✗ Failed to send to ${contactName}: ${failureReason}`);
+            this._log(`✗ Failed to send to recipient ${maskPhone(contact.phone)}: ${failureReason}`);
             this._recordFailure(contact, failureReason);
             
             // Record failure
@@ -237,7 +252,8 @@ class CampaignExecutor {
           await CampaignMessageDelayer.wait(delay);
           
         } catch (error) {
-          logger.error(`Error sending to contact ${contact.phone}: ${error.message}`);
+          campaignRateLimiter.recordOutcome(accountPhone, false);
+          logger.error(`Error sending to contact ${maskPhone(contact.phone)}: ${error.message}`);
           this.results.failureCount++;
           this._recordFailure(contact, error.message);
         }
@@ -306,7 +322,7 @@ class CampaignExecutor {
    */
   _recordFailure(contact, reason) {
     this.results.failureReasons.push({
-      contact: contact.phone,
+      contact: maskPhone(contact.phone),
       contactName: contact.name,
       reason,
       timestamp: new Date()
@@ -351,6 +367,11 @@ class CampaignExecutor {
   getResults() {
     return this.results;
   }
+}
+
+function maskPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.length < 5 ? '[redacted]' : `***${digits.slice(-4)}`;
 }
 
 export default new CampaignExecutor();

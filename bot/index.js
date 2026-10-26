@@ -21,6 +21,3 @@ export async function createBot(configPath = null) {
   await integration.start();
   return integration;
 }
-
-// Export classes for direct usage
-export { CustomBotEngine, BotConnection, MessageHandler } from './CustomBotEngine.js';

@@ -40,6 +40,11 @@ const MESSAGE_TYPES = {
 /**
  * Conversation Analyzer Class
  */
+function maskPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length < 5 ? '[redacted]' : `***${digits.slice(-4)}`;
+}
+
 class ConversationAnalyzer {
   constructor() {
     this.messages = [];
@@ -86,19 +91,18 @@ class ConversationAnalyzer {
     });
 
     const chatType = msg.isGroupMsg ? '👥 GROUP' : '👤 DIRECT';
-    const sender = msg.from ? msg.from.replace('@c.us', '').replace('@g.us', '') : 'Unknown';
+    const sender = maskPhone(msg.from);
     
     // Extract message preview
     let preview = '';
     if (type === 'chat' || type === 'text') {
-      preview = msg.body ? msg.body.substring(0, 50) : '(empty)';
-      if (msg.body && msg.body.length > 50) preview += '...';
+      preview = msg.body ? '[message content redacted]' : '(empty)';
     } else if (type === 'image' || type === 'video') {
-      preview = `Caption: ${msg.caption || '(no caption)'}`.substring(0, 50);
+      preview = msg.caption ? '[caption redacted]' : '(no caption)';
     } else if (type === 'document') {
-      preview = `File: ${msg.filename || 'unknown'}`;
+      preview = msg.filename ? '[filename redacted]' : 'unknown';
     } else if (type === 'location') {
-      preview = `Location: (${msg.lat}, ${msg.lng})`;
+      preview = '[location redacted]';
     } else if (type === 'ptt' || type === 'audio') {
       preview = `Duration: ${msg.duration || 'unknown'}s`;
     } else {
@@ -147,12 +151,11 @@ class ConversationAnalyzer {
     });
 
     const chatType = msg.isGroupMsg ? '👥' : '👤';
-    const sender = msg.from ? msg.from.replace('@c.us', '').replace('@g.us', '') : 'Unknown';
+    const sender = maskPhone(msg.from);
     
     let preview = '';
     if (type === 'chat' || type === 'text') {
-      preview = msg.body ? msg.body.substring(0, 30) : '(empty)';
-      if (msg.body && msg.body.length > 30) preview += '...';
+      preview = msg.body ? '[message content redacted]' : '(empty)';
     } else {
       preview = '(media)';
     }

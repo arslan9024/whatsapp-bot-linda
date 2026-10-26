@@ -1,5 +1,13 @@
 # MASTER PLAN: WhatsApp-Bot-Linda Unified Roadmap
 
+## Current priority: master WhatsApp sessions (2026-10-26)
+
+Use [MASTER_ACCOUNT_SESSION_PLAN.md](MASTER_ACCOUNT_SESSION_PLAN.md) as the
+detailed acceptance plan for linking, local-only authentication storage,
+automatic recovery, terminal account management and read-only conversation
+analysis. Implementation and automated tests are not live authentication proof.
+All actual-account acceptance checks remain pending until observed.
+
 ## 1. Analytics & Google Sheets CRUD
 - Implement robust analytics and CRUD integration for Google Sheets (PowerAgent).
 - Map all columns, confirm schema design, and ensure normalized database structure.
@@ -21,7 +29,9 @@
   - Event-driven and polling-based recovery
   - Exponential backoff and retry logic
   - Session persistence and auto-restore
-  - Dashboard suppression until activation
+  - Truthful dashboard during startup, offline recovery and activation
+  - Local credentials only; explicit linking separated from saved-session recovery
+  - Atomic metadata persistence and duplicate-process protection
 
 ## 5. Testing & Quality Assurance
 - Expand and enforce test coverage (unit, integration, E2E).
@@ -36,12 +46,14 @@
 - 12-factor config, secrets management, hardened CI/CD, zero-downtime deploys, automated rollbacks.
 
 ## 8. Git Workflow
-- All changes staged, committed, and pushed with clear messages.
-- Only this master plan is active; all other plan/archived .md files are deleted.
+- Commit or push only when explicitly requested.
+- This master plan is the roadmap; linked feature plans hold detailed acceptance
+  criteria. Historical plans are retained, not silently deleted.
 
 ## 9. Feature Verification
-- All features verified and confirmed working.
-- WhatsApp primary account/session recovery is robust and reliable.
+- Track implemented, automatically tested, and live-verified separately.
+- Primary account/session recovery still requires the recorded live checks in
+  the detailed feature plan. Do not claim guaranteed restoration of revoked credentials.
 - Manual and automated review of logs, API, and dashboard.
 
 ## 10. Next Steps

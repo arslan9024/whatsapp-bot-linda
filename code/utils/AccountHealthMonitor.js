@@ -13,7 +13,7 @@
  * Status: Production Ready
  */
 
-import sessionStateManager from "../utils/SessionStateManager.js";
+import services from './ServiceRegistry.js';
 import DeviceRecoveryManager from "../utils/DeviceRecoveryManager.js";
 import fs from 'fs';
 import path from 'path';
@@ -282,7 +282,12 @@ class AccountHealthMonitor {
             console.log(`  ✅ Recovery successful - account reconnected`);
             accountData.status = "healthy";
             accountData.consecutiveFailures = 0;
-            await sessionStateManager.markRecoverySuccess(phoneNumber);
+            const stateManager = services.get('sessionStateManager');
+            if (!stateManager || !await stateManager.saveDeviceMetadata(phoneNumber, {
+              status: 'linked', isActive: true, deviceLinked: true,
+            })) {
+              throw new Error('Could not persist recovered session metadata.');
+            }
             return true;
           }
         } catch (error) {
@@ -530,15 +535,17 @@ class AccountHealthMonitor {
       accountData.consecutiveFailures = 0;
       
       // Save state
-      await sessionStateManager.saveAccountState(phoneNumber, {
+      const stateManager = services.get('sessionStateManager');
+      if (!stateManager) throw new Error('Session state manager is unavailable.');
+      const saved = await stateManager.saveDeviceMetadata(phoneNumber, {
         phoneNumber,
-        displayName: `${phoneNumber} (Relinking)`,
         deviceLinked: false,
         isActive: false,
-        sessionPath: `sessions/session-${phoneNumber}`,
+        status: 'offline',
         lastKnownState: "relinking",
         requiresQRCode: true
       });
+      if (!saved) throw new Error('Could not persist session relinking state.');
 
       console.log(`✅ Account reset. New QR code will be displayed on next bot restart.`);
       console.log(`\nTo complete re-linking:`);

@@ -15,6 +15,9 @@
 
 import readline from 'readline';
 import accountHealthMonitor from './AccountHealthMonitor.js';
+import TerminalNumberMenu from './TerminalNumberMenu.js';
+import services from './ServiceRegistry.js';
+import { SessionManager } from './SessionManager.js';
 
 class TerminalHealthDashboard {
   constructor() {
@@ -25,13 +28,107 @@ class TerminalHealthDashboard {
     this.autoRefreshInterval = null;
     this.autoRefreshDelay = 60000; // 60 seconds
     this.masterPhoneNumber = null; // Set by index.js
+    this.isSelectingLinkingMethod = false;
+    this.linkingPromptQueue = Promise.resolve();
+    this.numberMenu = new TerminalNumberMenu(this);
+    this.linkingChallenges = new Set();
+    this.lastDashboard = '';
+    this.lastCommand = '';
+    this.lastNotice = '';
+    this.dashboardRefreshTimer = null;
+    this.commandRunning = false;
   }
 
   /**
    * Set device manager reference
    */
   setDeviceManager(deviceManager) {
+    if (this.deviceManager && this.deviceStatusListener) {
+      for (const event of this.deviceEvents) this.deviceManager.removeListener(event, this.deviceStatusListener);
+    }
     this.deviceManager = deviceManager;
+    this.deviceEvents = ['device:status-changed', 'device:linking-started', 'device:reset', 'device:added'];
+    this.deviceStatusListener = () => this.requestDashboardRefresh();
+    for (const event of this.deviceEvents) deviceManager.on(event, this.deviceStatusListener);
+  }
+
+  /**
+   * Accounts whose device-linking flow is currently waiting for a pairing code.
+   */
+  getAccountsAwaitingPairingCode() {
+    return [...(this.connectionManagers?.entries() || [])]
+      .filter(([, manager]) => manager?.isAwaitingPairingCode?.())
+      .map(([phone]) => phone);
+  }
+
+  /**
+   * Handles pairing-code refresh input even while the linking command is still running.
+   * @returns {false|Promise<true>} false when the input should be handled normally.
+   */
+  handlePairingCodeInput(input, requestCode) {
+    const words = String(input).trim().toLowerCase().split(/\s+/);
+    const refresh = ['r', 'refresh', 'new-code'].includes(words[0]) && words.length === 1 ||
+      words.join(' ') === 'new code' || words[0] === 'code' && words.length <= 2;
+    if (!refresh) return false;
+    const waiting = this.getAccountsAwaitingPairingCode();
+    // Only intercept while a pairing-code link is waiting; otherwise input keeps its normal meaning.
+    if (!waiting.length) return false;
+    const requested = words[0] === 'code' ? words[1] : null;
+    const normalize = phone => String(phone).replace(/^\+/, '');
+    const phone = requested
+      ? waiting.find(entry => normalize(entry) === normalize(requested))
+      : waiting.length === 1 ? waiting[0] : null;
+    if (requested && !phone) return false;
+    return this.refreshPairingCode(phone, waiting, requestCode);
+  }
+
+  async refreshPairingCode(phone, waiting, requestCode) {
+    if (!phone) {
+      console.log(`Several accounts are linking. Use: code <phone> (${waiting.join(', ')})`);
+      return true;
+    }
+    if (this.refreshingPairingCode) {
+      console.log('A new pairing code is already being requested. Please wait.');
+      return true;
+    }
+    this.refreshingPairingCode = true;
+    console.log(`\nRequesting a new WhatsApp pairing code for ${phone}...`);
+    try {
+      await requestCode?.(phone);
+    } catch (error) {
+      console.log(`Could not refresh the pairing code: ${error.message}`);
+    } finally {
+      this.refreshingPairingCode = false;
+    }
+    return true;
+  }
+
+  setLinkingChallenge(phoneNumber, active) {
+    if (active) this.linkingChallenges.add(phoneNumber);
+    else this.linkingChallenges.delete(phoneNumber);
+  }
+
+  recordNotice(message, level = 'info') {
+    if (!this.isMonitoring || this.isSelectingLinkingMethod || this.linkingChallenges.size) return false;
+    if (message.trim() && ['error', 'warn', 'ready', 'success'].includes(level)) {
+      this.lastNotice = message.replace(/\s+/g, ' ').slice(0, 180);
+      this.requestDashboardRefresh();
+    }
+    return true;
+  }
+
+  requestDashboardRefresh() {
+    if (!this.isMonitoring || this.dashboardRefreshTimer) return;
+    this.dashboardRefreshTimer = setTimeout(() => {
+      this.dashboardRefreshTimer = null;
+      this.refreshDashboard();
+    }, 100);
+  }
+
+  refreshDashboard(force = false) {
+    if (!this.isMonitoring || this.commandRunning || this.isSelectingLinkingMethod ||
+        this.numberMenu.pending || this.linkingChallenges.size || this.isCampaignMenuActive?.()) return;
+    this.displayHealthDashboard(force);
   }
 
   /**
@@ -46,6 +143,11 @@ class TerminalHealthDashboard {
    */
   setMasterPhoneNumber(phoneNumber) {
     this.masterPhoneNumber = phoneNumber;
+  }
+
+  setConnectionSources(accountClients, connectionManagers) {
+    this.accountClients = accountClients;
+    this.connectionManagers = connectionManagers;
   }
 
   /**
@@ -112,85 +214,157 @@ class TerminalHealthDashboard {
     return this.rl;
   }
 
+  selectLinkingMethod(phoneNumber) {
+    return this.queuedChoice(
+      `\nLink ${phoneNumber}\n  [1] Pairing code (default)\n  [2] QR code\nChoose 1/code or 2/qr [1], or cancel: `,
+      { '': 'code', 1: 'code', code: 'code', 2: 'qr', qr: 'qr' },
+      'Invalid choice. Enter 1/code, 2/qr, or cancel.',
+      'Linking selection timed out. Run link master to try again.',
+      'Linking cancelled by user'
+    );
+  }
+
+  /**
+   * Ask how to activate a linked-but-offline master: reconnect keeps the
+   * existing linked device; relinking registers it again with code/QR.
+   */
+  selectMasterActivation(phoneNumber) {
+    return this.queuedChoice(
+      `\nMaster ${phoneNumber} is offline\n  [1] Reconnect saved linked session (default, no relink)\n` +
+        '  [2] Relink with pairing code\n  [3] Relink with QR code\nChoose 1/reconnect, 2/code or 3/qr [1], or cancel: ',
+      { '': 'reconnect', 1: 'reconnect', reconnect: 'reconnect', 2: 'code', code: 'code', 3: 'qr', qr: 'qr' },
+      'Invalid choice. Enter 1/reconnect, 2/code, 3/qr, or cancel.',
+      `Master activation prompt timed out. Use recover ${phoneNumber} or relink master ${phoneNumber}.`,
+      'Master activation cancelled by user'
+    );
+  }
+
+  queuedChoice(question, choices, invalidText, timeoutText, cancelText) {
+    const select = async () => {
+      const input = this.rl?.input || process.stdin;
+      if (this.rl?.closed || input.destroyed || input.readable === false) {
+        throw new Error('Terminal input is unavailable. Start linking with link-code or link-qr.');
+      }
+
+      const rl = this.initializeInput();
+      this.isSelectingLinkingMethod = true;
+      try {
+        while (true) {
+          const answer = await new Promise((resolve, reject) => {
+            const onClose = () => {
+              clearTimeout(timer);
+              reject(new Error('Linking selection cancelled: terminal closed'));
+            };
+            const timer = setTimeout(() => {
+              rl.removeListener('close', onClose);
+              controller.abort();
+              reject(new Error(timeoutText));
+            }, 120000);
+            const controller = new AbortController();
+            rl.once('close', onClose);
+            rl.question(
+              question,
+              { signal: controller.signal },
+              (input) => {
+                clearTimeout(timer);
+                rl.removeListener('close', onClose);
+                resolve(input.trim().toLowerCase());
+              }
+            );
+          });
+          if (Object.hasOwn(choices, answer)) {
+            return choices[answer];
+          }
+          if (answer === 'cancel') {
+            throw new Error(cancelText);
+          }
+          console.log(invalidText);
+        }
+      } finally {
+        this.isSelectingLinkingMethod = false;
+      }
+    };
+    const selection = this.linkingPromptQueue.then(select);
+    // A cancelled prompt must not block other accounts waiting for a choice.
+    this.linkingPromptQueue = selection.then(() => undefined, () => undefined);
+    return selection;
+  }
+
   /**
    * Display comprehensive health dashboard with device tracking
    */
-  displayHealthDashboard() {
-    const report = accountHealthMonitor.generateDetailedHealthReport();
-    const timestamp = new Date().toLocaleTimeString();
-    
-    console.log(`\n╔════════════════════════════════════════════════════════════╗`);
-    console.log(`║         📱 LINDA BOT - REAL-TIME DEVICE DASHBOARD         ║`);
-    console.log(`║              Last Updated: ${timestamp.padEnd(42)} ║`);
-    console.log(`╚════════════════════════════════════════════════════════════╝\n`);
-    
-    // Device Summary (if device manager available)
-    if (this.deviceManager) {
-      const deviceCount = this.deviceManager.getDeviceCount();
-      console.log(`📊 DEVICE SUMMARY`);
-      console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`  Total Devices: ${deviceCount.total} | Linked: ${deviceCount.linked} | Unlinked: ${deviceCount.unlinked} | Linking: ${deviceCount.linking}`);
-      console.log(`  System Uptime: ${report.systemStatus.uptime} | Server Status: 🟢 HEALTHY\n`);
-    }
-    
-    // Linked Devices
-    if (this.deviceManager) {
-      const linkedDevices = this.deviceManager.getLinkedDevices();
-      if (linkedDevices.length > 0) {
-        console.log(`🔗 LINKED DEVICES (${linkedDevices.length})`);
-        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        linkedDevices.forEach(device => {
-          const formatted = this.deviceManager.formatDeviceForDisplay(device.phoneNumber);
-          if (formatted) {
-            console.log(`  ${formatted.main}`);
-            formatted.details.forEach(detail => console.log(`  ${detail}`));
-          }
-        });
-        console.log();
+  displayHealthDashboard(force = false) {
+    const accounts = this.accountConfigManager?.getAllAccounts() || [];
+    const devices = this.deviceManager?.getAllDevices() || [];
+    const rows = new Map(accounts.map(account => [account.phoneNumber, account]));
+    for (const device of devices) rows.set(device.phoneNumber, { ...rows.get(device.phoneNumber), ...device });
+    const sessionState = services.get('sessionStateManager');
+    const lines = [];
+    let active = 0;
+    let saved = 0;
+    let linked = 0;
+    let deviceNumber = 0;
+    for (const [phone, device] of rows) {
+      const metadata = sessionState?.getDeviceMetadata(phone) || {};
+      const clientId = SessionManager.resolveClientId(phone, metadata, device);
+      const manager = this.connectionManagers?.get(phone);
+      const connected = this.accountClients?.has(phone) && manager?.state === 'CONNECTED';
+      const inProgress = manager && !manager.authRequired &&
+        (manager.isInitializing || manager.isReconnecting || manager.state === 'CONNECTING');
+      const authRequired = !connected && !inProgress && (manager?.authRequired ||
+        device.status === 'auth_required' || metadata.status === 'auth_required');
+      const loggedOut = !connected && !inProgress && (['logged_out', 'auth_failed'].includes(device.status) ||
+        ['logged_out', 'auth_failed'].includes(metadata.status));
+      const canRestore = !loggedOut && SessionManager.canRestoreSession(clientId);
+      const online = this.accountClients ? connected :
+        device.status === 'linked' && device.isOnline === true;
+      const previouslyLinked = Boolean(online || metadata.deviceLinked || metadata.linkedAt || device.linkedAt);
+      if (previouslyLinked && !loggedOut) linked++;
+      const status = loggedOut ? 'LOGGED OUT' : online ? 'ACTIVE' : authRequired ? 'AUTH REQUIRED' :
+        inProgress ? (manager.isReconnecting ? 'RECONNECTING' : 'CONNECTING') :
+        device.status === 'paused' || metadata.status === 'paused' ? 'PAUSED' :
+        device.status === 'restoring' || device.status === 'restore_failed' && manager?.reconnectTimer ? 'RECONNECTING' :
+          device.status === 'restore_failed' ? 'RESTORE FAILED' :
+        device.status === 'authenticated' ? 'AUTHENTICATED' :
+          manager?.state === 'CONNECTING' ? 'CONNECTING' :
+            device.status === 'linking' ? 'LINKING' :
+              ['ERROR', 'SUSPENDED'].includes(manager?.state) || device.status === 'error' ? 'ERROR' : 'OFFLINE';
+      if (online && !loggedOut) active++;
+      if (canRestore) saved++;
+      const master = phone === (this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber);
+      const link = loggedOut ? 'NOT LINKED (logged out)' : previouslyLinked ? 'LINKED' :
+        status === 'LINKING' ? 'LINKING' : 'NOT LINKED';
+      lines.push(`${++deviceNumber}. ${device.displayName || device.name || phone}${master ? ' [MASTER]' : ''} | ${phone} | Link: ${link} | Connection: ${status} | session: ${canRestore ? `saved (${clientId})` : online ? 'active; save pending' : 'relink needed'}`);
+      if (previouslyLinked && !online && !loggedOut && !inProgress) {
+        lines.push(`   Linked device; currently offline. ${
+          !canRestore ? `No saved WhatsApp login on this computer; relink needed: relink ${master ? 'master' : 'servant'} ${phone}` :
+            authRequired ? `WhatsApp Web asked to verify this session. Reactivate first: recover ${phone} | relink only if it fails: relink ${master ? 'master' : 'servant'} ${phone}` :
+              `Reactivate (no relink): recover ${phone}`}`);
+      } else if (loggedOut) {
+        lines.push(`   Device was removed or logged out. Relink: relink ${master ? 'master' : 'servant'} ${phone}`);
+      }
+      const lastError = manager?.connectionFailureReason || device.lastError || metadata.lastError;
+      if (!online && !inProgress && lastError) {
+        lines.push(`   Connection error: ${String(lastError).replace(/\s+/g, ' ').slice(0, 240)}`);
       }
     }
-    
-    // Unlinked Devices
-    if (this.deviceManager) {
-      const unlinkedDevices = this.deviceManager.getUnlinkedDevices();
-      if (unlinkedDevices.length > 0) {
-        console.log(`🔴 UNLINKED DEVICES (${unlinkedDevices.length})`);
-        console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        unlinkedDevices.forEach(device => {
-          const formatted = this.deviceManager.formatDeviceForDisplay(device.phoneNumber);
-          if (formatted) {
-            console.log(`  ${formatted.main}`);
-            formatted.details.forEach(detail => console.log(`  ${detail}`));
-          }
-        });
-        console.log();
-      }
+    const screen = [
+      'LINDA | DEVICE DASHBOARD',
+      `Devices: ${rows.size} | Linked: ${linked} | Active (online): ${active} | Offline: ${rows.size - active} | Saved sessions: ${saved}`,
+      'Linked = registered on the phone (last known). Active = connected now. Reactivating an offline linked device does not need relinking.',
+      ...lines,
+      this.lastCommand ? `Last command: ${this.lastCommand}` : '',
+      this.lastNotice ? `Notice: ${this.lastNotice}` : '',
+      'link-code | link-qr | recover <phone> | restore-sessions | campaigns | menu | help',
+    ].filter(Boolean).join('\n');
+    if (!force && screen === this.lastDashboard) return;
+    this.lastDashboard = screen;
+    // Replace the terminal viewport, never the scrollback or redirected output.
+    if (process.stdout.isTTY) {
+      readline.cursorTo(process.stdout, 0, 0);
+      readline.clearScreenDown(process.stdout);
     }
-    
-    // System Status
-    console.log(`🤖 SYSTEM STATUS`);
-    console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`  Uptime: ${report.systemStatus.uptime} | Health Checks: ${report.systemStatus.totalChecks}`);
-    console.log(`  Recovery Success Rate: ${report.systemStatus.recoverySuccess}\n`);
-    
-    // Available Commands
-    console.log(`⚙️  AVAILABLE COMMANDS (Phase 26 - Unified Account Management)`);
-    console.log(`  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`  ACCOUNT MANAGEMENT:`);
-    console.log(`    'link master'               → Link first master account`);
-    console.log(`    'link master <+p> [name]'  → Add additional master account`);
-    console.log(`    'accounts'                  → List all accounts with status`);
-    console.log(`\n  HEALTH & MONITORING (NEW):`);
-    console.log(`    'health <+phone>'           → Detailed health for account`);
-    console.log(`    'stats <+phone>'            → Metrics (uptime, activity)`);
-    console.log(`    'recover <+phone>'          → Attempt session restore`);
-    console.log(`\n  DEVICE MANAGEMENT:`);
-    console.log(`    'status' / 'health'         → Show this dashboard`);
-    console.log(`    'relink master [<+phone>]'  → Re-link master account`);
-    console.log(`    'relink servant <+phone>'   → Re-link servant account`);
-    console.log(`    'device <+phone>'           → Show device details`);
-    console.log(`    'list'                      → List all devices`);
-    console.log(`\n  For full list, type 'help'\n`);
+    console.log(`\n${screen}\n`);
   }
 
   /**
@@ -430,6 +604,13 @@ class TerminalHealthDashboard {
       onShowDeviceDetails,
       onListDevices,
       onRestoreAllSessions,  // NEW: Restore all previous sessions (Phase 28)
+      onRestoreAccount,
+      onDisconnectAccount,
+      onListChats,
+      onAnalyzeChat,
+      onCampaigns,
+      onCampaignInput,
+      isCampaignMenuActive,
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
       onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
       onAnalyticsReportRequested,  // NEW: Analytics reporting (Phase 29e)
@@ -440,27 +621,59 @@ class TerminalHealthDashboard {
       onGoogleSheetsSearch,  // NEW: Google Sheets search (Phase 30)
       onGoogleSheetsMetadata,  // NEW: Google Sheets metadata (Phase 30)
     } = callbacks;
-
-    console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🤖 LINDA BOT - INTERACTIVE DEVICE MANAGER STARTED`);
-    console.log(`${'═'.repeat(60)}`);
-    console.log(`Type a command or press Enter to refresh. Type 'help' for commands.`);
-    console.log(`${'═'.repeat(60)}\n`);
+    this.isCampaignMenuActive = isCampaignMenuActive;
 
     // Start auto-refresh
     this.startAutoRefresh(() => {
-      console.clear();
-      this.displayHealthDashboard();
-      if (this.isMonitoring) {
-        this.rl.prompt();
-      }
+      this.refreshDashboard();
     });
 
     this.rl.on('line', async (input) => {
-      const input_lower = input.trim().toLowerCase();
+      if (this.isSelectingLinkingMethod) {
+        return;
+      }
+      const pairingRefresh = this.handlePairingCodeInput(input, onSwitchTo6Digit);
+      if (pairingRefresh) {
+        await pairingRefresh;
+        return;
+      }
+      if (this.commandRunning) {
+        console.log('A command is still running. Wait for it to finish.');
+        return;
+      }
+      if (this.isCampaignMenuActive?.()) {
+        this.commandRunning = true;
+        try {
+          await onCampaignInput(input);
+        } catch (error) {
+          console.error(`Campaign command failed: ${error.message}`);
+        } finally {
+          this.commandRunning = false;
+          if (!this.isCampaignMenuActive()) this.refreshDashboard(true);
+          this.rl.prompt();
+        }
+        return;
+      }
+      try {
+        const selection = this.numberMenu.handleInput(input);
+        if (selection.command) {
+          input = selection.command;
+        } else if (selection.handled) {
+          if (this.isMonitoring) {
+            this.rl.prompt();
+          }
+          return;
+        }
+      } catch (error) {
+        console.error(`Numbered menu failed: ${error.message}`);
+        return;
+      }
       const input_original = input.trim();
-      const parts = input_lower.split(/\s+/);
-      const command = parts[0];
+      const parts = input_original.split(/\s+/);
+      const command = parts[0].toLowerCase();
+      if (['link', 'relink', 'link-method', 'goraha', 'analytics', 'metrics', 'google', 'sheets'].includes(command) && parts[1]) {
+        parts[1] = parts[1].toLowerCase();
+      }
 
       // Helper function to extract display name with quoted string support
       const extractDisplayName = (originalInput, phoneNumber) => {
@@ -480,7 +693,35 @@ class TerminalHealthDashboard {
         return afterPhone;
       };
 
+      if (this.commandRunning) {
+        console.log('A command is still running. Wait for it to finish.');
+        return;
+      }
+      this.commandRunning = true;
+      this.lastCommand = input_original;
+      try {
       switch (command) {
+        case 'campaigns':
+          if (!onCampaigns) throw new Error('Terminal campaigns are unavailable.');
+          await onCampaigns();
+          break;
+        case 'link-code':
+        case 'link-qr':
+          if (parts.length !== 1) {
+            console.error('Use link-code or link-qr without arguments to link the configured master.');
+            break;
+          }
+          if (!onLinkMaster) {
+            console.error('Master linking handler is not available.');
+            break;
+          }
+          await onLinkMaster(command === 'link-code' ? 'code' : 'qr');
+          break;
+
+        case 'link-method':
+          console.log('Linking preferences are no longer saved. Use link-code or link-qr to start linking directly.');
+          break;
+
         // NEW: Link master account with health check (Phase 21 & enhanced Phase 25)
         case 'link':
           if (parts[1] === 'master') {
@@ -509,10 +750,8 @@ class TerminalHealthDashboard {
           }
           break;
 
-        case 'health':
         case 'status':
-          console.clear();
-          this.displayHealthDashboard();
+          this.displayHealthDashboard(true);
           break;
 
         case 'relink':
@@ -574,13 +813,32 @@ class TerminalHealthDashboard {
         case 'code':
           if (parts[1]) {
             const phoneNumber = parts[1];
-            console.log(`\n⏳ Switching to 6-digit auth for ${phoneNumber}...`);
+            console.log(`\nRequesting WhatsApp pairing code for ${phoneNumber}...`);
             if (onSwitchTo6Digit) {
               await onSwitchTo6Digit(phoneNumber);
             }
           } else {
             console.log(`\n⚠️  Usage: 'code <phone>'\n`);
           }
+          break;
+
+        case 'disconnect':
+          if (!parts[1] || parts.length !== 2) throw new Error('Usage: disconnect <phone> (keeps the local session)');
+          if (!onDisconnectAccount) throw new Error('Local disconnect is unavailable');
+          await onDisconnectAccount(parts[1]);
+          this.lastNotice = 'Disconnected locally; saved session retained. Recover explicitly or restart to reconnect.';
+          break;
+
+        case 'chats':
+          if (!onListChats) throw new Error('Local conversation inspection is unavailable');
+          if (parts.length > 3) throw new Error('Usage: chats [phone] [page]');
+          await onListChats(parts[1], parts[2]);
+          break;
+
+        case 'analyze':
+          if (!onAnalyzeChat) throw new Error('Local conversation analysis is unavailable');
+          if (parts.length < 3 || parts.length > 4) throw new Error('Usage: analyze <phone> <chat-number> [message-limit]');
+          await onAnalyzeChat(parts[1], parts[2], parts[3]);
           break;
 
         case 'device':
@@ -714,8 +972,7 @@ class TerminalHealthDashboard {
               console.log(`  ⚠️  Device manager not available\n`);
             }
           } else {
-            console.log(`\n⚠️  Usage: 'health <+phone-number>'`);
-            console.log(`  Example: 'health +971505760056'\n`);
+            this.displayHealthDashboard(true);
           }
           break;
 
@@ -799,30 +1056,10 @@ class TerminalHealthDashboard {
             console.log(`\n⏳ Attempting session restoration for ${phoneNumber}...`);
             
             try {
-              if (this.deviceManager) {
-                const device = this.deviceManager.getDevice(phoneNumber);
-                if (!device) {
-                  console.log(`  ❌ Account not found: ${phoneNumber}\n`);
-                  break;
-                }
-
-                // Import SessionManager to check session
-                const { SessionManager } = await import('./SessionManager.js');
-                const canRestore = SessionManager.canRestoreSession(phoneNumber);
-
-                if (canRestore) {
-                  console.log(`  ✅ Valid session found!`);
-                  console.log(`  💡 Session restored automatically on next link.\n`);
-                  this.deviceManager.markDeviceLinked(phoneNumber, {
-                    authMethod: 'restore',
-                    linkedAt: new Date().toISOString()
-                  });
-                } else {
-                  console.log(`  ❌ No valid session found.`);
-                  console.log(`  💡 Use 'relink <phone>' to link with QR code.\n`);
-                }
-              }
+              if (!onRestoreAccount) throw new Error('Session restore handler is unavailable');
+              await onRestoreAccount(phoneNumber);
             } catch (error) {
+              this.lastNotice = `Restore failed: ${error.message}`;
               console.log(`  ❌ Error during recovery: ${error.message}\n`);
             }
           } else {
@@ -1105,6 +1342,7 @@ class TerminalHealthDashboard {
           break;
 
         case 'help':
+          console.log('Numbered menu: menu | 0 = back | 00 = home | dotted code = direct selection');
           console.log(`\n📚 Available Commands:`);
           console.log(`\n  ACCOUNT MANAGEMENT:`);
           console.log(`    link master               → Link first master WhatsApp account (with health check)`);
@@ -1137,8 +1375,13 @@ class TerminalHealthDashboard {
           console.log(`    relink master [+phone]    → Re-link master account (optional: specify phone)`);
           console.log(`    relink servant [+phone]   → Re-link servant account`);
           console.log(`    relink <phone>            → Re-link specific device`);
-          console.log(`    code <phone>              → Switch to 6-digit authentication`);
+          console.log(`    code <phone>              → Request WhatsApp pairing code`);
+          console.log('    link-code                 → Link master with a pairing code (this attempt only)');
+          console.log('    link-qr                   → Link master with a QR code (this attempt only)');
           console.log(`    device <phone>            → Show detailed device information`);
+          console.log('    disconnect <phone>        → Close locally; keep the saved session');
+          console.log('    chats [phone] [page]      → List available chats; no message history read');
+          console.log('    analyze <phone> <n> [max] → Locally analyze selected chat (1-500 messages)');
           console.log(`    list                      → List all devices`);
           console.log(`    masters                   → Show all master accounts`);
           console.log(`    servants                  → Show all servant accounts`);
@@ -1152,6 +1395,7 @@ class TerminalHealthDashboard {
           console.log(`\n👋 Exiting device manager...\n`);
           this.isMonitoring = false;
           this.stopAutoRefresh();
+          clearTimeout(this.dashboardRefreshTimer);
           if (this.rl) {
             this.rl.close();
             this.rl = null;
@@ -1160,8 +1404,7 @@ class TerminalHealthDashboard {
 
         case '':
           // Empty input - refresh display
-          console.clear();
-          this.displayHealthDashboard();
+          this.displayHealthDashboard(true);
           break;
 
         default:
@@ -1169,8 +1412,14 @@ class TerminalHealthDashboard {
             console.log(`\n❓ Unknown command: '${command}'. Type 'help' for available commands.\n`);
           }
       }
-
-      if (this.isMonitoring) {
+      } catch (error) {
+        this.lastNotice = error.message;
+        console.error(`Command failed: ${error.message}`);
+      } finally {
+        this.commandRunning = false;
+        if (!['help', 'menu', 'campaigns'].includes(command)) this.refreshDashboard();
+      }
+      if (this.isMonitoring && !this.isSelectingLinkingMethod) {
         this.rl.prompt();
       }
     });
@@ -1178,10 +1427,12 @@ class TerminalHealthDashboard {
     this.rl.on('close', () => {
       this.isMonitoring = false;
       this.stopAutoRefresh();
+      clearTimeout(this.dashboardRefreshTimer);
     });
 
     // Initial display
     this.displayHealthDashboard();
+    console.log('Type menu for numbered actions (2.1 = link-code, 2.2 = link-qr).');
     this.rl.prompt();
   }
 

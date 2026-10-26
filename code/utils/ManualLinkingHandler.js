@@ -15,7 +15,8 @@
 
 import { CreatingNewWhatsAppClient } from '../WhatsAppBot/CreatingNewWhatsAppClient.js';
 import { setupClientFlow } from '../WhatsAppBot/ClientFlowSetup.js';
-import { killBrowserProcesses, sleep } from './browserCleanup.js';
+import { SessionManager } from './SessionManager.js';
+import { getSessionRecovery } from './SessionRecoveryService.js';
 
 export class ManualLinkingHandler {
   constructor({
@@ -146,61 +147,24 @@ export class ManualLinkingHandler {
    * Cleanup existing browser processes and clients before linking
    */
   async cleanupExistingConnections(phoneNumber) {
-    try {
-      this.logBot(`\n🧹 Cleaning up existing connections for ${phoneNumber}...`, "info");
-      
-      // Step 1: Close existing client if it exists
-      const existingClient = this.accountClients.get(phoneNumber);
-      if (existingClient && existingClient.pupPage) {
-        try {
-          this.logBot(`  - Closing existing WhatsApp client...`, "info");
-          await existingClient.destroy();
-          this.accountClients.delete(phoneNumber);
-          await sleep(1000); // Wait for process to fully die
-          this.logBot(`  ✅ Existing client closed`, "info");
-        } catch (e) {
-          this.logBot(`  ⚠️  Could not close client gracefully: ${e.message}`, "warn");
-        }
-      }
-      
-      // Step 2: Close connection manager if it exists
-      const connManager = this.connectionManagers.get(phoneNumber);
-      if (connManager) {
-        try {
-          this.logBot(`  - Closing connection manager...`, "info");
-          if (connManager.terminateConnection) {
-            await connManager.terminateConnection();
-          }
-          this.connectionManagers.delete(phoneNumber);
-          this.logBot(`  ✅ Connection manager closed`, "info");
-        } catch (e) {
-          this.logBot(`  ⚠️  Could not close connection manager: ${e.message}`, "warn");
-        }
-      }
-      
-      // Step 3: Kill all browser processes
-      try {
-        this.logBot(`  - Killing browser processes...`, "info");
-        await killBrowserProcesses();
-        await sleep(2000); // Give time for process termination
-        this.logBot(`  ✅ Browser processes killed`, "info");
-      } catch (e) {
-        this.logBot(`  ⚠️  Browser cleanup warning: ${e.message}`, "warn");
-      }
-      
-      this.logBot(`✅ Cleanup complete\n`, "success");
-      return true;
-      
-    } catch (error) {
-      this.logBot(`⚠️  Cleanup error: ${error.message}`, "warn");
-      return true; // Continue despite cleanup issues
-    }
+    const recovery = getSessionRecovery({
+      getFlowDeps: this.getFlowDeps, setupClientFlow,
+      createClient: CreatingNewWhatsAppClient, accountClients: this.accountClients,
+      accountConfigManager: this.accountConfigManager,
+    });
+    await recovery.stopAccount(phoneNumber);
+    this.connectionManagers.delete(phoneNumber);
+    return true;
   }
 
   /**
    * Initiate master account linking with full flow
    */
-  async initiateMasterAccountLinking() {
+  async initiateMasterAccountLinking(linkingMethod) {
+    if (linkingMethod !== undefined && !['code', 'qr'].includes(linkingMethod)) {
+      this.logBot('Invalid linking method. Use code or qr.', 'error');
+      return false;
+    }
     if (this.isLinking) {
       this.logBot("⚠️  Linking already in progress. Please wait...", "warn");
       return false;
@@ -219,7 +183,10 @@ export class ManualLinkingHandler {
 
       // Step 2: Get master account
       const masterPhone = this.accountConfigManager?.getMasterPhoneNumber();
-      const masterConfig = this.bootstrapManager.getAccountConfigs()[0]; // Primary account
+      const configs = this.bootstrapManager.getAccountConfigs();
+      const masterConfig = masterPhone
+        ? configs.find(config => config.phoneNumber === masterPhone)
+        : configs.find(config => config.role === 'primary') || configs[0];
 
       if (!masterConfig) {
         this.logBot("❌ No master account configured!", "error");
@@ -236,11 +203,23 @@ export class ManualLinkingHandler {
       this.logBot(`Role: ${masterConfig.role || 'primary'}`, "info");
 
       // Step 3: Cleanup existing connections
+      const currentClient = this.accountClients.get(masterConfig.phoneNumber);
+      if (currentClient && await currentClient.getState() === 'CONNECTED') {
+        this.logBot('Master is already active; keeping the current session.', 'success');
+        this.terminalHealthDashboard.requestDashboardRefresh?.();
+        this.isLinking = false;
+        return true;
+      }
       await this.cleanupExistingConnections(masterConfig.phoneNumber);
 
       // Step 4: Create WhatsApp client
       this.logBot("📱 Creating WhatsApp client...", "info");
-      const client = await CreatingNewWhatsAppClient(masterConfig.id);
+      const clientId = SessionManager.resolveClientId(
+        masterConfig.phoneNumber,
+        this.sessionStateManager.getDeviceMetadata(masterConfig.phoneNumber) || {},
+        masterConfig,
+      );
+      const client = await CreatingNewWhatsAppClient(clientId);
       
       if (!client) {
         this.logBot("❌ Failed to create WhatsApp client", "error");
@@ -270,32 +249,40 @@ export class ManualLinkingHandler {
         this.terminalHealthDashboard.setMasterPhoneNumber(masterConfig.phoneNumber);
       }
 
-      // Step 8: Setup client flow (shows QR code and waits for scan)
+      // Step 8: Setup client flow and choose a linking method.
       this.logBot("\n🎯 Starting device linking flow...", "info");
-      this.logBot("📸 QR code will appear below - scan with WhatsApp on your phone", "info");
-      this.logBot("⏱️  QR code expires in 15 seconds if not scanned", "info");
+      this.logBot(linkingMethod
+        ? `Using ${linkingMethod} for this linking attempt only.`
+        : "Choose pairing code (default) or QR code in the terminal.", "info");
       this.logBot("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", "info");
 
       this.createDeviceStatusFile(masterConfig.phoneNumber);
 
       const flowDependencies = this.getFlowDeps();
-      await setupClientFlow(
+      const flow = setupClientFlow(
         client,
         masterConfig.phoneNumber,
-        masterConfig.id,
+        clientId,
         { 
           isRestore: false, 
           displayName: masterConfig.displayName,
+          linkingMethod,
           manualLinking: true 
         },
         flowDependencies
       );
+      const initialized = await flow.initializationPromise;
+      if (!initialized) {
+        this.logBot("Master account linking did not initialize. Run 'link master' to retry.", "error");
+        this.isLinking = false;
+        return false;
+      }
 
       // Save that we initiated linking
       await this.bootstrapManager.recordInitialization(masterConfig.id, true);
 
       this.logBot("\n✅ Linking flow initiated successfully", "success");
-      this.logBot("⏳ Waiting for QR code scan... (you have 60 seconds)", "info");
+      this.logBot("Complete linking on your phone using the selected method.", "info");
 
       this.isLinking = false;
       return true;
@@ -314,13 +301,8 @@ export class ManualLinkingHandler {
    */
   isAccountLinked(phoneNumber) {
     const client = this.accountClients.get(phoneNumber);
-    if (!client) return false;
-    
-    try {
-      return client.info?.conn?.isOnline() === true;
-    } catch (e) {
-      return false;
-    }
+    const manager = this.connectionManagers.get(phoneNumber);
+    return Boolean(client && manager?.client === client && manager.state === 'CONNECTED');
   }
 
   /**

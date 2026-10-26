@@ -1,11 +1,8 @@
 /**
  * SessionCleanupManager.js
  * ========================
- * Auto-cleanup utility for abandoned WhatsApp session folders.
- * Removes old/stale session folders to prevent browser lock conflicts.
- * 
- * Production: Scans every 90 seconds, removes sessions inactive for 30+ min
- * or older than 24 hours. Also cleans stale .lock files (10+ min old).
+ * Cleans abandoned temporary folders under the sessions directory.
+ * Persistent LocalAuth session-* profiles and their locks are never aged out.
  * 
  * @since Phase 8 - Browser Lock Auto-Recovery (February 14, 2026)
  */
@@ -76,6 +73,8 @@ class SessionCleanupManager {
 
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
+        // LocalAuth profiles remain reusable regardless of the root folder's mtime.
+        if (entry.name.startsWith('session-')) continue;
         totalScanned++;
 
         const folderPath = path.join(this.sessionDir, entry.name);

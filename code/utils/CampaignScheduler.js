@@ -1,8 +1,8 @@
 import cron from 'node-cron';
-import campaignService from '../Services/CampaignService.js';
-import campaignRateLimiter from '../Services/CampaignRateLimiter.js';
+import { campaignService } from '../Services/CampaignService.js';
+import { campaignRateLimiter } from '../Services/CampaignRateLimiter.js';
 import campaignExecutor from '../Services/CampaignExecutor.js';
-import { Logger } from './logger.js';
+import { Logger } from './Logger.js';
 
 const logger = new Logger('CampaignScheduler');
 

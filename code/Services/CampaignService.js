@@ -1,6 +1,6 @@
 import { Campaign, DailyLimit, CampaignMessageLog } from '../Database/CampaignSchema.js';
 import { v4 as uuidv4 } from 'uuid';
-import { Logger } from '../utils/logger.js';
+import { Logger } from '../utils/Logger.js';
 
 const logger = new Logger('CampaignService');
 
@@ -13,6 +13,17 @@ const logger = new Logger('CampaignService');
  * - Campaign statistics
  */
 class CampaignService {
+  _idempotencyIndexPromise = null;
+
+  async _ensureIdempotencyIndex() {
+    if (!this._idempotencyIndexPromise) {
+      this._idempotencyIndexPromise = CampaignMessageLog.collection.createIndex(
+        { idempotencyKey: 1 },
+        { unique: true, sparse: true }
+      );
+    }
+    return this._idempotencyIndexPromise;
+  }
   
   /**
    * Create a new campaign
@@ -256,6 +267,65 @@ class CampaignService {
       return { success: false, error: error.message };
     }
   }
+
+  async reserveCampaignMessage(campaignId, contactPhone, contactName, messageText, accountPhone, messagePart = '') {
+    await this._ensureIdempotencyIndex();
+    const utcDay = new Date().toISOString().slice(0, 10);
+    const idempotencyKey = `${campaignId}:${utcDay}:${String(contactPhone).replace(/\D/g, '')}${messagePart ? `:${messagePart}` : ''}`;
+    const existing = await CampaignMessageLog.findOne({ idempotencyKey });
+    if (existing) return { success: true, duplicate: true, log: existing };
+
+    const log = new CampaignMessageLog({
+      messageId: uuidv4(),
+      idempotencyKey,
+      campaignId,
+      contactPhone,
+      contactName,
+      messageText,
+      agentPhone: accountPhone,
+      status: 'queued',
+      queuedAt: new Date()
+    });
+
+    try {
+      await log.save();
+      return { success: true, duplicate: false, log };
+    } catch (error) {
+      if (error.code === 11000) {
+        const duplicate = await CampaignMessageLog.findOne({ idempotencyKey });
+        if (duplicate) return { success: true, duplicate: true, log: duplicate };
+      }
+      throw error;
+    }
+  }
+
+  async completeReservedCampaignMessage(messageId) {
+    const log = await CampaignMessageLog.findOneAndUpdate(
+      { messageId, status: 'queued' },
+      { $set: { status: 'sent', sentAt: new Date() } },
+      { new: true }
+    );
+    if (!log) return { success: false, error: 'Message reservation is not pending.' };
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    await Promise.all([
+      Campaign.updateOne({ campaignId: log.campaignId }, { $inc: { 'stats.sentCount': 1 }, updatedAt: new Date() }),
+      DailyLimit.updateOne(
+        { campaignId: log.campaignId, accountNumber: log.agentPhone, date: today },
+        { $inc: { sentCount: 1 }, $set: { updatedAt: new Date() } },
+        { upsert: true }
+      )
+    ]);
+    return { success: true, log };
+  }
+
+  async failReservedCampaignMessage(messageId, reason) {
+    return CampaignMessageLog.updateOne(
+      { messageId, status: 'queued' },
+      { $set: { status: 'failed', failedAt: new Date(), errorReason: reason } }
+    );
+  }
   
   /**
    * Record a message as failed for retry
@@ -455,4 +525,5 @@ class CampaignService {
   }
 }
 
+export const campaignService = new CampaignService();
 export default CampaignService;

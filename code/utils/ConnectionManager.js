@@ -23,9 +23,6 @@
  * @since Phase 14 - February 15, 2026 (error categorization, enhanced QR, active health)
  */
 
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
 import { categorizeError, QRAutoRegenerator, ActiveHealthChecker } from './ConnectionEnhancements.js';
 
 export default class ConnectionManager {
@@ -53,12 +50,15 @@ export default class ConnectionManager {
     this.phoneNumber = phoneNumber;
     this.client = client;
     this.log = logFunc;
-    this.botId = botId || phoneNumber;
+    this.botId = client.authStrategy?.clientId || botId || phoneNumber;
     this._ctx = ctx; // Shared context — read at call-time so late-init services work
 
     // State management
     this.state = 'IDLE'; // IDLE, CONNECTING, CONNECTED, DISCONNECTED, ERROR, SUSPENDED
     this.isInitializing = false;
+    this.isReconnecting = false;
+    this.isDestroyed = false;
+    this.initializationPending = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
 
@@ -155,6 +155,11 @@ export default class ConnectionManager {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async initialize() {
+    if (this.isDestroyed) return false;
+    if (this.authRequired) {
+      this.log(`[${this.phoneNumber}] Authentication is required. Choose an explicit link command.`, 'warn');
+      return false;
+    }
     if (this.isInitializing || this.state === 'CONNECTING') {
       this.log(`[${this.phoneNumber}] Initialize already in progress`, 'warn');
       return false;
@@ -171,85 +176,65 @@ export default class ConnectionManager {
     this.isInitializing = true;
     this.setState('CONNECTING');
 
-    // PAGE INJECTION FIX: Retry logic for page injection timeout errors
-    const maxPageInjectionRetries = 5;
-    let pageInjectionAttempt = 0;
-
-    const attemptInitialize = async () => {
-      try {
-        this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
-        pageInjectionAttempt++;
-        
-        // Wrap in timeout to catch hung initialization
-        const initPromise = this.client.initialize();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Client initialization timeout after 45 seconds')), 45000)
-        );
-        
-        // Race the init against timeout
-        await Promise.race([initPromise, timeoutPromise]);
-        
-        this.reconnectAttempts = 0;
-        return true;
-      } catch (error) {
-        const msg = error?.message || String(error);
-        const isPageInjectionError = msg.includes('addScriptToEvaluateOnNewDocument') ||
-                                     msg.includes('Requesting main frame') ||
-                                     msg.includes('Session closed');
-        
-        // PROTOCOL ERROR HANDLING: Log detailed protocol errors for diagnosis
-        if (msg.includes('Target closed') || msg.includes('Protocol error') || msg.includes('PROTOCOL')) {
-          console.error(`[PROTOCOL_ERROR_DEBUG] Full error: ${JSON.stringify({
-            message: error?.message,
-            code: error?.code,
-            stack: error?.stack?.substring(0, 500)
-          })}`);
-        }
-
-        // Retry only for page injection errors
-        if (isPageInjectionError && pageInjectionAttempt < maxPageInjectionRetries) {
-          const backoffDelay = Math.min(1000 * Math.pow(2, pageInjectionAttempt - 1), 8000);
-          this.log(
-            `[${this.phoneNumber}] 🔧 Page Injection Retry ${pageInjectionAttempt}/${maxPageInjectionRetries - 1}: ${msg.substring(0, 60)}...`,
-            'warn'
-          );
-          this.log(
-            `[${this.phoneNumber}] ⏳ Waiting ${backoffDelay}ms before retry...`,
-            'info'
-          );
-          
-          // Wait with exponential backoff, then retry
-          await new Promise(resolve => setTimeout(resolve, backoffDelay));
-          return attemptInitialize(); // Recursive retry
-        }
-
-        // Non-injection error or max retries reached
-        const recoveryAttempted = this.attemptSmartRecovery(msg);
-        if (!recoveryAttempted) {
-          this.handleInitializeError(msg);
-        }
-        this.isInitializing = false;
-        return false;
-      }
+    const client = this.client;
+    this.acceptEvents = true;
+    let timer;
+    let settle;
+    const outcome = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+    const onReady = () => settle.resolve(true);
+    const onAuthFailure = msg => {
+      this.authRequired = true;
+      this.authenticationFailed = true;
+      settle.reject(new Error(`Authentication failed: ${msg}`));
     };
-
+    const onQR = () => {
+      if (!this.isRestore) return;
+      this.authRequired = true;
+      settle.reject(new Error('WhatsApp requested fresh authentication; saved profile retained'));
+    };
+    const onDisconnected = reason => settle.reject(new Error(`Disconnected during initialization: ${reason}`));
+    const onError = error => settle.reject(error instanceof Error ? error : new Error(String(error)));
+    this.cancelInitialization = () => settle.reject(new Error('Session initialization cancelled'));
+    client.once('ready', onReady);
+    client.once('auth_failure', onAuthFailure);
+    client.on('qr', onQR);
+    client.once('disconnected', onDisconnected);
+    client.once('error', onError);
     try {
-      const success = await attemptInitialize();
-      if (!success) {
-        this.isInitializing = false;
-      }
-      return success;
-    } catch (outerError) {
-      // Fallback for any uncaught errors from attemptInitialize
-      this.log(`[${this.phoneNumber}] ❌ Unexpected error in initialize: ${outerError?.message}`, 'error');
-      this.isInitializing = false;
+      this.log(`[${this.phoneNumber}] Initializing WhatsApp client...`, 'info');
+      timer = setTimeout(() => settle.reject(new Error('Client readiness timeout after 5 minutes')), 300000);
+      this.initializationPending = true;
+      const launch = Promise.resolve().then(() => client.initialize()).finally(() => {
+        this.initializationPending = false;
+      });
+      return await Promise.race([outcome, launch.then(() => outcome)]);
+    } catch (error) {
+      this.acceptEvents = false;
+      this.connectionFailureReason = error?.message || String(error);
+      if (!this.isDestroyed) this.handleInitializeError(this.connectionFailureReason);
       return false;
+    } finally {
+      clearTimeout(timer);
+      this.isInitializing = false;
+      this.cancelInitialization = null;
+      client.removeListener('ready', onReady);
+      client.removeListener('auth_failure', onAuthFailure);
+      client.removeListener('qr', onQR);
+      client.removeListener('disconnected', onDisconnected);
+      client.removeListener('error', onError);
     }
   }
 
   handleInitializeError(errorMsg) {
+    if (this.authRequired) {
+      this.connectionFailureReason = errorMsg;
+      this.setState('AUTH_REQUIRED');
+      this.log(`[${this.phoneNumber}] Recovery stopped: authentication is required. Saved profile is preserved.`, 'warn');
+      return;
+    }
     // Phase 14: Use intelligent error categorization
     const errorInfo = categorizeError(errorMsg);
+    if (errorInfo.category === 'AUTH') this.authRequired = true;
     
     this.metrics.totalErrors++;
     this.metrics.lastErrorMessage = errorMsg;
@@ -280,12 +265,20 @@ export default class ConnectionManager {
       );
     }
 
-    this.setState('ERROR');
-    this.scheduleReconnect();
+    this.setState(this.authRequired ? 'AUTH_REQUIRED' : 'ERROR');
+    this.connectionFailureReason = errorMsg;
+    this._ctx.deviceLinkedManager?.updateDeviceMetadata(this.phoneNumber, {
+      status: this.authRequired ? 'auth_required' : 'restore_failed', isOnline: false, lastError: errorMsg,
+    });
+    if (errorInfo.recoverable && !this.authRequired) this.scheduleReconnect();
   }
 
   scheduleReconnect() {
-    if (this.reconnectTimer || this.state === 'SUSPENDED') return;
+    if (this.isDestroyed || this.reconnectTimer || ['SUSPENDED', 'CONNECTED'].includes(this.state) || this.authRequired) return;
+    if (this.isReconnecting) {
+      this.reconnectRequested = true;
+      return;
+    }
 
     this.reconnectAttempts++;
 
@@ -304,53 +297,34 @@ export default class ConnectionManager {
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
-      if (this.state !== 'SUSPENDED') {
+      if (!this.isDestroyed && !['SUSPENDED', 'CONNECTED'].includes(this.state) && !this.authRequired) {
+        this.isReconnecting = true;
         this.metrics.totalReconnects++;
         try {
-          // Step 1: Targeted cleanup
-          this.log(`[${this.phoneNumber}] Cleaning up before reconnect (attempt ${this.reconnectAttempts})...`, 'info');
-          this._killBrowserProcesses();
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
-          // Step 2: Clean session lock files
-          const { lockFileDetector } = this._ctx;
-          if (lockFileDetector) {
-            lockFileDetector.forceCleanLocks(this.botId);
-            lockFileDetector.forceCleanLocks(this.phoneNumber);
-          }
-
-          // Step 3: Create fresh WhatsApp client
-          this.log(`[${this.phoneNumber}] Creating fresh client...`, 'info');
-          const { createClient } = this._ctx;
-          const newClient = createClient ? await createClient(this.botId) : null;
-          if (!newClient) {
-            this.log(`[${this.phoneNumber}] Failed to create new client`, 'error');
-            this.scheduleReconnect();
+          this.log(`[${this.phoneNumber}] Reconnecting with saved profile ${this.botId}; authentication data is preserved.`, 'info');
+          if (!this._ctx.sessionRecovery) throw new Error('Session recovery service is unavailable');
+          await this._ctx.sessionRecovery.recover(this.phoneNumber, {
+            source: 'automatic', connectionManager: this,
+          });
+        } catch (err) {
+          if (this.isDestroyed) {
+            this.log(`[${this.phoneNumber}] Reconnect ended during shutdown: ${err.message}`, 'warn');
             return;
           }
-
-          // Step 4: Track browser PID
-          this._trackBrowserPid(newClient);
-
-          // Step 5: Update references
-          this.client = newClient;
-          const { accountClients, accountConfigManager, setMasterRef } = this._ctx;
-          if (accountClients) accountClients.set(this.phoneNumber, newClient);
-          if (accountConfigManager && setMasterRef &&
-              this.phoneNumber === accountConfigManager.getMasterPhoneNumber?.()) {
-            setMasterRef(newClient);
-          }
-
-          // Step 6: Bind events on new client
-          this._bindClientEvents(newClient);
-
-          // Step 7: Initialize
-          this.isInitializing = false;
-          this.state = 'IDLE';
-          await this.initialize();
-        } catch (err) {
+          this.connectionFailureReason = err.message;
+          this.setState(this.authRequired ? 'AUTH_REQUIRED' : 'ERROR');
+          this._ctx.deviceLinkedManager?.updateDeviceMetadata(this.phoneNumber, {
+            status: this.authenticationFailed ? 'auth_failed' : this.authRequired ? 'auth_required' : 'restore_failed',
+            isOnline: false, lastError: err.message,
+          });
           this.log(`[${this.phoneNumber}] Reconnect failed: ${err.message}`, 'error');
           this.scheduleReconnect();
+        } finally {
+          this.isReconnecting = false;
+          if (this.reconnectRequested) {
+            this.reconnectRequested = false;
+            this.scheduleReconnect();
+          }
         }
       }
     }, delay);
@@ -411,9 +385,6 @@ export default class ConnectionManager {
 
   async handleStaleSession() {
     this.log(`[${this.phoneNumber}] Attempting graceful restart for stale session...`, 'warn');
-    try {
-      await this.client.destroy().catch(() => {});
-    } catch (e) { /* ignore */ }
     this.setState('DISCONNECTED');
     this.scheduleReconnect();
   }
@@ -546,7 +517,6 @@ export default class ConnectionManager {
       try {
         this.stopHealthCheck();
         this.stopKeepAlive();
-        this.client.destroy().catch(() => {});
         this.setState('DISCONNECTED');
         this.scheduleReconnect();
       } catch (err) {
@@ -558,76 +528,16 @@ export default class ConnectionManager {
   }
 
   attemptSmartRecovery(errorMsg) {
-    // ENHANCED: Treat PROTOCOL errors as browser lock errors (they're related to Chrome crashes)
-    const isBrowserLockError = errorMsg.includes('browser is already running') ||
-                               errorMsg.includes('userDataDir') ||
-                               errorMsg.includes('CHROME_EXECUTABLE_PATH') ||
-                               errorMsg.includes('Target closed') ||  // FIX: Protocol error from Chrome crash
-                               errorMsg.includes('PROTOCOL error') ||  // FIX: Generic protocol errors
-                               errorMsg.includes('Protocol error') ||  // FIX: Protocol error variant
-                               errorMsg.includes('WebSocket is closed') ||  // FIX: WebSocket protocol error
-                               errorMsg.includes('callFunctionOn') ||  // FIX: DevTools Protocol error
-                               errorMsg.includes('initialization timeout');  // FIX: Timeout during initialization
-                               
-    if (!isBrowserLockError) return false;
-
-    this.log(`[${this.phoneNumber}] 🔧 Browser lock/protocol error detected. Executing advanced recovery sequence...`, 'info');
-    this.executeProtocolErrorRecovery();
+    this.handleInitializeError(errorMsg);
     return true;
   }
 
   async executeProtocolErrorRecovery() {
     this.metrics.lockRecoveries++;
-    try {
-      // Step 1: Enhanced lock file cleaning
-      this.log(`[${this.phoneNumber}] [Recovery 1/6] Cleaning lock files extensively...`, 'info');
-      const { lockFileDetector, sessionCleanupManager } = this._ctx;
-      if (lockFileDetector) lockFileDetector.forceCleanLocks(this.phoneNumber);
-
-      // Step 2: Aggressive session cleaning
-      this.log(`[${this.phoneNumber}] [Recovery 2/6] Cleaning session folder...`, 'info');
-      if (sessionCleanupManager) {
-        sessionCleanupManager.forceCleanSession(this.phoneNumber);
-      } else {
-        const sessionPath = path.join(process.cwd(), 'sessions', `session-${this.phoneNumber}`);
-        if (fs.existsSync(sessionPath)) {
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-        }
-      }
-
-      // Step 3: Kill ALL orphaned browser processes (including system-wide)
-      this.log(`[${this.phoneNumber}] [Recovery 3/6] Killing ALL browser processes...`, 'info');
-      this._killBrowserProcessesAggressive();
-
-      // Step 4: Extended wait for Chrome to fully release resources
-      this.log(`[${this.phoneNumber}] [Recovery 4/6] Waiting for system cleanup (5s)...`, 'info');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-
-      // Step 5: Clear Puppeteer cache
-      this.log(`[${this.phoneNumber}] [Recovery 5/6] Clearing browser cache...`, 'info');
-      const cacheDir = path.join(process.cwd(), '.wwebjs_cache');
-      if (fs.existsSync(cacheDir)) {
-        try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch (_) {}
-      }
-
-      // Step 6: Re-initialize with fresh client
-      this.log(`[${this.phoneNumber}] [Recovery 6/6] Re-initializing fresh client...`, 'info');
-      this.state = 'IDLE';
-      this.isInitializing = false;
-      this.reconnectAttempts = 0;
-      this.errorCount = Math.max(0, this.errorCount - 2); // Decrement error count for recovery attempt
-
-      const success = await this.initialize();
-      if (success) {
-        this.log(`[${this.phoneNumber}] ✅ Protocol error recovery successful!`, 'success');
-      } else {
-        this.log(`[${this.phoneNumber}] ⚠️  Recovery initialize returned false, scheduling reconnect`, 'warn');
-        this.scheduleReconnect();
-      }
-    } catch (err) {
-      this.log(`[${this.phoneNumber}] ❌ Advanced recovery failed: ${err.message}. Activating circuit breaker.`, 'error');
-      this.activateCircuitBreaker();
-    }
+    this.log(`[${this.phoneNumber}] Preserving saved session; scheduling an account-only reconnect.`, 'warn');
+    this.isInitializing = false;
+    this.setState('DISCONNECTED');
+    this.scheduleReconnect();
   }
 
   _trackBrowserPid(client) {
@@ -643,201 +553,29 @@ export default class ConnectionManager {
   }
 
   _killBrowserProcesses() {
-    this.metrics.browserProcessKills++;
-
-    // Strategy 1: Kill specific tracked PID (minimal impact)
-    if (this._browserPid) {
-      try {
-        if (process.platform === 'win32') {
-          execSync(`taskkill /F /PID ${this._browserPid} /T 2>nul`, { stdio: 'pipe', windowsHide: true });
-        } else {
-          execSync(`kill -9 ${this._browserPid} 2>/dev/null`, { stdio: 'pipe' });
-        }
-        this.log(`[${this.phoneNumber}] Killed tracked browser PID: ${this._browserPid}`, 'info');
-        this._browserPid = null;
-        return;
-      } catch (_) {
-        this._browserPid = null;
-      }
-    }
-
-    // Strategy 2: Broad kill (only Chrome/Chromium, NEVER node.exe)
-    const commands = process.platform === 'win32'
-      ? ['taskkill /F /IM chrome.exe 2>nul', 'taskkill /F /IM chromium.exe 2>nul']
-      : ['pkill -9 chrome 2>/dev/null', 'pkill -9 chromium 2>/dev/null'];
-
-    for (const cmd of commands) {
-      try {
-        execSync(cmd, { stdio: 'pipe', windowsHide: true });
-      } catch (_) { /* processes may already be gone */ }
-    }
+    // Only the process object owned by this client can be targeted.
+    const browserProcess = this.client?.pupBrowser?.process?.();
+    if (!browserProcess || browserProcess.exitCode !== null || browserProcess.killed) return;
+    if (browserProcess.kill()) this.metrics.browserProcessKills++;
   }
 
   _killBrowserProcessesAggressive() {
-    this.metrics.browserProcessKills++;
-    this.log(`[${this.phoneNumber}] 🔫 AGGRESSIVE: Force killing ALL browser processes...`, 'warn');
-
-    // AGGRESSIVE Strategy 1: Kill specific tracked PID with tasktree on Windows
-    if (this._browserPid && process.platform === 'win32') {
-      try {
-        execSync(`taskkill /F /PID ${this._browserPid} /T 2>nul`, { stdio: 'pipe', windowsHide: true });
-        this.log(`[${this.phoneNumber}] Killed tracked browser PID tree: ${this._browserPid}`, 'info');
-        this._browserPid = null;
-        // Wait longer after aggressive kill
-        const { execSync: ex } = require('child_process');
-        ex('timeout /t 2 /nobreak 2>nul', { stdio: 'pipe', windowsHide: true }).catch(() => {});
-        return;
-      } catch (_) {
-        this._browserPid = null;
-      }
-    }
-
-    // AGGRESSIVE Strategy 2: Multiple kill attempts on all browser processes
-    const killCommands = process.platform === 'win32'
-      ? [
-          'taskkill /F /IM chrome.exe 2>nul',
-          'taskkill /F /IM chromium.exe 2>nul',
-          'taskkill /F /IM msedge.exe 2>nul',
-          'wmic process where name="chrome.exe" delete /nointeractive 2>nul',
-          'wmic process where name="chromium.exe" delete /nointeractive 2>nul'
-        ]
-      : [
-          'pkill -9 chrome 2>/dev/null',
-          'pkill -9 chromium 2>/dev/null',
-          'pkill -9 -f "Google Chrome" 2>/dev/null',
-          'killall -9 chrome 2>/dev/null',
-          'killall -9 chromium 2>/dev/null'
-        ];
-
-    // Execute all kill commands
-    for (const cmd of killCommands) {
-      try {
-        execSync(cmd, { stdio: 'pipe', windowsHide: true, shell: true });
-      } catch (_) { /* processes may already be gone */ }
-    }
-
-    // On Windows, also try to clear locks via registry/system cleanup
-    if (process.platform === 'win32') {
-      try {
-        execSync('del /F /S /Q "%LocalAppData%\\Google\\Chrome\\User Data\\*.lock" 2>nul', { stdio: 'pipe', windowsHide: true, shell: 'cmd.exe' });
-        execSync('del /F /S /Q "%temp%\\*.lock" 2>nul', { stdio: 'pipe', windowsHide: true, shell: 'cmd.exe' });
-      } catch (_) {}
-    }
-
-    this.log(`[${this.phoneNumber}] ✅ Aggressive browser cleanup complete`, 'info');
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CLIENT EVENT BINDING (with listener cleanup)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  _bindClientEvents(client) {
-    const phoneNumber = this.phoneNumber;
-    const connManager = this;
-
-    // ═══ LISTENER CLEANUP (Phase 10 - Memory Leak Prevention) ═══
-    try {
-      client.removeAllListeners();
-      connManager.log(`[${phoneNumber}] 🧹 Cleaned existing event listeners before rebind`, 'info');
-    } catch (e) {
-      connManager.log(`[${phoneNumber}] ⚠️  Listener cleanup warning: ${e.message}`, 'warn');
-    }
-
-    // QR CODE
-    client.on("qr", async (qr) => {
-      if (!connManager.handleQR(qr)) return;
-      const { deviceLinkedManager, QRCodeDisplay } = connManager._ctx;
-      if (deviceLinkedManager) deviceLinkedManager.startLinkingAttempt(phoneNumber);
-      try {
-        if (QRCodeDisplay) {
-          await QRCodeDisplay.display(qr, {
-            method: 'auto', fallback: true,
-            masterAccount: phoneNumber, timeout: 120000
-          });
-        }
-      } catch (error) {
-        connManager.log(`QR display error: ${error.message}`, "warn");
-      }
-    });
-
-    // AUTHENTICATED
-    client.once("authenticated", () => {
-      connManager.clearQRTimer();
-      connManager.log(`✅ Device linked (${phoneNumber}) via reconnect`, "success");
-      const now = new Date().toISOString();
-      const { updateDeviceStatus, deviceLinkedManager } = connManager._ctx;
-      if (updateDeviceStatus) {
-        updateDeviceStatus(phoneNumber, {
-          deviceLinked: true, linkedAt: now, lastConnected: now, authMethod: 'qr',
-        });
-      }
-      if (deviceLinkedManager) {
-        deviceLinkedManager.markDeviceLinked(phoneNumber, { linkedAt: now, authMethod: 'qr', ipAddress: null });
-      }
-    });
-
-    // READY
-    client.once("ready", async () => {
-      connManager.log(`🟢 READY - ${phoneNumber} is online (reconnected)`, "ready");
-      connManager.setState('CONNECTED');
-      connManager.sessionCreatedAt = Date.now();
-      connManager.lastSuccessfulConnection = Date.now();
-      connManager.isInitializing = false;
-      connManager.reconnectAttempts = 0;
-      connManager.errorCount = 0;
-      connManager._trackBrowserPid(client);
-      connManager.metrics.totalRecoveries++;
-
-      const { allInitializedAccounts, accountHealthMonitor, keepAliveManager, setupMessageListeners } = connManager._ctx;
-      if (allInitializedAccounts) allInitializedAccounts.push(client);
-      if (accountHealthMonitor) accountHealthMonitor.registerAccount(phoneNumber, client);
-      if (keepAliveManager) keepAliveManager.startKeepAlive(phoneNumber, client);
-      connManager.startHealthCheck();
-      connManager.startKeepAlive();
-      if (setupMessageListeners) setupMessageListeners(client, phoneNumber, connManager);
-    });
-
-    // AUTH FAILURE
-    client.once("auth_failure", (msg) => {
-      connManager.log(`❌ Auth failed (${phoneNumber}): ${msg}`, "error");
-      connManager.isInitializing = false;
-      connManager.setState('ERROR');
-    });
-
-    // DISCONNECTED
-    client.on("disconnected", async (reason) => {
-      connManager.isInitializing = false;
-      const reasonStr = reason || 'unknown';
-      connManager.log(`Disconnected (${phoneNumber}): ${reasonStr}`, "warn");
-      const { deviceLinkedManager } = connManager._ctx;
-      if (deviceLinkedManager) deviceLinkedManager.markDeviceUnlinked(phoneNumber, reasonStr);
-      connManager.stopHealthCheck();
-      connManager.stopKeepAlive();
-      if (reasonStr.includes('LOGOUT')) {
-        connManager.setState('DISCONNECTED');
-      } else {
-        connManager.setState('DISCONNECTED');
-        connManager.scheduleReconnect();
-      }
-    });
-
-    // ERROR
-    client.on("error", (error) => {
-      const msg = error?.message || String(error);
-      if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) return;
-      connManager.log(`Client error (${phoneNumber}): ${msg}`, "error");
-      connManager.errorCount++;
-      if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
-        connManager.activateCircuitBreaker();
-      }
-    });
+    this._killBrowserProcesses();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  async destroy() {
+  destroy() {
+    if (!this.destroyPromise) this.destroyPromise = this.closeClient();
+    return this.destroyPromise;
+  }
+
+  async closeClient() {
+    this.isDestroyed = true;
+    this.acceptEvents = false;
+    this.cancelInitialization?.();
     this.stopHealthCheck();
     this.stopKeepAlive();
 
@@ -847,7 +585,7 @@ export default class ConnectionManager {
 
     // ═══ QR AUTO-REGENERATOR CLEANUP (Phase 15) ═══
     if (this.qrRegenerator) {
-      this.qrRegenerator.stop();
+      this.qrRegenerator.stopTracking();
       this.log(`[${this.phoneNumber}] 🛑 QR auto-regenerator stopped`, 'info');
     }
 
@@ -859,11 +597,12 @@ export default class ConnectionManager {
       }
     } catch (e) { /* best effort */ }
 
-    this._killBrowserProcesses();
-
     try {
-      await this.client.destroy().catch(() => {});
-    } catch (e) { /* ignore */ }
+      await this.client.destroy();
+    } catch (error) {
+      this.log(`[${this.phoneNumber}] Could not close the account browser gracefully: ${error.message}`, 'warn');
+      this._killBrowserProcesses();
+    }
 
     this.setState('IDLE');
   }

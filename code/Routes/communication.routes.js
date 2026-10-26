@@ -42,8 +42,23 @@
 import express from 'express';
 import CommunicationService from '../Database/CommunicationService.js';
 import CommunicationLog from '../Database/CommunicationLogSchema.js';
+import ContactConsentService from '../Services/ContactConsentService.js';
+import { requireApiRole } from '../middleware/apiSecurity.js';
 
 const router = express.Router();
+
+function requireIdempotencyKey(req, res) {
+  const key = req.get('Idempotency-Key');
+  if (typeof key !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(key)) {
+    res.status(400).json({
+      success: false,
+      error: 'A valid Idempotency-Key header (8-128 characters) is required.',
+      timestamp: new Date().toISOString()
+    });
+    return null;
+  }
+  return key;
+}
 
 // ============================================================================
 // TEMPLATE ENDPOINTS
@@ -320,6 +335,8 @@ router.get('/templates/:id/analytics', async (req, res) => {
  */
 router.post('/send', async (req, res) => {
   try {
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) return;
     const { templateId, recipientPhone, variables, sentBy, recipientId, recipientName, recipientType, sentFrom, language, context, priority } = req.body;
 
     if (!templateId || !recipientPhone) {
@@ -341,7 +358,8 @@ router.post('/send', async (req, res) => {
       sentFrom,
       language,
       context,
-      priority
+      priority,
+      idempotencyKey
       // sendFn not provided — message is queued for bot to pick up
     });
 
@@ -371,6 +389,8 @@ router.post('/send', async (req, res) => {
  */
 router.post('/send-direct', async (req, res) => {
   try {
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) return;
     const { recipientPhone, content, sentBy, recipientId, recipientName, recipientType, sentFrom, language, context, priority } = req.body;
 
     if (!recipientPhone || !content) {
@@ -391,7 +411,8 @@ router.post('/send-direct', async (req, res) => {
       sentFrom,
       language,
       context,
-      priority
+      priority,
+      idempotencyKey
     });
 
     if (result.success) {
@@ -415,9 +436,11 @@ router.post('/send-direct', async (req, res) => {
  */
 router.post('/send-bulk', async (req, res) => {
   try {
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) return;
     const { templateId, recipients, sentBy, sentFrom, language, context, delayMs } = req.body;
 
-    if (!templateId || !recipients || recipients.length === 0) {
+    if (!templateId || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'templateId and at least one recipient are required',
@@ -440,7 +463,8 @@ router.post('/send-bulk', async (req, res) => {
       sentFrom,
       language,
       context,
-      delayMs: delayMs || 1000
+      delayMs: delayMs ?? 1000,
+      idempotencyKey
     });
 
     if (result.success) {
@@ -465,6 +489,8 @@ router.post('/send-bulk', async (req, res) => {
  */
 router.post('/schedule', async (req, res) => {
   try {
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) return;
     const { templateId, recipientPhone, variables, sentBy, scheduledFor, language, context, priority } = req.body;
 
     if (!templateId || !recipientPhone || !scheduledFor) {
@@ -483,7 +509,8 @@ router.post('/schedule', async (req, res) => {
       scheduledFor,
       language,
       context,
-      priority
+      priority,
+      idempotencyKey
     });
 
     if (result.success) {
@@ -498,6 +525,29 @@ router.post('/schedule', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
+  }
+});
+
+router.get('/consent/:phone', requireApiRole('admin'), async (req, res, next) => {
+  try {
+    const consent = await ContactConsentService.getConsent(req.params.phone);
+    res.json({ success: true, data: consent });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/consent/:phone', requireApiRole('admin'), async (req, res, next) => {
+  try {
+    const consent = await ContactConsentService.setConsent(req.params.phone, {
+      granted: req.body.granted,
+      source: req.body.source,
+      evidence: req.body.evidence,
+      updatedBy: req.body.updatedBy || 'api-admin',
+    });
+    res.json({ success: true, data: consent });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -672,26 +722,11 @@ router.get('/delivery-stats', async (req, res) => {
  * Process all queued messages
  */
 router.post('/queue/process', async (req, res) => {
-  try {
-    const { limit, delayMs } = req.body;
-
-    // Note: In production, sendFn would be injected from bot integration
-    // For API-only mode, messages remain queued for bot pickup
-    const result = await CommunicationService.processQueue(
-      null, // sendFn — will be handled by bot integration
-      limit || 50,
-      delayMs || 1000
-    );
-
-    res.json({
-      success: true,
-      data: result,
-      note: 'Messages remain queued — bot integration will pick them up',
+  res.status(501).json({
+      success: false,
+      error: 'Queue processing requires an active WhatsApp bot worker. Queued messages were not modified.',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
-  }
 });
 
 /**

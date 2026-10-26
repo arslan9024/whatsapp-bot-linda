@@ -35,7 +35,7 @@
  */
 
 import fs from 'fs/promises';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, openSync, writeFileSync, fsyncSync, closeSync, renameSync, unlinkSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -46,6 +46,7 @@ class SessionStateManager {
     this.logBot = logBotFn || console.log;
     this.stateFilePath = path.join(__dirname, '../../session-state.json');
     this.state = null;
+    this.loadFailed = false;
   }
 
   /**
@@ -56,18 +57,25 @@ class SessionStateManager {
       if (!existsSync(this.stateFilePath)) {
         this.logBot('[SessionState] Creating new session state file', 'debug');
         this.state = this.getDefaultState();
-        await this.saveState();
+        if (!await this.saveState()) throw new Error('Could not create session metadata file');
         return this.state;
       }
 
       const data = readFileSync(this.stateFilePath, 'utf-8');
-      this.state = JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
+          !parsed.accounts || typeof parsed.accounts !== 'object' || Array.isArray(parsed.accounts) ||
+          Object.values(parsed.accounts).some(account => !account || typeof account !== 'object' || Array.isArray(account))) {
+        throw new Error('Invalid session-state structure');
+      }
+      this.state = parsed;
+      this.loadFailed = false;
       this.logBot(`[SessionState] ✅ Loaded state: ${Object.keys(this.state.accounts || {}).length} devices`, 'success');
       return this.state;
     } catch (error) {
       this.logBot(`[SessionState] Load error: ${error.message}`, 'error');
-      this.state = this.getDefaultState();
-      return this.state;
+      this.loadFailed = true;
+      throw new Error(`Cannot load session metadata; original file preserved at ${this.stateFilePath}: ${error.message}`, { cause: error });
     }
   }
 
@@ -75,18 +83,32 @@ class SessionStateManager {
    * Save session state to disk
    */
   async saveState() {
+    let temporaryPath;
+    let descriptor;
     try {
+      if (this.loadFailed) throw new Error('Session metadata is unreadable; refusing to overwrite the original file');
       if (!this.state) {
         this.state = this.getDefaultState();
       }
 
       this.state.timestamp = new Date().toISOString();
-      writeFileSync(this.stateFilePath, JSON.stringify(this.state, null, 2), 'utf-8');
+      const candidate = `${this.stateFilePath}.${process.pid}.tmp`;
+      descriptor = openSync(candidate, 'wx', 0o600);
+      temporaryPath = candidate;
+      writeFileSync(descriptor, JSON.stringify(this.state, null, 2), 'utf-8');
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = undefined;
+      renameSync(temporaryPath, this.stateFilePath);
+      temporaryPath = undefined;
       this.logBot(`[SessionState] Saved state (${new Date().toLocaleTimeString()})`, 'debug');
       return true;
     } catch (error) {
       this.logBot(`[SessionState] Save error: ${error.message}`, 'error');
       return false;
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+      if (temporaryPath && existsSync(temporaryPath)) unlinkSync(temporaryPath);
     }
   }
 
@@ -120,7 +142,7 @@ class SessionStateManager {
 
     this.state.masterPhoneNumber = phoneNumber;
     this.state.lastMasterSelection = new Date().toISOString();
-    await this.saveState();
+    if (!await this.saveState()) return false;
     this.logBot(`[SessionState] Master phone set: ${phoneNumber}`, 'debug');
     return true;
   }
@@ -145,18 +167,23 @@ class SessionStateManager {
         this.state.accounts = {};
       }
 
+      const previous = this.state.accounts[phoneNumber] || {};
       this.state.accounts[phoneNumber] = {
-        displayName: metadata.displayName || phoneNumber,
-        role: metadata.role || 'secondary',
-        status: metadata.status || 'linked',
-        linkedAt: metadata.linkedAt || new Date().toISOString(),
+        ...previous,
+        ...metadata,
+        displayName: metadata.displayName || previous.displayName || phoneNumber,
+        role: metadata.role || previous.role || 'secondary',
+        status: metadata.status || previous.status || 'linked',
+        linkedAt: metadata.linkedAt || previous.linkedAt ||
+          (['linked', 'authenticated'].includes(metadata.status) || metadata.deviceLinked === true
+            ? new Date().toISOString() : null),
         ipAddress: metadata.ipAddress || 'unknown',
         browserPid: metadata.browserPid || null,
         sessionUptime: metadata.sessionUptime || 0,
         lastHeartbeat: new Date().toISOString()
       };
 
-      await this.saveState();
+      if (!await this.saveState()) return false;
       this.logBot(`[SessionState] Device saved: ${phoneNumber}`, 'debug');
       return true;
     } catch (error) {

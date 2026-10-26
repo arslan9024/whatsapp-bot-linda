@@ -279,6 +279,10 @@ const campaignMessageLogSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
+
+  idempotencyKey: {
+    type: String
+  },
   
   campaignId: {
     type: String,
@@ -370,6 +374,7 @@ dailyLimitSchema.index({ resetAt: 1 });
 
 campaignMessageLogSchema.index({ campaignId: 1, contactPhone: 1, sentAt: -1 });
 campaignMessageLogSchema.index({ status: 1, campaignId: 1 });
+campaignMessageLogSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 campaignMessageLogSchema.index({ createdAt: -1 });
 
 // TTL Index: Auto-delete message logs after 90 days

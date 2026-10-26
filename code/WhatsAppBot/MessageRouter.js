@@ -15,6 +15,7 @@ import { ReactionHandler } from './Handlers/ReactionHandler.js';
 import { GroupEventHandler } from './Handlers/GroupEventHandler.js';
 import GorahaContactVerificationService from './GorahaContactVerificationService.js';
 import services from '../utils/ServiceRegistry.js';
+import ContactConsentService from '../Services/ContactConsentService.js';
 
 /**
  * @typedef {Object} MessageRouterDeps
@@ -73,7 +74,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
   for (const event of messageEvents) {
     try { client.removeAllListeners(event); } catch (_) { /* best effort */ }
   }
-  logBot(`🧹 Cleaned message listeners for ${phoneNumber} before rebind`, 'info');
+  logBot(`🧹 Cleaned message listeners for ${maskPhone(phoneNumber)} before rebind`, 'info');
 
   // ─── Activity tracking ─────────────────────────────────────────────
   if (connManager) {
@@ -120,12 +121,13 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     }
   });
 
-  logBot(`✅ Phase 1 event handlers bound for ${phoneNumber}`, 'success');
+  logBot(`✅ Phase 1 event handlers bound for ${maskPhone(phoneNumber)}`, 'success');
 
   // ─── Main message handler ─────────────────────────────────────────
   client.on('message', async (msg) => {
     const timestamp = new Date().toLocaleTimeString();
-    const from = msg.from.includes('@g.us') ? `Group: ${msg.from}` : `User: ${msg.from}`;
+    const from = msg.from.includes('@g.us') ? 'Group message' : `User: ${maskPhone(msg.from)}`;
+    const messageText = typeof msg.body === 'string' ? msg.body : '';
 
     // Keep-alive activity
     if (keepAliveManager) keepAliveManager.updateLastActivity(phoneNumber);
@@ -140,9 +142,19 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       });
     }
 
-    logBot(`📨 [${timestamp}] (${phoneNumber}) ${from}: ${msg.body.substring(0, 50)}${msg.body.length > 50 ? '...' : ''}`, 'info');
+    logBot(`📨 [${timestamp}] (${maskPhone(phoneNumber)}) ${from}: [message content redacted]`, 'info');
 
     try {
+      if (!msg.fromMe && !msg.from?.includes('@g.us') && /^(stop|unsubscribe|opt[\s-]?out)$/i.test(messageText.trim())) {
+        await ContactConsentService.setConsent(msg.from, {
+          granted: false,
+          source: 'inbound_whatsapp_opt_out',
+          evidence: messageText.trim(),
+        });
+        await msg.reply('You have been unsubscribed and will not receive further messages.');
+        return;
+      }
+
       // ── Analytics tracking ──────────────────────────────────────
       if (analyticsModule) {
         analyticsModule.trackMessage(msg, {
@@ -156,7 +168,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
       // ── Authorization check ─────────────────────────────────────
       if (adminConfigModule && !adminConfigModule.isUserAuthorized(msg.from)) {
-        logBot(`⚠️  Unauthorized user attempt: ${msg.from}`, 'warn');
+        logBot(`⚠️  Unauthorized user attempt: ${maskPhone(msg.from)}`, 'warn');
       }
 
       // ── Master account detection ────────────────────────────────
@@ -169,7 +181,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
         if (commandBridge.shouldHandle(msg, phoneNumber)) {
           const handled = await commandBridge.handleMessage(msg);
           if (handled) {
-            logBot(`📱 Bridge command processed from ${msg.from}`, 'success');
+            logBot(`📱 Bridge command processed from ${maskPhone(msg.from)}`, 'success');
             return;
           }
         }
@@ -193,10 +205,11 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
           return;
         }
       } else if (!isMasterAccount && msg.body.startsWith('!')) {
-        logBot(`📩 Command on secondary account: ${msg.body.substring(0, 30)}`, 'info');
+        logBot('📩 Command received on secondary account.', 'info');
         if (masterPhone) {
           await msg.reply('📢 Commands are processed by the master account.\n\nYou can still send messages to the master account for help!');
         }
+
         return;
       }
 
@@ -232,7 +245,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
           if (contactHandlerRef?.current && !msg.from.includes('@g.us')) {
             const contact = await contactHandlerRef.current.getContact(msg.from);
             if (contact) {
-              logBot(`✅ Contact: ${contact.displayName || contact.phoneNumber}`, 'success');
+              logBot(`✅ Contact found: ${maskPhone(contact.phoneNumber)}`, 'success');
             }
           }
         } catch (error) {
@@ -258,13 +271,18 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       
       // NEW: Detect and report frame detachment errors to health monitor
       if (clientHealthMonitor && error.message.includes('detached')) {
-        logBot(`🚨 Frame detachment detected on ${phoneNumber}`, 'warn');
+        logBot(`🚨 Frame detachment detected on ${maskPhone(phoneNumber)}`, 'warn');
         clientHealthMonitor.recordFrameDetachment(phoneNumber, error);
       }
     }
   });
 
-  logBot(`✅ Message listeners ready for ${phoneNumber}`, 'success');
+  logBot(`✅ Message listeners ready for ${maskPhone(phoneNumber)}`, 'success');
+}
+
+function maskPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length < 5 ? '[redacted]' : `***${digits.slice(-4)}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

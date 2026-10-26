@@ -48,6 +48,11 @@ const CommunicationLogSchema = new mongoose.Schema(
       index: true,
       description: 'Groups messages from the same bulk send operation'
     },
+    idempotencyKey: {
+      type: String,
+      maxlength: 128,
+      description: 'Client-provided key that prevents duplicate message creation'
+    },
 
     // Sender info
     sentBy: {
@@ -191,6 +196,7 @@ const CommunicationLogSchema = new mongoose.Schema(
 CommunicationLogSchema.index({ status: 1, queuedAt: -1 });
 CommunicationLogSchema.index({ recipientPhone: 1, createdAt: -1 });
 CommunicationLogSchema.index({ bulkId: 1, status: 1 });
+CommunicationLogSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 CommunicationLogSchema.index({ templateId: 1, createdAt: -1 });
 CommunicationLogSchema.index({ sentBy: 1, createdAt: -1 });
 CommunicationLogSchema.index({ scheduledFor: 1, status: 1 });

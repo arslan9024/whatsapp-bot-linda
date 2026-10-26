@@ -100,6 +100,30 @@ export class LindaCommandRegistry {
     });
 
     this.registerCommand({
+      name: 'link-method',
+      category: 'whatsapp',
+      description: 'Show the replacement direct linking commands',
+      usage: '!link-method',
+      examples: ['!link-method'],
+      requiresAuth: false,
+      handler: 'LinkMethodHandler',
+      helpText: 'Preferences are no longer saved. Use !link-code or !link-qr instead.'
+    });
+
+    for (const method of ['code', 'qr']) {
+      this.registerCommand({
+        name: `link-${method}`,
+        category: 'whatsapp',
+        description: `Start master linking with ${method === 'code' ? 'a pairing code' : 'a QR code'}`,
+        usage: `!link-${method}`,
+        examples: [`!link-${method}`],
+        requiresAuth: false,
+        handler: 'DirectLinkHandler',
+        helpText: 'Group admins or the master account only. Starts linking for this attempt without saving a preference. Complete authentication in the bot terminal.'
+      });
+    }
+
+    this.registerCommand({
       name: 'switch-device',
       category: 'whatsapp',
       description: 'Switch active device for sending messages',

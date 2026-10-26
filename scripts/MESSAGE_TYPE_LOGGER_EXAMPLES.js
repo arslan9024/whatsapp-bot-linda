@@ -10,7 +10,14 @@
 // ============================================================
 
 import { WhatsAppClient } from 'whatsapp-web.js';
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
+import {
+  logMessageTypeCompact,
+  logMessageType,
+  createMessageStats,
+  updateMessageStats,
+  displayMessageStats,
+  getMessageTypeConfig
+} from './code/utils/messageTypeLogger.js';
 
 const client = new WhatsAppClient();
 
@@ -27,8 +34,6 @@ client.on('message', msg => {
 // EXAMPLE 2: Full Detailed Logging with Metadata
 // ============================================================
 
-import { logMessageType } from './code/utils/messageTypeLogger.js';
-
 client.on('message', msg => {
   // Full detailed logging with all metadata
   logMessageType(msg);
@@ -40,8 +45,6 @@ client.on('message', msg => {
 // ============================================================
 // EXAMPLE 3: Conditional Logging Based on Message Type
 // ============================================================
-
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
 
 client.on('message', msg => {
   // Log all messages
@@ -88,13 +91,6 @@ client.on('message', msg => {
 // EXAMPLE 4: Message Statistics Tracking
 // ============================================================
 
-import { 
-  logMessageTypeCompact, 
-  createMessageStats, 
-  updateMessageStats, 
-  displayMessageStats 
-} from './code/utils/messageTypeLogger.js';
-
 // Initialize statistics
 const messageStats = createMessageStats();
 
@@ -119,8 +115,6 @@ setInterval(() => {
 // ============================================================
 // EXAMPLE 5: Advanced - Custom Statistics with Grouping
 // ============================================================
-
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
 
 class MessageTracker {
   constructor() {
@@ -183,8 +177,6 @@ global.getMessageReport = () => tracker.report();
 // EXAMPLE 6: Filtering Messages by Type
 // ============================================================
 
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
-
 const messageFilters = {
   textOnly: (msg) => msg.type === 'chat' || msg.type === 'text',
   mediaOnly: (msg) => ['image', 'video', 'document', 'audio', 'ptt'].includes(msg.type),
@@ -215,7 +207,6 @@ client.on('message', msg => {
 // EXAMPLE 7: Integration with Existing MessageAnalyzer
 // ============================================================
 
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
 import { MessageAnalyzer } from './code/WhatsAppBot/MessageAnalyzer.js';
 
 client.on('message', msg => {
@@ -230,12 +221,6 @@ client.on('message', msg => {
 // ============================================================
 // EXAMPLE 8: Detailed Logging Only for Errors/Unusual Types
 // ============================================================
-
-import { 
-  logMessageTypeCompact, 
-  logMessageType,
-  getMessageTypeConfig 
-} from './code/utils/messageTypeLogger.js';
 
 client.on('message', msg => {
   // Compact logging for normal types
@@ -255,8 +240,6 @@ client.on('message', msg => {
 // ============================================================
 // EXAMPLE 9: Real-Time Message Dashboard
 // ============================================================
-
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
 
 let lastMessageTime = Date.now();
 let messageCountThisMinute = 0;
@@ -288,7 +271,6 @@ client.on('message', msg => {
 // ============================================================
 
 import fs from 'fs';
-import { logMessageTypeCompact } from './code/utils/messageTypeLogger.js';
 
 const logFile = './message_logs.txt';
 

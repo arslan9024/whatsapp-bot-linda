@@ -9,14 +9,24 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { apiLimiter } from './middleware/rateLimit.js';
+import {
+  assertApiAccessToken,
+  getApiCorsOptions,
+  requireApiPermission,
+  requireApiRole,
+  requireApiToken,
+} from './middleware/apiSecurity.js';
+import { validateApiRequest } from './middleware/apiRequestValidation.js';
+import { createApiMetrics } from './middleware/apiMetrics.js';
+import CommunicationLog from './Database/CommunicationLogSchema.js';
 
 // Import all route handlers
-import peopleRoutes from './routes/people.routes.js';
-import propertyRoutes from './routes/property.routes.js';
-import tenancyRoutes from './routes/tenancy.routes.js';
-import ownershipRoutes from './routes/ownership.routes.js';
-import buyingRoutes from './routes/buying.routes.js';
-import agentRoutes from './routes/agent.routes.js';
+import peopleRoutes from './Routes/people.routes.js';
+import propertyRoutes from './Routes/property.routes.js';
+import tenancyRoutes from './Routes/tenancy.routes.js';
+import ownershipRoutes from './Routes/ownership.routes.js';
+import buyingRoutes from './Routes/buying.routes.js';
+import agentRoutes from './Routes/agent.routes.js';
 
 // Phase 20 + Phase 5 Feature routes
 import commissionRoutes from './Routes/CommissionRoutes.js';
@@ -31,8 +41,10 @@ import { initializeDatabase } from './Database/index.js';
 
 // Load environment variables
 dotenv.config();
+assertApiAccessToken();
 
 const app = express();
+const apiMetrics = createApiMetrics();
 const PORT = process.env.API_PORT || process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/damac-hills-2';
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -42,29 +54,51 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // ========================================
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors(getApiCorsOptions()));
 
 // Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+app.use(apiMetrics.middleware);
 
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    const safePath = req.path.replace(/\+?\d{7,}/g, (value) => `***${value.replace(/\D/g, '').slice(-4)}`);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${safePath} - ${res.statusCode} (${duration}ms)`);
   });
   next();
 });
 
-// Apply rate limiting globally (can be fine-tuned per route)
-app.use(apiLimiter);
+app.get('/ready', (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    ready,
+    database: ready ? 'connected' : 'unavailable',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/metrics', apiLimiter, requireApiToken, requireApiRole('admin'), async (req, res, next) => {
+  try {
+    const [queueDepth, delivery] = await Promise.all([
+      CommunicationLog.countDocuments({ status: 'queued' }),
+      CommunicationLog.aggregate([
+        { $match: { sentAt: { $type: 'date' }, deliveredAt: { $type: 'date' } } },
+        { $group: { _id: null, averageMs: { $avg: { $subtract: ['$deliveredAt', '$sentAt'] } } } },
+      ]),
+    ]);
+    res.json({
+      ...apiMetrics.snapshot(),
+      queueDepth,
+      averageDeliveryLatencyMs: Math.round(delivery[0]?.averageMs || 0),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ========================================
 // DATABASE CONNECTION
@@ -75,7 +109,7 @@ let db;
 async function connectDatabase() {
   try {
     console.log('🔄 Connecting to MongoDB...');
-    console.log(`📍 URI: ${MONGODB_URI}`);
+    console.log('📍 Using the configured MongoDB endpoint.');
     
     // Connect to MongoDB
     await mongoose.connect(MONGODB_URI, {
@@ -95,8 +129,10 @@ async function connectDatabase() {
     
     return true;
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
-    console.error('Stack:', error.stack);
+    console.error('❌ MongoDB connection failed:', error.name);
+    if (NODE_ENV === 'development') {
+      console.error(error.message);
+    }
     return false;
   }
 }
@@ -115,6 +151,8 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
+
+app.use('/api', apiLimiter, requireApiToken, requireApiPermission, validateApiRequest);
 
 // API version endpoint
 app.get('/api/version', (req, res) => {
@@ -232,7 +270,7 @@ async function startServer() {
       console.log('='.repeat(70));
       console.log(`📍 Server URL:       http://localhost:${PORT}`);
       console.log(`🌐 Environment:      ${NODE_ENV}`);
-      console.log(`📊 Database:         ${MONGODB_URI}`);
+      console.log(`📊 Database:         ${mongoose.connection.name}`);
       console.log(`⚙️  Node Version:     ${process.version}`);
       console.log('');
       console.log('📚 Available API Endpoints:');

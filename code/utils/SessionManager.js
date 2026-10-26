@@ -11,10 +11,12 @@ import fs from "fs/promises";
 import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { logger } from './Logger.js';
+import { chooseProfile, hasSavedLogin, waitForSavedLogin } from './SessionLoginDetector.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "../../");
-const SESSIONS_DIR = path.join(PROJECT_ROOT, "sessions");
+export const SESSIONS_DIR = path.join(PROJECT_ROOT, "sessions");
+export const WEB_CACHE_DIR = path.join(PROJECT_ROOT, ".wwebjs_cache");
 const SESSION_CACHE_DIR = path.join(PROJECT_ROOT, ".session-cache");
 const SESSION_STATE_FILE = path.join(PROJECT_ROOT, "session-state.json");
 
@@ -270,37 +272,26 @@ export class SessionManager {
   }
 
   /**
-   * Check if session can be restored immediately (nodemon restart scenario)
+   * Check if session can be restored: the profile must hold a saved WhatsApp login,
+   * not just an empty browser profile left by an unfinished linking attempt.
    */
   static canRestoreSession(masterNumber) {
-    try {
-      // Check session folder exists and has content
-      const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
-      if (!existsSync(sessionFolder)) {
-        console.log(`⚠️  Session folder missing: ${masterNumber}`);
-        return false;
-      }
+    return this.hasSessionArtifacts(masterNumber) && this.hasAuthenticatedSession(masterNumber) !== false;
+  }
 
-      // Check for critical session files (Chromium session data)
-      const defaultDir = path.join(sessionFolder, 'Default');
-      if (!existsSync(defaultDir)) {
-        console.log(`⚠️  Default session directory missing for ${masterNumber}`);
-        return false;
-      }
+  /**
+   * Detects a completed WhatsApp Web login stored in a LocalAuth profile.
+   * @returns {boolean|null} true = login saved, false = no login, null = unreadable/unknown
+   */
+  static hasAuthenticatedSession(masterNumber) {
+    return hasSavedLogin(SESSIONS_DIR, masterNumber);
+  }
 
-      // Check for Session file (crucial for restauration)
-      const sessionFile = path.join(defaultDir, 'Session');
-      if (!existsSync(sessionFile)) {
-        console.log(`⚠️  Session file missing for ${masterNumber}`);
-        return false;
-      }
-
-      console.log(`✅ Session can be restored for ${masterNumber}`);
-      return true;
-    } catch (error) {
-      logger.error(`❌ Session restoration check failed: ${error.message}`);
-      return false;
-    }
+  /**
+   * Waits until the WhatsApp login of a freshly linked profile is flushed to disk.
+   */
+  static waitForAuthenticatedSession(clientId, options) {
+    return waitForSavedLogin(() => this.hasAuthenticatedSession(clientId), options);
   }
 
   /**
@@ -315,14 +306,24 @@ export class SessionManager {
     try {
       if (!masterNumber) return false;
 
-      const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const clientId = String(masterNumber).replace(/^\+/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const sessionFolder = path.join(SESSIONS_DIR, `session-${clientId}`);
       const defaultDir = path.join(sessionFolder, 'Default');
-      const sessionFile = path.join(defaultDir, 'Session');
-
-      return existsSync(sessionFolder) && existsSync(defaultDir) && existsSync(sessionFile);
+      return ['IndexedDB', 'Local Storage', 'Network', 'Cookies', 'Session']
+        .some(artifact => existsSync(path.join(defaultDir, artifact)));
     } catch {
       return false;
     }
+  }
+
+  static resolveClientId(phoneNumber, metadata = {}, config = {}) {
+    const profileId = value => value && path.basename(value.replace(/\\/g, '/')).replace(/^session-/, '');
+    return chooseProfile({
+      persisted: metadata.clientId || profileId(metadata.sessionPath),
+      candidates: [profileId(config.sessionPath), config.id, phoneNumber],
+      hasArtifacts: id => this.hasSessionArtifacts(id),
+      hasLogin: id => this.hasAuthenticatedSession(id),
+    });
   }
 
   /**

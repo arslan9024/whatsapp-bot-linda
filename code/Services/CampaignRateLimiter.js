@@ -1,6 +1,6 @@
-import CampaignService from './CampaignService.js';
+import { campaignService } from './CampaignService.js';
 import { DailyLimit } from '../Database/CampaignSchema.js';
-import { Logger } from '../utils/logger.js';
+import { Logger } from '../utils/Logger.js';
 
 const logger = new Logger('CampaignRateLimiter');
 
@@ -23,6 +23,10 @@ class CampaignRateLimiter {
   constructor() {
     this.accountLimits = new Map();    // Track per-account limits
     this.campaignLimits = new Map();   // Track per-campaign limits
+    this.recentFailures = new Map();
+    this.failureThreshold = 5;
+    this.failureWindowMs = 10 * 60 * 1000;
+    this.cooldownMs = 5 * 60 * 1000;
   }
   
   /**
@@ -37,13 +41,26 @@ class CampaignRateLimiter {
           reason: 'Missing required parameters'
         };
       }
+
+      const failures = this._getRecentFailures(accountPhone);
+      if (failures.length >= this.failureThreshold) {
+        const retryAt = failures[failures.length - 1] + this.cooldownMs;
+        if (retryAt > Date.now()) {
+          return {
+            allowed: false,
+            reason: 'Account circuit breaker is open after repeated send failures.',
+            retryAt: new Date(retryAt)
+          };
+        }
+        this.recentFailures.delete(accountPhone);
+      }
       
       // Check campaign daily limit
       const campaignCheck = await this._checkCampaignLimit(campaignId, accountPhone, messagesPerDayLimit);
       if (!campaignCheck.allowed) {
         return campaignCheck;
       }
-      
+
       // Check account daily limit (WhatsApp global limit)
       const accountCheck = await this._checkAccountLimit(accountPhone);
       if (!accountCheck.allowed) {
@@ -65,6 +82,24 @@ class CampaignRateLimiter {
       };
     }
   }
+
+  _getRecentFailures(accountPhone) {
+    const cutoff = Date.now() - this.failureWindowMs;
+    const recent = (this.recentFailures.get(accountPhone) || []).filter((time) => time >= cutoff);
+    this.recentFailures.set(accountPhone, recent);
+    return recent;
+  }
+
+  recordOutcome(accountPhone, succeeded) {
+    if (!accountPhone) return;
+    if (succeeded) {
+      this.recentFailures.delete(accountPhone);
+      return;
+    }
+    const failures = this._getRecentFailures(accountPhone);
+    failures.push(Date.now());
+    this.recentFailures.set(accountPhone, failures);
+  }
   
   /**
    * Check campaign-specific daily limit
@@ -72,7 +107,7 @@ class CampaignRateLimiter {
    */
   async _checkCampaignLimit(campaignId, accountPhone, limit) {
     try {
-      const result = await CampaignService.getOrCreateDailyLimit(campaignId, accountPhone);
+      const result = await campaignService.getOrCreateDailyLimit(campaignId, accountPhone);
       
       if (!result.success) {
         return {
@@ -161,7 +196,7 @@ class CampaignRateLimiter {
    */
   async recordSend(campaignId, accountPhone, contactPhone) {
     try {
-      const result = await CampaignService.recordMessageSent(
+      const result = await campaignService.recordMessageSent(
         campaignId,
         contactPhone,
         null,      // contactName (can be fetched later if needed)
@@ -245,7 +280,7 @@ class CampaignRateLimiter {
     try {
       logger.info('Running daily rate limit reset...');
       
-      const result = await CampaignService.resetDailyCounters();
+      const result = await campaignService.resetDailyCounters();
       
       if (result.success) {
         logger.info(`Daily reset complete: ${result.resetCount} records reset`);
@@ -314,4 +349,5 @@ class CampaignRateLimiter {
   }
 }
 
+export const campaignRateLimiter = new CampaignRateLimiter();
 export default CampaignRateLimiter;

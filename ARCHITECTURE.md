@@ -13,8 +13,9 @@ Linda is an enterprise-grade WhatsApp automation platform purpose-built for UAE 
 ├── index.js                  # Main bot entry — ALL phases initialized here
 ├── express-server.js         # REST API (MongoDB backend)
 ├── express-server-inmemory.js# REST API (in-memory, no DB needed)
-├── package.json              # ES Module, node v25+
+├── package.json              # ES Module, Node.js 22.13+
 ├── nodemon.json              # Nodemon watcher config
+├── code/api-server.js        # Complete feature REST API
 ├── .env                      # Secrets (never in git)
 ├── .env.example              # Template for new devs
 ├── COPILOT_CONTEXT.md        # AI dev context (read first)
@@ -125,9 +126,16 @@ Mongoose schemas + DB utilities:
 | `PropertyOwnerService.js` | DB operations for property owners |
 | `InMemoryMongoDBSetup.js` | In-memory MongoDB for testing |
 
-### 5. REST API (`Routes/` + `express-server.js`)
+### 5. REST API (`code/Routes/`)
 
-All routes prefixed `/api/v1/`:
+`npm run api-server` starts the complete feature API on port 3000 by default,
+mounting people, property, tenancy, ownership, buying, agent, commission,
+communication, analytics, invoice, and notification routers under `/api/*`.
+The legacy `express-server.js` and its in-memory counterpart serve the DAMAC
+API under `/api/v1/damac/*` on port 5000 by default. All API routes require a
+configured bearer token; `/health` remains public.
+
+Feature route modules:
 
 | Route File | Endpoints |
 |-----------|-----------|

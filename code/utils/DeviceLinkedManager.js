@@ -118,15 +118,16 @@ export default class DeviceLinkedManager extends EventEmitter {
     if (!device) return false;
 
     const oldStatus = device.status;
-    device.status = "unlinked";
+    const loggedOut = /LOGOUT|AUTH_FAILURE/i.test(String(reason));
+    device.status = loggedOut ? 'logged_out' : 'offline';
     device.isOnline = false;
     device.lastError = reason;
     device.uptimeStartTime = null;
 
-    this.logFunction(`❌ Device unlinked: ${phoneNumber} (${reason})`, "warn");
+    this.logFunction(`${loggedOut ? 'Device logged out' : 'Device offline; saved session retained'}: ${phoneNumber} (${reason})`, "warn");
     
     this.emit('device:unlinked', { phoneNumber, device, reason });
-    this.emit('device:status-changed', { phoneNumber, oldStatus, newStatus: "unlinked" });
+    this.emit('device:status-changed', { phoneNumber, oldStatus, newStatus: device.status });
     return true;
   }
 
@@ -224,6 +225,7 @@ export default class DeviceLinkedManager extends EventEmitter {
     if (!device) return false;
 
     Object.assign(device, metadata);
+    this.emit('device:status-changed', { phoneNumber, device });
     return true;
   }
 
@@ -232,7 +234,7 @@ export default class DeviceLinkedManager extends EventEmitter {
    */
   recordHeartbeat(phoneNumber) {
     const device = this.devices.get(phoneNumber);
-    if (!device) return false;
+    if (!device || device.status !== 'linked') return false;
 
     device.lastHeartbeat = new Date().toISOString();
     device.lastActivity = device.lastHeartbeat;

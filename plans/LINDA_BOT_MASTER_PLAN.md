@@ -1,5 +1,11 @@
 # 🤖 LINDA BOT - MASTER PLAN
 
+> Historical roadmap. Current decisions and acceptance criteria are in
+> [MASTER_PLAN.md](MASTER_PLAN.md) and
+> [MASTER_ACCOUNT_SESSION_PLAN.md](MASTER_ACCOUNT_SESSION_PLAN.md).
+> Earlier checkmarks and readiness percentages below are historical claims,
+> not current live verification.
+
 **Document Version:** 1.0  
 **Date Created:** February 7, 2026  
 **Status:** Active Implementation  
@@ -39,17 +45,17 @@ Linda enables intelligent WhatsApp conversation management for business users by
 **Focus:** Local development only (npm run dev)
 
 **Objectives:**
-- ✅ Master account (971505760056) WhatsApp Web session properly connected
+- ⏳ Actual master account connection must pass the current live acceptance checks
 - ✅ Session persists locally in ./sessions/ folder
-- ✅ 6-digit code or QR code device linking works
-- ⏳ Session automatically refreshes if expired
+- Pairing code or QR code device linking (no fixed code-length assumption)
+- Automatically reconnect a saved session; revoked credentials require explicit linking
 - ✅ Terminal displays active session status with account number
 - ✅ Ready to listen to incoming messages
 - ⏳ Monitor session health continuously
 
 **Deliverables:**
 - ✅ Working npm run dev command
-- ✅ Device linking via WhatsApp web (6-digit code)
+- Device linking via WhatsApp Web (pairing code or QR)
 - ✅ Session persistence system
 - ✅ Terminal status display
 - ⏳ Auto-session refresh mechanism
@@ -88,9 +94,9 @@ Linda enables intelligent WhatsApp conversation management for business users by
 
 **Objectives:**
 - Session expiration detection
-- Automatic session renewal
+- Automatic saved-session reconnect, not automatic renewal of revoked authentication
 - Session health monitoring
-- Database/file-based session storage options
+- LocalAuth profiles on local disk only; no cloud credential storage
 
 ### Phase 4: Campaign & Contact Management ⏳ PLANNED
 **Duration:** 2-3 weeks

@@ -4,7 +4,7 @@
  * ====================================================================
  * Handles WhatsApp client lifecycle events for both:
  *   - Session restore (previously linked devices)
- *   - New device linking (QR code flow)
+ *   - New device linking (pairing code or QR code)
  *
  * Eliminates ~120 lines of duplication that existed when these were
  * two separate functions (setupRestoreFlow / setupNewLinkingFlow).
@@ -16,6 +16,7 @@
  */
 
 import ConnectionManager from '../utils/ConnectionManager.js';
+import { SessionManager } from '../utils/SessionManager.js';
 
 /**
  * @typedef {Object} FlowDeps
@@ -46,8 +47,11 @@ import ConnectionManager from '../utils/ConnectionManager.js';
  * @param {string}  phoneNumber - Account phone number
  * @param {string}  botId       - Bot identifier for session folder
  * @param {object}  opts
- * @param {boolean} opts.isRestore          - true = restore existing session; false = QR linking
+ * @param {boolean} opts.isRestore          - true = restore existing session; false = new linking
  * @param {string}  [opts.displayName]      - Human-readable account name
+ * @param {'code'|'qr'} [opts.linkingMethod] - Explicit method for this attempt only; otherwise prompt
+ * @param {ConnectionManager} [opts.connectionManager] - Reuse manager when reconnecting
+ * @param {boolean} [opts.initialize]      - false = only bind events for an existing manager
  * @param {object}  deps                    - Injected dependencies (see FlowDeps above)
  */
 export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
@@ -73,41 +77,197 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     uptimeTracker,         // NEW: Phase 29e - SLA tracking
   } = deps;
 
-  const mode = isRestore ? 'restore' : 'qr';
+  let mode = isRestore ? 'restore' : 'qr';
   logBot(`Setting up ${mode} flow for ${phoneNumber}...`, 'info');
 
   let readyFired = false;
+  let authenticated = false;
 
   // ───────────────────────── Connection Manager ─────────────────────────
-  const connManager = new ConnectionManager(phoneNumber, client, logBot, botId, sharedContext);
+  const connManager = opts.connectionManager ||
+    new ConnectionManager(phoneNumber, client, logBot, botId, sharedContext);
+  connManager.client = client;
+  connManager.isRestore = isRestore;
+  connManager.acceptEvents = true;
+  const isCurrent = () => !connManager.isDestroyed && connManager.client === client && connManager.acceptEvents;
+  const clientId = client.authStrategy?.clientId ||
+    String(botId).replace(/^\+/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const persist = (status, extra = {}) => {
+    const operation = (connManager.persistenceQueue || Promise.resolve()).then(async () => {
+      if (connManager.isDestroyed || connManager.client !== client) return;
+      try {
+        const account = sharedContext.accountConfigManager?.getAllAccounts()
+          .find(entry => entry.phoneNumber === phoneNumber);
+        const saved = await sessionStateManager.saveDeviceMetadata(phoneNumber, {
+          ...sessionStateManager.getDeviceMetadata(phoneNumber),
+          ...(account?.role ? { role: account.role } : {}),
+          displayName, clientId, sessionPath: `sessions/session-${clientId}`,
+          status, authMethod: mode, ...extra,
+        });
+        if (!saved) logBot(`Could not save session state for ${phoneNumber}`, 'error');
+      } catch (error) {
+        logBot(`Could not save session state for ${phoneNumber}: ${error.message}`, 'error');
+      }
+    });
+    connManager.persistenceQueue = operation;
+    return operation;
+  };
   connectionManagers.set(phoneNumber, connManager);
+  connManager.botId = clientId;
+
+  // Confirms the WhatsApp login was written to the local profile so the next start restores it.
+  const verifySessionSaved = async () => {
+    const saved = await SessionManager.waitForAuthenticatedSession(clientId, {
+      timeoutMs: opts.sessionSaveTimeoutMs ?? 60000,
+      intervalMs: opts.sessionSaveIntervalMs ?? 3000,
+    });
+    if (!isCurrent()) return saved;
+    if (saved) {
+      await persist('linked', { sessionSavedAt: new Date().toISOString(), sessionSaved: true });
+      if (!isRestore) logBot(`💾 Session saved on this computer (sessions/session-${clientId}); restarts will reconnect without relinking`, 'success');
+    } else {
+      await persist('linked', { sessionSaved: false });
+      logBot(`Session for ${phoneNumber} is online but not confirmed on disk yet (sessions/session-${clientId}). Keep Linda running and avoid closing it right after linking.`, 'warn');
+    }
+    return saved;
+  };
   logBot(`✅ Connection manager created for ${phoneNumber} (${mode})`, 'success');
 
-  // ───────────────────────── QR Code (new linking only) ─────────────────
-  if (!isRestore) {
-    client.on('qr', async (qr) => {
-      if (!connManager.handleQR(qr)) return; // debounced
+  let selectionPromise;
+  const chooseMethod = () => {
+    if (!selectionPromise) {
+      selectionPromise = opts.linkingMethod
+        ? Promise.resolve(opts.linkingMethod)
+        : terminalHealthDashboard.selectLinkingMethod(phoneNumber);
+    }
+    return selectionPromise;
+  };
+
+  const configureMethod = (method) => {
+    if (!['code', 'qr'].includes(method)) {
+      throw new Error(`Invalid linking method: ${method}`);
+    }
+    if (method === 'code' && !/^\+?[1-9]\d{6,14}$/.test(phoneNumber)) {
+      throw new Error('Pairing requires a phone number with country code (7-15 digits)');
+    }
+    Object.assign(client.options.pairWithPhoneNumber ??= {}, {
+      phoneNumber: method === 'code' ? phoneNumber.replace(/^\+/, '') : '',
+      showNotification: true,
+      intervalMs: 180000,
+    });
+    mode = method;
+  };
+
+  let requestingCode = false;
+  connManager.requestPairingCode = async () => {
+    if (isRestore || connManager.isDestroyed || !connManager.acceptEvents) {
+      throw new Error('Session recovery cannot start device linking. Use link-code or an explicit account relink command.');
+    }
+    if (requestingCode) {
+      return;
+    }
+    if (authenticated || readyFired || client.info) {
+      throw new Error('Account is already linked; no pairing code is needed');
+    }
+    if (!client.pupPage) {
+      throw new Error('WhatsApp is still loading. Wait for the linking screen and try again.');
+    }
+    const previousMode = mode;
+    const previousOptions = {
+      phoneNumber: '', showNotification: true, intervalMs: 180000,
+      ...client.options.pairWithPhoneNumber,
+    };
+    requestingCode = true;
+    try {
+      configureMethod('code');
+      connManager.clearQRTimer();
+      await client.requestPairingCode(client.options.pairWithPhoneNumber.phoneNumber, true, 180000);
+    } catch (error) {
+      Object.assign(client.options.pairWithPhoneNumber ??= {}, previousOptions);
+      mode = previousMode;
+      throw error;
+    } finally {
+      requestingCode = false;
+    }
+  };
+
+  connManager.isAwaitingPairingCode = () =>
+    !isRestore && mode === 'code' && isCurrent() && !authenticated && !readyFired;
+
+  const clearCodeReminder = () => {
+    clearTimeout(connManager.pairingCodeReminder);
+    connManager.pairingCodeReminder = null;
+  };
+  const scheduleCodeReminder = () => {
+    clearCodeReminder();
+    connManager.pairingCodeReminder = setTimeout(() => {
+      if (!connManager.isAwaitingPairingCode()) return;
+      console.log(`\nStill waiting for ${phoneNumber} to link. If the code was delayed or rejected, type r and press Enter for a new code.\n`);
+    }, 90000);
+    connManager.pairingCodeReminder.unref?.();
+  };
+
+  client.on('code', (code) => {
+    if (!isCurrent() || authenticated || readyFired || mode !== 'code') {
+      return;
+    }
+    connManager.clearQRTimer();
+    deviceLinkedManager?.startLinkingAttempt(phoneNumber);
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true);
+    // Pairing codes belong only in the local terminal, not persistent logs.
+    console.log(`\nWhatsApp pairing code for ${phoneNumber}: ${code}`);
+    console.log('On that phone: WhatsApp > Settings (iPhone) or menu (Android) > Linked devices');
+    console.log('Choose Link a device > Link with phone number instead, then enter this code.');
+    console.log('Codes refresh automatically while waiting. Do not share this code.');
+    console.log('Code delayed, expired, or linking failed? Type r and press Enter for a new code.\n');
+    scheduleCodeReminder();
+  });
+
+  client.on('qr', async (qr) => {
+    try {
+      if (!isCurrent() || authenticated || readyFired) {
+        return;
+      }
+      // Recovery must never silently become new device registration.
+      if (isRestore && mode === 'restore') {
+        connManager.authRequired = true;
+        connManager.isInitializing = false;
+        connManager.setState('AUTH_REQUIRED');
+        clearTimeout(connManager.reconnectTimer);
+        connManager.reconnectTimer = null;
+        connManager.clearQRTimer();
+        deviceLinkedManager?.updateDeviceMetadata(phoneNumber, { status: 'auth_required', isOnline: false });
+        await persist('auth_required', { isActive: false });
+        terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, false);
+        terminalHealthDashboard?.requestDashboardRefresh?.();
+        logBot(`Saved session for ${phoneNumber} requires authentication. Recovery stopped without deleting it. Use an explicit link-code/link-qr or account relink command.`, 'warn');
+        return;
+      }
+      if (mode === 'code' || !connManager.handleQR(qr)) {
+        return;
+      }
+      terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true);
 
       if (deviceLinkedManager) {
         deviceLinkedManager.startLinkingAttempt(phoneNumber);
       }
 
-      try {
-        await QRCodeDisplay.display(qr, {
-          method: 'auto',
-          fallback: true,
-          masterAccount: phoneNumber,
-          timeout: 120000,
-        });
-      } catch (error) {
-        logBot(`QR display error: ${error.message}`, 'warn');
-        logBot('Please link device manually via WhatsApp Settings', 'warn');
-      }
-    });
-  }
+      await QRCodeDisplay.display(qr, {
+        method: 'auto',
+        fallback: true,
+        masterAccount: phoneNumber,
+        timeout: 120000,
+      });
+    } catch (error) {
+      logBot(`Device linking failed (${phoneNumber}): ${error.message}`, 'error');
+    }
+  });
 
   // ───────────────────────── Authenticated ──────────────────────────────
-  client.once('authenticated', () => {
+  client.once('authenticated', async () => {
+    if (!isCurrent()) return;
+    authenticated = true;
+    clearCodeReminder();
     connManager.clearQRTimer();
     logBot(`✅ ${isRestore ? 'Session authenticated' : 'Device linked'} (${phoneNumber})`, 'success');
 
@@ -128,34 +288,26 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
       });
     }
 
-    if (deviceLinkedManager) {
-      deviceLinkedManager.markDeviceLinked(phoneNumber, {
-        linkedAt: now,
-        authMethod: mode,
-        ipAddress: null,
-      });
-      logBot(`📊 Device manager updated (${mode}) for ${phoneNumber}`, 'success');
-    }
-
-    sessionStateManager.saveAccountState(phoneNumber, {
-      phoneNumber,
-      displayName,
-      deviceLinked: true,
-      isActive: false,
-      sessionPath: `sessions/session-${isRestore ? phoneNumber : botId}`,
-      lastKnownState: 'authenticated',
-    });
-
-    sessionStateManager.recordDeviceLinkEvent(phoneNumber, 'success');
+    deviceLinkedManager?.updateDeviceMetadata(phoneNumber, { status: 'authenticated', isOnline: false });
+    await persist('authenticated', { deviceLinked: true, isActive: false });
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, false);
+    terminalHealthDashboard?.requestDashboardRefresh?.();
   });
 
   // ───────────────────────── Ready ──────────────────────────────────────
   client.once('ready', async () => {
-    if (readyFired) return;
+    if (!isCurrent() || readyFired) return;
     readyFired = true;
+    clearCodeReminder();
+    connManager.authRequired = false;
+    connManager.authenticationFailed = false;
+    connManager.connectionFailureReason = null;
+    clearTimeout(connManager.reconnectTimer);
+    clearTimeout(connManager.errorResetTimer);
+    connManager.reconnectTimer = null;
+    connManager.errorResetTimer = null;
 
     logBot(`🟢 READY - ${phoneNumber} is online`, 'ready');
-    if (!isRestore) logBot('Session saved for future restarts', 'success');
 
     // Update ConnectionManager state
     connManager.setState('CONNECTED');
@@ -164,13 +316,30 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     connManager.isInitializing = false;
     connManager.reconnectAttempts = 0;
     connManager.errorCount = 0;
+    connManager.recordActivity?.();
+    if (isRestore && connManager.metrics) connManager.metrics.totalRecoveries++;
     connManager._trackBrowserPid(client);
 
     // Mark account as active
-    allInitializedAccounts.push(client);
-    await sessionStateManager.markRecoverySuccess(phoneNumber);
+    if (!allInitializedAccounts.includes(client)) allInitializedAccounts.push(client);
+    deviceLinkedManager?.markDeviceLinked(phoneNumber, { authMethod: mode });
+    deviceLinkedManager?.updateDeviceMetadata(phoneNumber, { lastError: null });
+    await persist('linked', { deviceLinked: true, isActive: true, lastError: null });
+    if (!isCurrent() || connManager.state !== 'CONNECTED') return;
+    connManager.sessionSaveVerification = verifySessionSaved().catch(error => {
+      logBot(`Could not verify saved session for ${phoneNumber}: ${error.message}`, 'warn');
+      return false;
+    });
+    if (sharedContext.accountConfigManager?.getMasterPhoneNumber?.() === phoneNumber &&
+        sessionStateManager.setMasterPhoneNumber) {
+      const saved = await sessionStateManager.setMasterPhoneNumber(phoneNumber);
+      if (!saved) logBot(`Could not save master account selection for ${phoneNumber}`, 'error');
+    }
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, false);
+    terminalHealthDashboard?.requestDashboardRefresh?.();
 
     // Register for health monitoring
+    if (!isCurrent() || connManager.state !== 'CONNECTED') return;
     accountHealthMonitor.registerAccount(phoneNumber, client);
 
     // NEW: Record account online status (Phase 29e)
@@ -211,47 +380,40 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     setupMessageListeners(client, phoneNumber, connManager);
     setIsInitializing(false);
 
-    // Update dashboard when device is linked and ready
-    if (terminalHealthDashboard && deviceLinkedManager?.getDevice(phoneNumber)) {
-      logBot('', 'info');
-      logBot('═══════════════════════════════════════════════════════════', 'info');
-      logBot('✅ DEVICE SUCCESSFULLY LINKED AND ONLINE', 'success');
-      logBot('═══════════════════════════════════════════════════════════', 'info');
-      logBot('', 'info');
-      // Display updated dashboard showing new device status
-      terminalHealthDashboard.displayHealthDashboard();
-      logBot('', 'info');
-    }
+    terminalHealthDashboard?.requestDashboardRefresh?.();
   });
 
   // ───────────────────────── Auth Failure ────────────────────────────────
   client.once('auth_failure', async (msg) => {
+    if (!isCurrent()) return;
+    connManager.authRequired = true;
+    connManager.authenticationFailed = true;
+    connManager.connectionFailureReason = String(msg);
+    clearTimeout(connManager.reconnectTimer);
+    connManager.reconnectTimer = null;
     connManager.isInitializing = false;
     connManager.setState('ERROR');
 
-    if (isRestore) {
-      logBot(`Session restore failed for ${phoneNumber}: ${msg}`, 'error');
-      logBot('Falling back to new QR code authentication...', 'warn');
-      // Remove all existing listeners before re-entering — otherwise
-      // each auth_failure retry adds a duplicate set of on() listeners,
-      // leaking 2-5 MB per cycle and causing duplicate event handling.
-      client.removeAllListeners();
-      try {
-        setupClientFlow(client, phoneNumber, botId, { isRestore: false, displayName }, deps);
-      } catch (error) {
-        logBot(`Fallback QR setup failed: ${error.message}`, 'error');
-        setIsInitializing(false);
-      }
-    } else {
-      logBot(`❌ Authentication failed for ${phoneNumber}: ${msg}`, 'error');
-      logBot('Please restart and scan QR code again', 'warn');
-    }
+    deviceLinkedManager?.markDeviceUnlinked(phoneNumber, 'AUTH_FAILURE');
+    await persist('auth_failed', { deviceLinked: false, isActive: false, lastError: String(msg) });
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, false);
+    logBot(`Authentication failed (${phoneNumber}): ${msg}. Use link-code or link-qr.`, 'error');
+    terminalHealthDashboard?.requestDashboardRefresh?.();
   });
 
   // ───────────────────────── Disconnected ────────────────────────────────
-  client.on('disconnected', (reason) => {
+  client.on('disconnected', async (reason) => {
+    if (!isCurrent()) return;
     connManager.isInitializing = false;
     const reasonStr = reason || 'unknown';
+    connManager.connectionFailureReason = String(reasonStr);
+    const loggedOut = String(reasonStr).toUpperCase().includes('LOGOUT');
+    connManager.authRequired = loggedOut || connManager.authRequired === true;
+    connManager.setState(connManager.authRequired && !loggedOut ? 'AUTH_REQUIRED' : 'DISCONNECTED');
+    if (connManager.authRequired) {
+      clearTimeout(connManager.reconnectTimer);
+      connManager.reconnectTimer = null;
+    }
     logBot(`Disconnected (${phoneNumber}): ${reasonStr}`, 'warn');
 
     // NEW: Record offline status (Phase 29e)
@@ -277,13 +439,23 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     // Stop monitoring
     connManager.stopHealthCheck();
     connManager.stopKeepAlive();
+    keepAliveManager?.stopKeepAlive(phoneNumber);
+    if (loggedOut) deviceLinkedManager?.updateDeviceMetadata(phoneNumber, { status: 'logged_out' });
+    const status = loggedOut ? 'logged_out' : connManager.authenticationFailed ? 'auth_failed' :
+      connManager.authRequired ? 'auth_required' : 'offline';
+    deviceLinkedManager?.updateDeviceMetadata(phoneNumber, { status, lastError: String(reasonStr) });
+    await persist(status, {
+      deviceLinked: !loggedOut && !connManager.authenticationFailed, isActive: false, lastError: String(reasonStr),
+    });
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, false);
+    terminalHealthDashboard?.requestDashboardRefresh?.();
 
     // Decide recovery strategy
-    if (reasonStr.includes('LOGOUT')) {
+    if (loggedOut) {
       logBot(`User logged out from ${phoneNumber} - manual re-auth needed`, 'warn');
       connManager.setState('DISCONNECTED');
       connManager.reconnectAttempts = 0;
-    } else {
+    } else if (!connManager.authRequired) {
       if (reasonStr.toLowerCase().includes('session closed')) {
         logBot(`Session closed unexpectedly for ${phoneNumber}`, 'warn');
       }
@@ -294,10 +466,8 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
 
   // ───────────────────────── Client Error ────────────────────────────────
   client.on('error', (error) => {
+    if (!isCurrent()) return;
     const msg = error?.message || String(error);
-    // Filter non-critical Puppeteer/Protocol errors
-    if (msg.includes('Target') || msg.includes('Protocol') || msg.includes('Requesting')) return;
-
     logBot(`Client error (${phoneNumber}): ${msg}`, 'error');
     
     // NEW: Record error metric (Phase 29e)
@@ -309,17 +479,34 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
       });
     }
 
-    connManager.errorCount++;
-    if (connManager.errorCount >= connManager.circuitBreakerThreshold) {
-      connManager.activateCircuitBreaker();
-    }
+    if (!connManager.isInitializing) connManager.handleInitializeError(msg);
   });
 
   // ───────────────────────── Initialize ─────────────────────────────────
-  logBot(`Initializing WhatsApp client for ${phoneNumber}...`, 'info');
-  connManager.initialize().catch((error) => {
-    logBot(`Failed to initialize (${mode}): ${error?.message || String(error)}`, 'error');
-  });
+  connManager.bindClientFlow = (newClient) => {
+    setupClientFlow(newClient, phoneNumber, botId, {
+      isRestore: true, displayName, connectionManager: connManager, initialize: false,
+    }, deps);
+  };
+  if (opts.initialize !== false) {
+    connManager.initializationPromise = (async () => {
+      if (!isRestore) {
+        configureMethod(await chooseMethod());
+        if (mode === 'code') {
+          console.log(`Preparing a pairing code for ${phoneNumber}. If it is slow or linking fails, type r and press Enter for a new code.`);
+          scheduleCodeReminder();
+        }
+      }
+      logBot(`Initializing WhatsApp client for ${phoneNumber} (${mode})...`, 'info');
+      const initialized = await connManager.initialize();
+      clearCodeReminder();
+      return initialized && !connManager.authRequired;
+    })().catch((error) => {
+      clearCodeReminder();
+      logBot(`Failed to initialize (${mode}): ${error?.message || String(error)}`, 'error');
+      return false;
+    });
+  }
 
   return connManager;
 }

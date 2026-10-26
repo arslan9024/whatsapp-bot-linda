@@ -132,8 +132,8 @@ describe('CI/CD Integration Tests', () => {
       const content = fs.readFileSync(workflowPath, 'utf8');
       
       expect(content).toMatch(/node-version|nodejs/i);
-      expect(content).toContain('[16.x, 18.x]');
-      console.log('  ✓ test.yml uses Node.js 16.x and 18.x');
+      expect(content).toContain("'22.13.x', '24.x'");
+      console.log('  ✓ test.yml uses supported Node.js 22.13.x and 24.x');
     });
 
     test('test.yml installs dependencies', () => {
@@ -148,8 +148,7 @@ describe('CI/CD Integration Tests', () => {
       const workflowPath = path.join(__dirname, '../.github/workflows/test.yml');
       const content = fs.readFileSync(workflowPath, 'utf8');
       
-      expect(content).toContain('npm test');
-      expect(content).toContain('coverage');
+      expect(content).toContain('npm test -- --runInBand --json --outputFile=test-results.json');
       expect(content).toContain('Run Full Test Suite');
       console.log('  ✓ test.yml executes tests');
     });
@@ -298,7 +297,8 @@ describe('CI/CD Integration Tests', () => {
       const workflowPath = path.join(__dirname, '../.github/workflows/test.yml');
       const content = fs.readFileSync(workflowPath, 'utf8');
       
-      expect(content).toContain('uses: actions/upload-artifact');
+      expect(content).toContain('uses: actions/upload-artifact@v4');
+      expect(content).toContain('path: test-results.json');
       console.log('  ✓ Test workflow uploads artifacts');
     });
 
@@ -329,9 +329,9 @@ describe('CI/CD Integration Tests', () => {
       const workflowPath = path.join(__dirname, '../.github/workflows/test.yml');
       const content = fs.readFileSync(workflowPath, 'utf8');
       
-      expect(content).toContain('npm test');
-      expect(content).toContain('Full Test Suite');
-      console.log('  ✓ test.yml includes multiple test configurations');
+      expect(content).toContain("'22.13.x', '24.x'");
+      expect(content).toContain('Run Full Test Suite');
+      console.log('  ✓ test.yml tests the supported Node.js matrix');
     });
 
     test('test.yml excludes performance tests from main flow', () => {

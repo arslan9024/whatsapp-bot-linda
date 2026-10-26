@@ -12,6 +12,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import CommunicationTemplate from '../code/Database/CommunicationTemplateSchema.js';
 import CommunicationLog from '../code/Database/CommunicationLogSchema.js';
 import CommunicationService from '../code/Database/CommunicationService.js';
+import ContactConsentService from '../code/Services/ContactConsentService.js';
 
 let mongoServer;
 let passed = 0;
@@ -203,6 +204,20 @@ async function testMessaging() {
   log('\n📋 Test Suite: Message Sending');
 
   try {
+    for (const phone of [
+      '+971501234567',
+      '+971509876543',
+      '+971501111111',
+      '+971502222222',
+      '+971503333333'
+    ]) {
+      await ContactConsentService.setConsent(phone, {
+        granted: true,
+        source: 'automated_test_fixture',
+        evidence: 'Synthetic test contact'
+      });
+    }
+
     // Create and activate a template
     const tmpl = await CommunicationService.createTemplate({
       name: 'Messaging Test Template',

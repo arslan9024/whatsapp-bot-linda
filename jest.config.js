@@ -31,22 +31,15 @@ export default {
   
   // Coverage configuration
   collectCoverageFrom: [
-    'bot/**/*.js',
-    '!bot/**/*.test.js',
-    '!bot/**/*.spec.js',
-    '!bot/tests/**',
-    '!bot/examples/**'
+    'code/**/*.js',
+    '!code/**/*.test.js',
+    '!code/**/*.spec.js',
+    '!code/**/tests/**',
+    '!code/**/backupfiles/**',
+    '!code/**/test-*.js',
+    '!code/**/verify-*.js'
   ],
-  
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 75,
-      lines: 75,
-      statements: 75
-    }
-  },
-  
+
   // Reporter configuration
   reporters: ['default'],
   

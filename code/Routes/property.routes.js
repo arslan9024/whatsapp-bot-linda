@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { PropertyService } from '../Database/index.js';
+import { escapeRegex } from '../middleware/apiRequestValidation.js';
 
 const router = express.Router();
 const propertyService = new PropertyService();
@@ -37,9 +38,10 @@ router.get('/', async (req, res) => {
       if (maxPrice) filter.estimatedValue.$lte = parseInt(maxPrice);
     }
     if (search) {
+      const safeSearch = escapeRegex(search);
       filter.$or = [
-        { unitNumber: { $regex: search, $options: 'i' } },
-        { buildingName: { $regex: search, $options: 'i' } }
+        { unitNumber: { $regex: safeSearch, $options: 'i' } },
+        { buildingName: { $regex: safeSearch, $options: 'i' } }
       ];
     }
 

@@ -68,7 +68,7 @@ class OrchestrationScript {
 
       logger.info(`\n✅ Sheet Organization Complete`);
       logger.info(`   New Sheet ID: ${organizationResult.newSheetId}`);
-      logger.info(`   Records: ${organizationResult.original Records} → ${organizationResult.deduplicatedRecords}`);
+      logger.info(`   Records: ${organizationResult.originalRecords} → ${organizationResult.deduplicatedRecords}`);
       logger.info(`   Duplicates Removed: ${organizationResult.duplicatesRemoved}`);
 
       // PHASE 2: Context Loading (optional)

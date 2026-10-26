@@ -23,33 +23,33 @@ jobs:
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24.x'
           cache: 'npm'
       
       - name: Install Dependencies
         run: npm ci
       
       - name: Run Full Test Suite
-        run: npm test -- --coverage
+        run: npm test -- --runInBand
         timeout-minutes: 20
       
       - name: Code Quality Check
         run: |
           echo "📦 Code Quality Validation"
-          npm run lint --if-present || echo "Linting skipped"
+          npm run lint
           echo "✓ Code quality check completed"
       
       - name: Security Audit
         run: |
           echo "🔒 Security Audit"
-          npm audit --audit-level=moderate 2>&1 | grep -i "packages" || echo "Dependencies secure"
+          npm audit --audit-level=high
           echo "✓ Security audit completed"
       
       - name: Build Artifacts

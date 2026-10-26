@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { PersonService } from '../Database/index.js';
+import { escapeRegex } from '../middleware/apiRequestValidation.js';
 
 const router = express.Router();
 const personService = new PersonService();
@@ -21,11 +22,12 @@ router.get('/', async (req, res) => {
     const filter = {};
     if (role) filter.role = role;
     if (search) {
+      const safeSearch = escapeRegex(search);
       filter.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
+        { firstName: { $regex: safeSearch, $options: 'i' } },
+        { lastName: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+        { phone: { $regex: safeSearch, $options: 'i' } }
       ];
     }
 

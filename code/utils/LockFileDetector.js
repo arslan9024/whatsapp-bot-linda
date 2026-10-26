@@ -81,6 +81,8 @@ class LockFileDetector {
 
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
+        // Lock age cannot establish that the Chromium process no longer owns it.
+        if (entry.name.startsWith('session-')) continue;
 
         const folderPath = path.join(this.sessionDir, entry.name);
 
