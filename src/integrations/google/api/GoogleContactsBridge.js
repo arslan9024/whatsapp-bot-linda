@@ -1,6 +1,6 @@
 /**
  * GoogleContactsBridge.js
- * Interface with Google Contacts API via GorahaBot service account
+ * Interface with Google Contacts API via Goraha Gmail user OAuth
  * 
  * This module handles all operations with Google Contacts:
  * - Reading contacts from goraha.properties@gmail.com
@@ -10,7 +10,7 @@
  */
 
 import { google } from 'googleapis';
-import MultiAccountManager from './MultiAccountManager.js';
+import { loadContactsAuth } from './ContactsOAuth.js';
 
 class GoogleContactsBridge {
   constructor() {
@@ -26,11 +26,7 @@ class GoogleContactsBridge {
    */
   async initialize() {
     try {
-      this.manager = await MultiAccountManager.getInstance();
-      
-      // Switch to GorahaBot for all operations
-      await this.manager.switchTo(this.accountName);
-      const auth = this.manager.currentAuth;
+      const auth = loadContactsAuth();
       
       // Create People API client
       this.peopleAPI = google.people({

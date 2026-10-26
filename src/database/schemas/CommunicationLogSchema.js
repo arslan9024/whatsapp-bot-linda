@@ -301,8 +301,9 @@ CommunicationLogSchema.statics.getBulkStatus = async function (bulkId) {
   return this.getDeliveryStats({ bulkId });
 };
 
-CommunicationLogSchema.statics.getQueuedMessages = function (limit = 50) {
-  return this.find({ status: 'queued' })
+CommunicationLogSchema.statics.getQueuedMessages = function (limit = 50, now = new Date()) {
+  // Scheduled messages are not due until scheduledFor; null also matches a missing field.
+  return this.find({ status: 'queued', $or: [{ scheduledFor: null }, { scheduledFor: { $lte: now } }] })
     .sort({ priority: -1, queuedAt: 1 })
     .limit(limit);
 };
@@ -310,6 +311,8 @@ CommunicationLogSchema.statics.getQueuedMessages = function (limit = 50) {
 CommunicationLogSchema.statics.getFailedMessages = function (limit = 50) {
   return this.find({
     status: 'failed',
+    // A send that may have reached WhatsApp must be reviewed manually, never auto-retried.
+    errorCode: { $ne: 'DELIVERY_UNKNOWN' },
     $expr: { $lt: [{ $size: '$retries' }, '$maxRetries'] }
   })
     .sort({ failedAt: -1 })

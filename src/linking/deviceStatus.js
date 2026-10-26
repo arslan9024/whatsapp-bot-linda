@@ -1,13 +1,15 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+import { sanitizeClientId } from "../sessions/SessionLoginDetector.js";
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const STATUS_DIR = path.join(PROJECT_ROOT, "data", "device-status");
+const statusPath = number => path.join(STATUS_DIR, `${sanitizeClientId(number)}.json`);
 
 export const createDeviceStatusFile = (number) => {
-  const sessionPath = path.join(process.cwd(), "sessions", `session-${number}`);
-  const statusFile = path.join(sessionPath, "device-status.json");
-  
-  if (!fs.existsSync(sessionPath)) {
-    fs.mkdirSync(sessionPath, { recursive: true });
-  }
+  const statusFile = statusPath(number);
+  fs.mkdirSync(STATUS_DIR, { recursive: true });
   
   const status = {
     number,
@@ -23,11 +25,18 @@ export const createDeviceStatusFile = (number) => {
 };
 
 export const getDeviceStatus = (number) => {
-  const statusFile = path.join(process.cwd(), "sessions", `session-${number}`, "device-status.json");
-  
   try {
-    if (fs.existsSync(statusFile)) {
-      return JSON.parse(fs.readFileSync(statusFile, "utf8"));
+    const id = sanitizeClientId(number);
+    const candidates = [
+      statusPath(number),
+      path.join(PROJECT_ROOT, "sessions", `session-${id}`, "device-status.json"),
+      ...(/^\+\d+$/.test(String(number))
+        ? [path.join(PROJECT_ROOT, "sessions", `session-${number}`, "device-status.json")]
+        : []),
+    ];
+    const existing = candidates.find(file => fs.existsSync(file));
+    if (existing) {
+      return JSON.parse(fs.readFileSync(existing, "utf8"));
     }
   } catch (error) {
     console.error("Error reading device status:", error.message);
@@ -37,7 +46,7 @@ export const getDeviceStatus = (number) => {
 };
 
 export const updateDeviceStatus = (number, updates) => {
-  const statusFile = path.join(process.cwd(), "sessions", `session-${number}`, "device-status.json");
+  const statusFile = statusPath(number);
   
   try {
     const currentStatus = getDeviceStatus(number) || createDeviceStatusFile(number);
@@ -46,7 +55,7 @@ export const updateDeviceStatus = (number, updates) => {
       ...updates,
       number,
     };
-    
+    fs.mkdirSync(STATUS_DIR, { recursive: true });
     fs.writeFileSync(statusFile, JSON.stringify(newStatus, null, 2));
     return newStatus;
   } catch (error) {

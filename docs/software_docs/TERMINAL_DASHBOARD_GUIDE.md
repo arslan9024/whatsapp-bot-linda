@@ -68,6 +68,25 @@ The OUTPUT title changes with the master state:
 A **linked but offline** device does not need relinking: reactivate it with `recover <phone>`. On restart Linda
 restores saved sessions automatically ([ALG-003](../plans/03-algorithms/ALG-003-master-restore.md)).
 
+### 2.2 Event-driven Inbox counters
+
+The live Inbox line takes one chat-list baseline after readiness, without fetching
+message histories. There is no 30-second recount timer or extra listening port:
+Linda subscribes to events from its existing WhatsApp client.
+
+1. Subscribe before loading the baseline; retain updates received while it loads.
+2. Store each chat's unread value and running totals.
+3. On `unread_count`, apply `newUnread - oldUnread`. A change from 3 to 4 adds
+   exactly 1; marking it read at 0 subtracts 4.
+4. Message events discover new conversations but do not guess unread increments.
+   Duplicate events and either message/unread event order cannot double-count.
+5. On chat removal, subtract that chat's contribution.
+6. Ignore replaced/disconnected clients; take a fresh baseline after readiness
+   on reconnect. Rendering the dashboard never initiates periodic recounts.
+
+Unread changes and total-message analysis are distinct: the `convos` report is a
+separate snapshot, not a periodically rescanned live Inbox.
+
 ### 2.2 Plain mode
 
 Set `LINDA_PLAIN_TERMINAL=1`, or pipe the output, to disable pinning. Set `NO_COLOR` to disable colours. Non-TTY
@@ -314,6 +333,6 @@ described in [ARCHITECTURAL_BOUNDARIES.md §6](./ARCHITECTURAL_BOUNDARIES.md#6-m
 | ID | Change | Status |
 |---|---|---|
 | TD-P1 | PROCESS VIEWBOARD as a full panel listing running jobs (restore, campaign, analysis, API queue worker) with progress, not only a divider | Planned |
-| TD-P2 | API queue worker status (queued / sent today / last error) in HEADER and PROCESS | Planned, depends on API-G1 in [API_REFERENCE.md](./API_REFERENCE.md#8-known-gaps-and-planned-work) |
+| TD-P2 | API queue worker status (queued / sent today / last error) in HEADER and PROCESS | Planned. The worker exists (API-G1, opt-in); today it reports state changes to OUTPUT only |
 | TD-P3 | Multi-account view (servants as first-class accounts) | Later phase |
-| TD-P4 | "Link attempt 0/5 failed" notice shown when no attempt has started | Known defect, fix pending (`src/linking/DeviceLinkedManager.js`) |
+| TD-P4 | "Link attempt 0/5 failed. Retrying…" notice shown when no attempt had started, promising a retry that never happens | Fixed: failures count from attempt 1, and the notice says to wait and then run `recover <phone>` (or relink if the phone shows a logout) |

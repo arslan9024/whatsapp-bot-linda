@@ -35,4 +35,40 @@ describe('Real ESM session profile resolution', () => {
       'actual-profile', 'phone-profile', 'phone-profile', '15550000001', 'missing-persisted',
     ]);
   });
+
+  test('a new account defaults to one phone profile, but persisted aliases are preserved', () => {
+    const url = pathToFileURL(path.resolve('src', 'sessions', 'SessionManager.js')).href;
+    const result = execFileSync(process.execPath, ['--input-type=module', '-e', `
+      import { SessionManager } from ${JSON.stringify(url)};
+      SessionManager.hasSessionArtifacts = () => false;
+      SessionManager.hasAuthenticatedSession = () => false;
+      console.log('RESULT:' + JSON.stringify([
+        SessionManager.resolveClientId('+15550000001', {}, {id:'display-name'}),
+        SessionManager.resolveClientId('15550000001', {}, {id:'display-name'}),
+        SessionManager.resolveClientId('+15550000001', {clientId:'existing-alias'}, {id:'display-name'}),
+      ]));
+    `], { encoding: 'utf8' });
+    expect(JSON.parse(result.split('RESULT:')[1].trim())).toEqual([
+      '15550000001', '15550000001', 'existing-alias',
+    ]);
+  });
+
+  test('directory helpers normalize plus-prefixed numbers just like LocalAuth', () => {
+    const url = pathToFileURL(path.resolve('src', 'sessions', 'SessionManager.js')).href;
+    const result = execFileSync(process.execPath, ['--input-type=module', '-e', `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const created = [];
+      fs.existsSync = () => false;
+      fs.mkdirSync = dir => created.push(dir);
+      syncBuiltinESMExports();
+      const { SessionManager } = await import(${JSON.stringify(url)});
+      const profile = SessionManager.ensureSessionDirectory('+15550000001');
+      console.log('RESULT:' + JSON.stringify({profile, created}));
+    `], { encoding: 'utf8' });
+    const { profile, created } = JSON.parse(result.split('RESULT:')[1].trim());
+    const expected = path.resolve('sessions', 'session-15550000001');
+    expect(profile.path).toBe(expected);
+    expect(created).toEqual([expected, path.join(expected, 'Default')]);
+  });
 });

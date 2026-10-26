@@ -51,6 +51,34 @@ describe('Persistent campaign workspace', () => {
       contacts: normalizeRecipients(contacts).contacts,
     });
 
+  test('outside working hours the campaign waits (still pausable) and sends nothing', async () => {
+    const closed = new CampaignWorkspace({
+      directory,
+      accounts: () => [{ phone, active: true }],
+      sendRecipient: send,
+      checkRecipient: check,
+      log: jest.fn(),
+      // A one-minute window 12 hours away from now, so it is closed for this test.
+      workingHours: (() => {
+        const start = (new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + 12 * 60) % (24 * 60);
+        return { startMinute: start, endMinute: start + 1, timezone: 'UTC' };
+      })(),
+    });
+    closed.initialize();
+    const campaign = draft(closed);
+    closed.start(campaign.id);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(check).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(campaign.status).toBe('running');
+    expect(campaign.nextSendAt - Date.now()).toBeGreaterThan(11 * 60 * 60 * 1000);
+    expect(closed.log).toHaveBeenCalledWith(expect.stringContaining('outside working hours'), 'info');
+    closed.pause(campaign.id);
+    await closed.jobs.get(campaign.id);
+    expect(campaign.status).toBe('paused');
+    expect(campaign.contacts.every(contact => contact.status === 'pending')).toBe(true);
+  });
+
   test('normalizes international numbers, deduplicates and explicitly reports invalid rows', () => {
     const imported = normalizeRecipients([
       { 'Phone Number': '+1 (555) 000-0002', Name: 'Alex' },

@@ -11,12 +11,13 @@ import fs from "fs/promises";
 import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { logger } from '../core/Logger.js';
-import { chooseProfile, hasSavedLogin, waitForSavedLogin } from './SessionLoginDetector.js';
+import { chooseProfile, hasSavedLogin, waitForSavedLogin, sanitizeClientId } from './SessionLoginDetector.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "../../");
 export const SESSIONS_DIR = path.join(PROJECT_ROOT, "sessions");
 export const WEB_CACHE_DIR = path.join(PROJECT_ROOT, ".wwebjs_cache");
+const sessionDirectory = clientId => path.join(SESSIONS_DIR, `session-${sanitizeClientId(clientId)}`);
 const SESSION_CACHE_DIR = path.join(PROJECT_ROOT, ".session-cache");
 const SESSION_STATE_FILE = path.join(PROJECT_ROOT, "session-state.json");
 
@@ -29,7 +30,7 @@ export class SessionManager {
    */
   static async sessionExists(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       const stats = await fs.stat(sessionPath);
       return stats.isDirectory();
     } catch (error) {
@@ -61,7 +62,7 @@ export class SessionManager {
    */
   static async cleanupSession(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
 
       if (await this.sessionExists(masterNumber)) {
         console.log(`🧹 Cleaning up session: ${masterNumber}...`);
@@ -113,7 +114,7 @@ export class SessionManager {
       await this.cleanupSession(masterNumber);
 
       // Create fresh session directory
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       await fs.mkdir(sessionPath, { recursive: true });
 
       console.log(`✅ Fresh session created: ${masterNumber}\n`);
@@ -129,7 +130,7 @@ export class SessionManager {
    */
   static async getSessionCreationTime(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       const stats = await fs.stat(sessionPath);
       return stats.birthtime;
     } catch (error) {
@@ -142,7 +143,7 @@ export class SessionManager {
    */
   static async getSessionSize(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       let size = 0;
 
       const getSize = async (dir) => {
@@ -206,7 +207,7 @@ export class SessionManager {
    */
   static async validateSession(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       const requiredDirs = ["Default", "chrome_shutdown_ms"];
 
       if (!(await this.sessionExists(masterNumber))) {
@@ -321,6 +322,7 @@ export class SessionManager {
     return chooseProfile({
       persisted: metadata.clientId || profileId(metadata.sessionPath),
       candidates: [profileId(config.sessionPath), config.id, phoneNumber],
+      fallback: phoneNumber,
       hasArtifacts: id => this.hasSessionArtifacts(id),
       hasLogin: id => this.hasAuthenticatedSession(id),
     });
@@ -368,7 +370,7 @@ export class SessionManager {
     try {
       mkdirSync(SESSION_CACHE_DIR, { recursive: true });
 
-      const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionFolder = sessionDirectory(masterNumber);
       const backupFolder = path.join(SESSION_CACHE_DIR, `backup-${masterNumber}-${Date.now()}`);
 
       if (!existsSync(sessionFolder)) {
@@ -393,7 +395,7 @@ export class SessionManager {
     try {
       mkdirSync(SESSION_CACHE_DIR, { recursive: true });
 
-      const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionFolder = sessionDirectory(masterNumber);
       
       // Find most recent backup
       const backupDir = SESSION_CACHE_DIR;
@@ -429,7 +431,7 @@ export class SessionManager {
    * Get session information for debugging
    */
   static getSessionInfo(masterNumber) {
-    const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+    const sessionFolder = sessionDirectory(masterNumber);
     const exists = existsSync(sessionFolder);
     const canRestore = exists ? this.canRestoreSession(masterNumber) : false;
     const state = this.loadSessionState();
@@ -476,7 +478,7 @@ export class SessionManager {
    * Returns comprehensive info about session state
    */
   static getDetailedSessionStatus(masterNumber) {
-    const sessionFolder = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+    const sessionFolder = sessionDirectory(masterNumber);
     const result = {
       phoneNumber: masterNumber,
       sessionFolder,
@@ -732,7 +734,7 @@ export class SessionManager {
    */
   static ensureSessionDirectory(masterNumber) {
     try {
-      const sessionPath = path.join(SESSIONS_DIR, `session-${masterNumber}`);
+      const sessionPath = sessionDirectory(masterNumber);
       
       if (!existsSync(sessionPath)) {
         mkdirSync(sessionPath, { recursive: true });

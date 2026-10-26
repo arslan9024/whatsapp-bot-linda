@@ -121,6 +121,7 @@ import ReportGenerator from "./src/analytics/ReportGenerator.js";
 import MetricsDashboard from "./src/analytics/MetricsDashboard.js";
 import GoogleSheetsManager from "./src/integrations/google/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
 import { createTerminalCampaigns } from "./src/campaigns/CampaignWorkspaceSetup.js";
+import ApiQueueWorker from "./src/campaigns/ApiQueueWorker.js";
 
 // PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
 // Allows master accounts to send "linda <command>" messages to primary master
@@ -215,6 +216,7 @@ let lockFileDetector = null;
 // Phase 19: Campaign Manager instances
 let campaignService = null;
 let terminalCampaigns = null;
+let apiQueueWorker = null;
 let contactFilterService = null;
 let campaignScheduler = null;
 
@@ -966,6 +968,14 @@ async function initializeBot() {
     }
     logBot("", "info");
 
+    // ============================================
+    // STEP 10: API queue worker — delivers REST API messages via the master (opt-in)
+    // ============================================
+    if (!apiQueueWorker) {
+      apiQueueWorker = new ApiQueueWorker({ accountClients, accountConfigManager, logBot });
+      apiQueueWorker.start();
+    }
+
     logBot("MASTER FIRST: master check | master ready (restore if offline)", "info");
     logBot("   If authentication is required: link-code | link-qr", "info");
     logBot("   All commands: features | menu | help", "info");
@@ -1012,7 +1022,10 @@ services.register('getConnectionDiagnostics', getAllConnectionDiagnostics);
  */
 const gracefulShutdown = createGracefulShutdown({
   stopSessionRecovery: () => sharedContext.sessionRecovery.stop(),
-  closeCampaigns: () => terminalCampaigns?.close(),
+  closeCampaigns: async () => {
+    await apiQueueWorker?.stop();
+    await terminalCampaigns?.close();
+  },
   logBot,
   getSessionStateManager: () => sessionStateManager,
   accountHealthMonitor,

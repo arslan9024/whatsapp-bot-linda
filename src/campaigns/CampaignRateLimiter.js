@@ -1,6 +1,7 @@
 import { campaignService } from './CampaignService.js';
 import { DailyLimit } from '../database/schemas/CampaignSchema.js';
 import { Logger } from '../core/Logger.js';
+import { workingHoursConfig, isWithinWorkingHours as isInsideWorkingHours } from './WorkingHours.js';
 
 const logger = new Logger('CampaignRateLimiter');
 
@@ -297,26 +298,19 @@ class CampaignRateLimiter {
    * Check if a specific time is within working hours
    * (Helps avoid sending at night or on non-business days)
    */
-  isWithinWorkingHours(timezone = 'Asia/Dubai') {
+  isWithinWorkingHours(timezone) {
     try {
-      const now = new Date();
-      
-      // Get hour in specific timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
+      const config = workingHoursConfig();
+      if (timezone) config.timezone = timezone;
+      const hour = Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: config.timezone,
         hour: 'numeric',
-        hour12: false
-      });
-      
-      const hour = parseInt(formatter.format(now));
-      
-      // Working hours: 8 AM to 6 PM
-      const inWorkingHours = hour >= 8 && hour <= 18;
-      
-      return { inWorkingHours, hour };
+        hourCycle: 'h23'
+      }).format(new Date()));
+      return { inWorkingHours: isInsideWorkingHours(config), hour };
     } catch (error) {
       logger.warn(`Failed to check working hours: ${error.message}`);
-      return { inWorkingHours: true, hour: -1 }; // Allow if check fails
+      return { inWorkingHours: false, hour: -1 }; // Fail closed: never send when the window is unknown
     }
   }
   

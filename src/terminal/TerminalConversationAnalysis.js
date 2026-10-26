@@ -24,6 +24,15 @@ const timeAgo = (seconds, now = Date.now()) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 const formatCount = entry => (entry.messages === null ? '?' : `${entry.messages}${entry.capped ? '+' : ''}`);
+const isConversationId = id => typeof id === 'string' && /@(c\.us|g\.us|lid)$/.test(id);
+const unreadOf = chat => Math.max(0, Number(chat?.unreadCount) || 0);
+const applyEntry = (totals, entry, sign) => {
+  totals.totalChats += sign;
+  if (entry.group) totals.groups += sign;
+  else totals.people += sign;
+  if (entry.unread > 0) totals.unreadChats += sign;
+  totals.unreadMessages += sign * entry.unread;
+};
 
 /** Short summary lines of a conversation report for the OUTPUT panel. */
 export function conversationSummaryLines(report, { top = 5, now = Date.now() } = {}) {
@@ -61,12 +70,15 @@ export function conversationReportLines(report, { now = Date.now() } = {}) {
 }
 
 export class TerminalConversationAnalysis {
-  constructor({ accountClients, getFlowDeps, output = console.log }) {
+  constructor({ accountClients, getFlowDeps, output = console.log, onInboxChange = null }) {
     this.accountClients = accountClients;
     this.getFlowDeps = getFlowDeps;
     this.output = output;
     this.snapshots = new Map();
     this.reports = new Map();
+    this.inboxes = new Map();
+    this.listenedClients = new WeakSet();
+    this.onInboxChange = onInboxChange;
   }
 
   async connected(requestedPhone) {
@@ -252,6 +264,127 @@ export class TerminalConversationAnalysis {
     return report;
   }
 
+  /**
+   * Inbox counters (total conversations, unread messages) for an active account.
+   *
+   * Algorithm: one O(n) baseline over the chat list (no message fetching), then O(1) delta
+   * updates driven by WhatsApp events, so there is no polling loop:
+   *   unread_count(chat) → set that chat's exact unread value (authoritative)
+   *   message(msg)       → discover a new conversation; never guess its unread count
+   *   chat_removed(chat) → drop the chat from both totals
+   * Totals are kept as running sums, so each event adjusts them by the per-chat delta.
+   */
+  async counts(phoneNumber, { refresh = false } = {}) {
+    const { phone, client } = await this.connected(phoneNumber);
+    const existing = this.inboxes.get(phone);
+    if (existing?.client === client && (existing.loading || !refresh)) return existing.loading || existing.totals;
+    const inbox = {
+      client, chats: new Map(), ready: false, touched: new Set(), discovered: new Set(),
+      totals: { phone, at: Date.now(), totalChats: 0, people: 0, groups: 0, unreadChats: 0, unreadMessages: 0 },
+    };
+    this.inboxes.set(phone, inbox);
+    // Subscribe before the snapshot request so updates received while it loads win.
+    this.listenForInboxChanges(phone, client);
+    inbox.loading = (async () => {
+      try {
+        const chats = await client.getChats();
+        if (this.accountClients.get(phone) !== client || this.inboxes.get(phone) !== inbox ||
+            this.getFlowDeps().connectionManagers.get(phone)?.state !== 'CONNECTED') {
+          throw new Error('Account connection changed while reading chats');
+        }
+        for (const chat of chats) {
+          const id = chat.id?._serialized;
+          if (!isConversationId(id) || inbox.chats.has(id) || inbox.touched.has(id)) continue;
+          const entry = { group: chat.isGroup === true || id.endsWith('@g.us'), unread: unreadOf(chat) };
+          inbox.chats.set(id, entry);
+          applyEntry(inbox.totals, entry, 1);
+        }
+        for (const id of inbox.discovered) {
+          if (inbox.chats.has(id) || inbox.touched.has(id)) continue;
+          const entry = { group: id.endsWith('@g.us'), unread: 0 };
+          inbox.chats.set(id, entry);
+          applyEntry(inbox.totals, entry, 1);
+        }
+        inbox.touched.clear();
+        inbox.discovered.clear();
+        inbox.ready = true;
+        inbox.totals.at = Date.now();
+        return inbox.totals;
+      } catch (error) {
+        if (this.inboxes.get(phone) === inbox) this.inboxes.delete(phone);
+        throw error;
+      } finally {
+        inbox.loading = null;
+      }
+    })();
+    return inbox.loading;
+  }
+
+  listenForInboxChanges(phone, client) {
+    if (this.listenedClients.has(client) || typeof client.on !== 'function') return;
+    this.listenedClients.add(client);
+    const current = () => {
+      const inbox = this.inboxes.get(phone);
+      return inbox?.client === client && this.accountClients.get(phone) === client &&
+        this.getFlowDeps().connectionManagers.get(phone)?.state === 'CONNECTED' ? inbox : null;
+    };
+    const update = (inbox, id, change) => {
+      const before = inbox.chats.get(id);
+      const after = change(before);
+      if (before?.group === after?.group && before?.unread === after?.unread) return;
+      if (before) applyEntry(inbox.totals, before, -1);
+      if (after) {
+        inbox.chats.set(id, after);
+        applyEntry(inbox.totals, after, 1);
+      } else {
+        inbox.chats.delete(id);
+      }
+      inbox.totals.at = Date.now();
+      if (inbox.ready) this.onInboxChange?.(phone, inbox.totals);
+    };
+    client.on('unread_count', chat => {
+      const inbox = current();
+      const id = chat?.id?._serialized;
+      if (!inbox || !isConversationId(id)) return;
+      if (!inbox.ready) inbox.touched.add(id);
+      update(inbox, id, before => ({
+        group: before?.group ?? (chat.isGroup === true || id.endsWith('@g.us')),
+        unread: unreadOf(chat),
+      }));
+    });
+    const discover = message => {
+      const inbox = current();
+      const remote = message?.id?.remote;
+      const id = remote?._serialized || remote || (message?.fromMe ? message?.to : message?.from);
+      if (!inbox || !isConversationId(id)) return;
+      if (!inbox.ready) {
+        inbox.discovered.add(id);
+      } else if (!inbox.chats.has(id)) {
+        update(inbox, id, () => ({ group: id.endsWith('@g.us'), unread: 0 }));
+      }
+    };
+    client.on('message', discover);
+    client.on('message_create', discover);
+    client.on('chat_removed', chat => {
+      const inbox = current();
+      const id = chat?.id?._serialized;
+      if (!inbox || !isConversationId(id)) return;
+      if (!inbox.ready) inbox.touched.add(id);
+      if (inbox.chats.has(id)) update(inbox, id, () => null);
+    });
+  }
+
+  getCounts(phone) {
+    if (!phone) return null;
+    const bare = String(phone).replace(/^\+/, '');
+    for (const [key, inbox] of this.inboxes) {
+      if (key.replace(/^\+/, '') === bare && inbox.ready &&
+          this.accountClients.get(key) === inbox.client &&
+          this.getFlowDeps().connectionManagers.get(key)?.state === 'CONNECTED') return inbox.totals;
+    }
+    return null;
+  }
+
   getReport(phone) {
     if (!phone) return null;
     if (this.reports.has(phone)) return this.reports.get(phone);
@@ -263,5 +396,6 @@ export class TerminalConversationAnalysis {
   clear(phone) {
     this.snapshots.delete(phone);
     this.reports.delete(phone);
+    this.inboxes.delete(phone);
   }
 }

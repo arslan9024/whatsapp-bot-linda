@@ -326,6 +326,24 @@ class CampaignService {
       { $set: { status: 'failed', failedAt: new Date(), errorReason: reason } }
     );
   }
+
+  /**
+   * Count a delivered message toward today's per-account cap for a non-campaign
+   * sender (e.g. the API queue worker), using the same DailyLimit rows as campaigns.
+   */
+  async incrementDailySent(limitId, accountNumber) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return DailyLimit.updateOne(
+      { campaignId: limitId, accountNumber, date: today },
+      {
+        $inc: { sentCount: 1 },
+        $set: { updatedAt: new Date() },
+        $setOnInsert: { resetAt: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
+      },
+      { upsert: true }
+    );
+  }
   
   /**
    * Record a message as failed for retry

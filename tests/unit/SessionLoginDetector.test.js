@@ -25,6 +25,14 @@ describe('Saved WhatsApp login detection', () => {
     expect(hasSavedLogin(sessionsDir, 'missing')).toBe(false);
   });
 
+  it('detects a login on newer WhatsApp Web builds that hash the last-wid keys', () => {
+    const key = name => `\u0000_https://web.whatsapp.com\u0000\u0001${name}\u0000x`;
+    createProfile('new-build-linked', ['WANoiseInfo', 'WAWebEncKeySalt', 'Y6YE613Bc6amSMCxZ3g9cg==', 'WASyncdPrimaryAllowsAllMutations', 'WAHistorySyncRemainingPausedSeconds'].map(key).join(''));
+    createProfile('new-build-unlinked', ['WANoiseInfo', 'WAWebEncKeySalt', 'WAMms4Conn'].map(key).join(''));
+    expect(hasSavedLogin(sessionsDir, 'new-build-linked')).toBe(true);
+    expect(hasSavedLogin(sessionsDir, 'new-build-unlinked')).toBe(false);
+  });
+
   it('notices a login written after an earlier check', () => {
     createProfile('late-login', 'WAWebVersion');
     expect(hasSavedLogin(sessionsDir, 'late-login')).toBe(false);
@@ -45,6 +53,15 @@ describe('Saved WhatsApp login detection', () => {
   it('keeps the persisted profile while no profile holds a login', () => {
     expect(choose('arslan-malik', ['other', '+15550000001'])).toBe('arslan-malik');
     expect(choose(undefined, ['other', '+15550000001'])).toBe('other');
+  });
+
+  it('uses the normalized phone for a new account instead of creating a display-name profile', () => {
+    expect(chooseProfile({
+      candidates: ['new-account-name', '+15550000001'],
+      fallback: '+15550000001',
+      hasArtifacts: () => false,
+      hasLogin: () => false,
+    })).toBe('15550000001');
   });
 
   it('waits for the login to reach disk', async () => {

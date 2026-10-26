@@ -1,4 +1,5 @@
 import { Logger } from '../core/Logger.js';
+import { workingHoursConfig, msUntilWorkingHours, describeWorkingHours } from './WorkingHours.js';
 
 const logger = new Logger('CampaignMessageDelayer');
 
@@ -18,9 +19,7 @@ class CampaignMessageDelayer {
   BASE_DELAY_MAX = 5000;              // 5 seconds maximum
   BURST_THRESHOLD = 5;                // After 5 consecutive messages
   BURST_DELAY = 60000;                // 60 seconds after burst
-  NIGHT_START_HOUR = 18;              // 6 PM
-  NIGHT_END_HOUR = 8;                 // 8 AM
-  WORKING_HOURS_TIMEZONE = 'Asia/Dubai';
+  workingHours = workingHoursConfig(); // WORK_HOURS_START/END/TIMEZONE, shared with all senders
   
   // Retry backoff configuration
   RETRY_DELAYS = [
@@ -55,10 +54,9 @@ class CampaignMessageDelayer {
       }
       
       // Check if we should wait for working hours
-      const workingHoursCheck = this._isWithinWorkingHours();
-      if (!workingHoursCheck.inWorkingHours && !workingHoursCheck.willBeWorkingHours) {
-        const sleepTime = this._getHoursUntilWorkingHours();
-        logger.info(`Outside working hours. Sleeping ${sleepTime}ms until ${this.NIGHT_END_HOUR}:00`);
+      const sleepTime = msUntilWorkingHours(this.workingHours);
+      if (sleepTime) {
+        logger.info(`Outside working hours (${describeWorkingHours(this.workingHours)}). Sleeping ${sleepTime}ms`);
         delay = sleepTime;
       }
       
@@ -78,84 +76,6 @@ class CampaignMessageDelayer {
     return Math.floor(
       Math.random() * (this.BASE_DELAY_MAX - this.BASE_DELAY_MIN) + this.BASE_DELAY_MIN
     );
-  }
-  
-  /**
-   * Check if current time is within working hours
-   * @private
-   */
-  _isWithinWorkingHours() {
-    try {
-      const now = new Date();
-      
-      // Get hour in timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: this.WORKING_HOURS_TIMEZONE,
-        hour: 'numeric',
-        hour12: false
-      });
-      
-      const hour = parseInt(formatter.format(now));
-      
-      const inWorkingHours = hour >= this.NIGHT_END_HOUR && hour < this.NIGHT_START_HOUR;
-      
-      // Check if we'll be in working hours if we wait until next morning
-      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-      const formatter2 = new Intl.DateTimeFormat('en-US', {
-        timeZone: this.WORKING_HOURS_TIMEZONE,
-        hour: 'numeric',
-        hour12: false
-      });
-      const hourLater = parseInt(formatter2.format(oneHourLater));
-      const willBeWorkingHours = hourLater >= this.NIGHT_END_HOUR && hourLater < this.NIGHT_START_HOUR;
-      
-      return { inWorkingHours, willBeWorkingHours, currentHour: hour };
-    } catch (error) {
-      logger.warn(`Failed to check working hours: ${error.message}`);
-      return { inWorkingHours: true, willBeWorkingHours: true };
-    }
-  }
-  
-  /**
-   * Calculate milliseconds until working hours begin
-   * @private
-   */
-  _getHoursUntilWorkingHours() {
-    try {
-      const now = new Date();
-      
-      // Get current time in timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: this.WORKING_HOURS_TIMEZONE,
-        hour: 'numeric',
-        minute: 'numeric',
-        second: 'numeric',
-        hour12: false
-      });
-      
-      const timeString = formatter.format(now);
-      const [hours, minutes, seconds] = timeString.split(':').map(Number);
-      
-      let msUntilWorkStart;
-      
-      if (hours < this.NIGHT_END_HOUR) {
-        // Before working hours start today (e.g., 2 AM)
-        const startTime = new Date(now);
-        startTime.setHours(this.NIGHT_END_HOUR, 0, 0, 0);
-        msUntilWorkStart = startTime - now;
-      } else {
-        // After working hours end (e.g., 9 PM)
-        const nextDay = new Date(now);
-        nextDay.setDate(nextDay.getDate() + 1);
-        nextDay.setHours(this.NIGHT_END_HOUR, 0, 0, 0);
-        msUntilWorkStart = nextDay - now;
-      }
-      
-      return Math.max(msUntilWorkStart, 0);
-    } catch (error) {
-      logger.error(`Failed to calculate wait time: ${error.message}`);
-      return 60 * 60 * 1000; // Default 1 hour
-    }
   }
   
   /**
@@ -234,7 +154,7 @@ class CampaignMessageDelayer {
       failedRetries: Array.from(this.failedRetries.entries()),
       baseDelayRange: `${this.BASE_DELAY_MIN}ms - ${this.BASE_DELAY_MAX}ms`,
       burstThreshold: this.BURST_THRESHOLD,
-      workingHours: `${this.NIGHT_END_HOUR}:00 - ${this.NIGHT_START_HOUR}:00 (${this.WORKING_HOURS_TIMEZONE})`
+      workingHours: describeWorkingHours(this.workingHours)
     };
   }
 }

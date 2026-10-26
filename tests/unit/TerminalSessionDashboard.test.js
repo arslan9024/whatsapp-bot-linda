@@ -170,6 +170,49 @@ describe('Compact truthful terminal device dashboard', () => {
     delete process.env.LINDA_AUTO_CHAT_REPORT;
   });
 
+  test('online master shows inbox counters once, then only on events (no polling), re-counted after reconnect', async () => {
+    jest.useFakeTimers();
+    const phone = devices[0].phoneNumber;
+    dashboard.accountConfigManager.getMasterPhoneNumber = () => phone;
+    let stored = null;
+    const reporter = {
+      run: jest.fn(), get: () => null,
+      counts: jest.fn(async () => (stored = { phone, at: Date.now(), totalChats: 42, people: 30, groups: 12, unreadChats: 5, unreadMessages: 17 })),
+      getCounts: () => stored,
+    };
+    dashboard.setConversationReporter(reporter);
+    dashboard.displayHealthDashboard();
+    expect(console.log.mock.calls.at(-1)[0]).toContain('Inbox: counting conversations and unread messages');
+    await dashboard.inboxCountJobs.get(phone);
+    expect(reporter.counts).toHaveBeenCalledTimes(1);
+    dashboard.displayHealthDashboard(true);
+    const screen = console.log.mock.calls.at(-1)[0];
+    expect(screen).toContain('Inbox: 42 conversations (30 people, 12 groups) · Unread: 17 messages in 5 chats · live');
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    dashboard.displayHealthDashboard(true);
+    expect(reporter.counts).toHaveBeenCalledTimes(1);
+    dashboard.onAccountReady(phone, 1000);
+    jest.advanceTimersByTime(1000);
+    await dashboard.inboxCountJobs.get(phone);
+    expect(reporter.counts).toHaveBeenCalledTimes(2);
+    expect(reporter.counts).toHaveBeenLastCalledWith(phone, { refresh: true });
+  });
+
+  test('baseline inbox failures are visible and dashboard redraws do not create a retry loop', async () => {
+    const phone = devices[0].phoneNumber;
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    dashboard.setConversationReporter({
+      counts: jest.fn().mockRejectedValue(new Error('Chat list unavailable')),
+      getCounts: () => null,
+    });
+    dashboard.inboxCountLine(phone);
+    await dashboard.inboxCountJobs.get(phone);
+    expect(dashboard.lastNotice).toContain('Chat list unavailable');
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Chat list unavailable'));
+    dashboard.inboxCountLine(phone);
+    expect(dashboard.conversationReporter.counts).toHaveBeenCalledTimes(1);
+  });
+
   test('offline master shows the RELINK section (reactivate first) instead of the message analyzer', () => {
     const phone = devices[0].phoneNumber;
     dashboard.accountConfigManager.getMasterPhoneNumber = () => phone;

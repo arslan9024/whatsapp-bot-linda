@@ -288,7 +288,7 @@ Source: `src/api/routes/communication.routes.js` · Prefix: `/api/communications
 | 25 | GET | `/api/communications/queue/scheduled` | read, admin | Get scheduled messages due for sending |
 | 26 | POST | `/api/communications/seed` | admin | Seed default templates |
 
-`POST /queue/process` always returns `501`: queue processing needs an active WhatsApp bot worker, which is not wired yet.
+`POST /queue/process` returns `501` by design: queued messages are delivered by the bot's API queue worker (`src/campaigns/ApiQueueWorker.js`), enabled with `API_QUEUE_WORKER=1`, not by this endpoint. The worker sends one due message at a time through the master account within the safety limits in [ARCHITECTURAL_BOUNDARIES.md §6](./ARCHITECTURAL_BOUNDARIES.md#6-messaging-safety-limits).
 
 ### 6.10 Analytics
 
@@ -421,7 +421,7 @@ Source: `src/api/routes/damacApiRoutes.js` · Prefix: `/api/v1/damac` · Servers
 
 | ID | Gap | Planned resolution | Status |
 |---|---|---|---|
-| API-G1 | No WhatsApp delivery for API-queued messages: `CommunicationService.processQueue(sendFn)` exists but nothing in the bot calls it; `/queue/process` returns 501. | Separate feature: a bot-side queue worker that drains `CommunicationLog` through the active master client, inside the campaign safety limits and honouring idempotency. | Planned |
+| API-G1 | WhatsApp delivery for API-queued messages. | Bot-side `ApiQueueWorker` drains due `CommunicationLog` records through the master client, sharing the 45/day account cap and circuit breaker, re-checking consent, marking unconfirmed sends `DELIVERY_UNKNOWN` (never auto-retried) and cancelling messages overdue by more than 24 h. Sends only within working hours (`WORK_HOURS_START`/`END`/`TIMEZONE`, default 09:00–20:00 Asia/Dubai). Text only. | Implemented, opt-in (`API_QUEUE_WORKER=1`); unit-tested, not yet live-verified |
 | API-G2 | The bot and the API run as separate processes; the API cannot see live WhatsApp session state. | Expose session state to the API through MongoDB (the worker records heartbeat and master status). | Planned |
 | API-G3 | Two API servers with different prefixes (`/api/*` vs `/api/v1/damac/*`). | Choose one public base path for the web app and keep the other for compatibility. | To decide |
 | API-G4 | Activation and timing of the API alongside the bot (when it starts, which server) is not decided. | Check and add later, as agreed on 2026-10-26. | Open |

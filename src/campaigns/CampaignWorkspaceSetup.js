@@ -8,6 +8,7 @@ import CampaignWorkspace, {
 import ContactConsentService from './ContactConsentService.js';
 import { campaignService } from './CampaignService.js';
 import { campaignRateLimiter } from './CampaignRateLimiter.js';
+import { workingHoursConfig } from './WorkingHours.js';
 import TerminalCampaignMenu from '../terminal/TerminalCampaignMenu.js';
 
 export function createTerminalCampaigns({
@@ -27,10 +28,13 @@ export function createTerminalCampaigns({
       active: connectionManagers.get(phone)?.state === 'CONNECTED',
     }));
   };
+  const workingHours = workingHoursConfig();
+  workingHours.warnings.forEach(warning => logBot(warning, 'warn'));
   const workspace = new CampaignWorkspace({
     directory: path.resolve('data', 'campaign-workspace'),
     accounts,
-    log: message => logBot(message, 'error'),
+    workingHours,
+    log: (message, level = 'error') => logBot(message, level),
     checkRecipient: async (campaign, contact) => {
       if (mongoose.connection.readyState !== 1) {
         return {

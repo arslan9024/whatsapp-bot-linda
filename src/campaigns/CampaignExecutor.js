@@ -134,7 +134,7 @@ class CampaignExecutor {
       }
       
       // ========== STEP 4-5: Send messages with rate limiting ==========
-      CampaignMessageDelayer.resetBatchCounter();
+      campaignMessageDelayer.resetBatchCounter();
       
       for (let i = 0; i < Math.min(contacts.length, remaining); i++) {
         const contact = contacts[i];
@@ -248,8 +248,8 @@ class CampaignExecutor {
           }
           
           // Apply intelligent delay before next message
-          const delay = await CampaignMessageDelayer.getMessageDelay();
-          await CampaignMessageDelayer.wait(delay);
+          const delay = await campaignMessageDelayer.getMessageDelay();
+          await campaignMessageDelayer.wait(delay);
           
         } catch (error) {
           campaignRateLimiter.recordOutcome(accountPhone, false);

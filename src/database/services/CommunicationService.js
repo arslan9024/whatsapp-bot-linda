@@ -351,7 +351,8 @@ class CommunicationService {
         context = {},
         priority = 'normal',
         sendFn,
-        idempotencyKey
+        idempotencyKey,
+        scheduledFor
       } = options;
 
       const normalizedKey = CommunicationService._validateIdempotencyKey(idempotencyKey);
@@ -402,7 +403,8 @@ class CommunicationService {
         status: 'queued',
         context,
         priority,
-        idempotencyKey: normalizedKey
+        idempotencyKey: normalizedKey,
+        ...(scheduledFor ? { scheduledFor: new Date(scheduledFor) } : {})
       });
 
       const saved = await CommunicationService._saveMessageLog(log);
@@ -684,23 +686,18 @@ class CommunicationService {
         return { success: false, error: 'scheduledFor must be in the future' };
       }
 
-      // Create without sending
+      // Create without sending; scheduledFor is stored atomically so the queue worker never sends it early.
       const result = await CommunicationService.sendTemplateMessage({
         ...sendOptions,
-        sendFn: null // Don't send yet
+        scheduledFor: scheduleDate,
+        sendFn: null
       });
 
       if (result.success && result.log) {
         if (result.duplicate) return result;
-        // Update schedule time
-        await CommunicationLog.findOneAndUpdate(
-          { logId: result.log.logId },
-          { scheduledFor: scheduleDate }
-        );
-
         return {
           success: true,
-          log: { ...result.log, scheduledFor: scheduleDate },
+          log: result.log,
           message: `Message scheduled for ${scheduleDate.toISOString()}`
         };
       }
@@ -1009,7 +1006,7 @@ class CommunicationService {
             await new Promise(resolve => setTimeout(resolve, delayMs));
           }
         } catch (sendError) {
-          await msg.markFailed(sendError.message, 'QUEUE_SEND_FAILED');
+          await msg.markFailed(sendError.message, sendError.code || 'QUEUE_SEND_FAILED');
           failed++;
 
           if (msg.templateId) {
@@ -1029,6 +1026,31 @@ class CommunicationService {
     } catch (error) {
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Cancel queued messages that became due more than maxAgeMs ago, so a long outage
+   * never releases an old backlog to recipients.
+   */
+  static async expireStaleQueued(maxAgeMs, now = new Date()) {
+    const cutoff = new Date(now.getTime() - maxAgeMs);
+    const result = await CommunicationLog.updateMany(
+      {
+        status: 'queued',
+        $or: [
+          { scheduledFor: null, queuedAt: { $lt: cutoff } },
+          { scheduledFor: { $lt: cutoff } }
+        ]
+      },
+      {
+        $set: {
+          status: 'cancelled',
+          errorCode: 'EXPIRED',
+          errorMessage: 'Expired in the queue before the master account could send it.'
+        }
+      }
+    );
+    return result.modifiedCount || 0;
   }
 
   // ============================================

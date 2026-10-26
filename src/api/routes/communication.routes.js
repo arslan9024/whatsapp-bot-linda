@@ -724,7 +724,7 @@ router.get('/delivery-stats', async (req, res) => {
 router.post('/queue/process', async (req, res) => {
   res.status(501).json({
       success: false,
-      error: 'Queue processing requires an active WhatsApp bot worker. Queued messages were not modified.',
+      error: 'Queue processing runs inside the bot (ApiQueueWorker, enabled with API_QUEUE_WORKER=1) through the master account. Queued messages were not modified.',
       timestamp: new Date().toISOString()
     });
 });

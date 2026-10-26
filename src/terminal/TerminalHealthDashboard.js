@@ -81,6 +81,8 @@ class TerminalHealthDashboard {
     this.conversationReporter = null;
     this.conversationJobs = new Map();
     this.conversationTimers = new Map();
+    this.inboxCountJobs = new Map();
+    this.inboxCountAttempts = new Set();
   }
 
   /** HEADER panel: Linda identity, runtime details and master/device status. */
@@ -134,6 +136,8 @@ class TerminalHealthDashboard {
     const { phone } = info;
     if (info.online) {
       const lines = [`MESSAGE ANALYZER · MASTER ${phone} ONLINE`];
+      const inboxLine = this.inboxCountLine(phone);
+      if (inboxLine) lines.push(`  ${inboxLine}`);
       const report = this.conversationReporter?.get(phone);
       if (!this.conversationReporter) {
         lines.push('  Conversation reports are unavailable in this run.');
@@ -165,14 +169,59 @@ class TerminalHealthDashboard {
     return lines;
   }
 
-  /** `reporter = { run(phone, options) => report, get(phone) => report|null }` */
+  /**
+   * "Inbox: N conversations · U unread" for an online account. A single baseline count runs
+   * when the account comes online; afterwards WhatsApp events keep the counters current
+   * (see TerminalConversationAnalysis.counts), so there is no polling here.
+   */
+  inboxCountLine(phone) {
+    const reporter = this.conversationReporter;
+    if (!reporter?.counts || !reporter.getCounts) return '';
+    const counts = reporter.getCounts(phone);
+    if (!counts && !this.inboxCountJobs.has(phone) && !this.inboxCountAttempts.has(phone)) {
+      this.refreshInboxCounts(phone);
+    }
+    if (!counts) {
+      return this.inboxCountJobs.has(phone) ? 'Inbox: counting conversations and unread messages…' :
+        'Inbox: counts unavailable (they load when the master comes online; 8.11 convos for a full report)';
+    }
+    return `Inbox: ${counts.totalChats} conversations (${counts.people} people, ${counts.groups} groups) · ` +
+      `Unread: ${counts.unreadMessages} messages in ${counts.unreadChats} chats · ` +
+      `live, updated ${new Date(counts.at).toLocaleTimeString()}`;
+  }
+
+  /** Takes the baseline inbox count of `phone` in the background and redraws when done. */
+  refreshInboxCounts(phone, { refresh = false } = {}) {
+    if (!this.conversationReporter?.counts) return Promise.resolve(null);
+    if (this.inboxCountJobs.has(phone)) return this.inboxCountJobs.get(phone);
+    this.inboxCountAttempts.add(phone);
+    const job = Promise.resolve()
+      .then(() => this.conversationReporter.counts(phone, { refresh }))
+      .catch(error => {
+        this.lastNotice = `Inbox counts for ${phone} failed: ${error.message}`;
+        console.error(this.lastNotice);
+        return null;
+      })
+      .finally(() => {
+        this.inboxCountJobs.delete(phone);
+        this.requestDashboardRefresh();
+      });
+    this.inboxCountJobs.set(phone, job);
+    return job;
+  }
+
+  /** `reporter = { run, get, counts?, getCounts? }` (see TerminalConversationAnalysis) */
   setConversationReporter(reporter) {
     this.conversationReporter = reporter;
   }
 
   /** Called when an account becomes ready: analyze its conversations once WhatsApp has synced. */
   onAccountReady(phone, delayMs = Number(process.env.LINDA_CHAT_REPORT_DELAY_MS) || 8000) {
-    if (!this.conversationReporter || process.env.LINDA_AUTO_CHAT_REPORT === '0') return;
+    if (!this.conversationReporter) return;
+    this.inboxCountAttempts.delete(phone);
+    const countsTimer = setTimeout(() => this.refreshInboxCounts(phone, { refresh: true }), Math.min(delayMs, 3000));
+    countsTimer.unref?.();
+    if (process.env.LINDA_AUTO_CHAT_REPORT === '0') return;
     clearTimeout(this.conversationTimers.get(phone));
     const timer = setTimeout(() => {
       this.conversationTimers.delete(phone);

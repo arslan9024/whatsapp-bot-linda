@@ -96,6 +96,7 @@ export default class DeviceLinkedManager extends EventEmitter {
     device.lastHeartbeat = now;
     device.lastError = null;
     device.recoveryMode = false;
+    device.retryAfter = null;
     
     // Reset link attempts on successful link
     this.linkAttempts.delete(phoneNumber);
@@ -161,8 +162,11 @@ export default class DeviceLinkedManager extends EventEmitter {
     const device = this.devices.get(phoneNumber);
     if (!device) return null;
 
-    const attempts = this.linkAttempts.get(phoneNumber) || 0;
-    
+    // A failure before startLinkingAttempt() (e.g. client creation) still consumes an attempt.
+    const attempts = Math.max(this.linkAttempts.get(phoneNumber) || 0, 1);
+    this.linkAttempts.set(phoneNumber, attempts);
+    device.linkAttempts = attempts;
+
     if (attempts >= this.maxLinkAttempts) {
       device.status = "error";
       device.isOnline = false;
@@ -177,12 +181,15 @@ export default class DeviceLinkedManager extends EventEmitter {
       return null;
     }
 
-    // Calculate exponential backoff: 2^attempt * 1000ms
+    // Suggested wait before the operator retries (exponential backoff); no retry is scheduled here.
     const backoffDelay = Math.pow(2, attempts) * this.baseBackoffMs;
     device.lastError = error?.message || "Link failed";
+    device.retryAfter = new Date(Date.now() + backoffDelay).toISOString();
 
+    const waitSeconds = Math.ceil(backoffDelay / 1000);
     this.logFunction(
-      `⏳ Link attempt ${attempts}/${this.maxLinkAttempts} failed. Retrying in ${backoffDelay}ms...`,
+      `Link attempt ${attempts}/${this.maxLinkAttempts} failed for ${phoneNumber}: ${device.lastError}. ` +
+        `Wait ${waitSeconds}s, then run: recover ${phoneNumber} (or relink if the phone shows it logged out)`,
       "warn"
     );
 
@@ -206,6 +213,7 @@ export default class DeviceLinkedManager extends EventEmitter {
 
     device.status = "unlinked";
     device.linkAttempts = 0;
+    device.retryAfter = null;
     device.lastError = null;
     device.isOnline = false;
     device.recoveryMode = false;

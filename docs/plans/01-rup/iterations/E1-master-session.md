@@ -152,9 +152,9 @@ while retaining the working file; prior Git history was not rewritten.
 
 Live checks (not replaceable by mocks; do not mark done without evidence):
 
-- [ ] Reach ACTIVE on the actual configured master.
-- [ ] Stop and restart without QR/code; same profile reaches ACTIVE.
-- [ ] Repeat through nodemon restart.
+- [x] Reach ACTIVE on the actual configured master (2026-10-26, 23:25 +04:00).
+- [x] Stop and restart without QR/code; same profile reaches ACTIVE (controlled nodemon run below).
+- [x] Repeat through nodemon restart (controlled stop/start and automatic watched-file reload below).
 - [ ] Network interruption recovers without registration or lost credentials.
 - [x] Duplicate launch fails without disturbing the running account.
 - [ ] Local disconnect remains paused until explicit recovery or restart.
@@ -164,6 +164,28 @@ Live checks (not replaceable by mocks; do not mark done without evidence):
 
 No percentage-based production-readiness claim is justified until these checks
 have recorded outcomes. Do not send real messages just to validate recovery.
+
+### Live verification: 2026-10-26, 23:25-23:26 +04:00
+
+- With explicit operator approval, stopped the project watcher/bot and confirmed
+  its browser exited before profile maintenance.
+- Retained `sessions/session-971505760056`; deleted the three explicitly approved
+  older/duplicate directories. Aligned the configured session path with the
+  retained profile. Device status now writes under `data/device-status`, not a
+  separate plus-prefixed LocalAuth directory.
+- Started the VS Code `Linda: nodemon dev` task (`npm run dev`).
+- At 23:25:43, startup logged `READY` for the configured master and
+  `Session recovery: 1 ready, 0 need attention`.
+- A separate read-only probe of the existing master browser returned the same
+  live WhatsApp socket state used by `Client.getState()`: `CONNECTED`.
+- Fresh metadata recorded `linked`, `isActive: true`, `sessionSaved: true` and
+  no last error. Exactly one session directory remained after startup.
+- No pairing code/QR was needed in this run, and no test message was sent.
+- At 23:27, a watched-source update triggered an automatic nodemon reload.
+  Fresh metadata at 23:27:19 again recorded an active, saved login; the read-only
+  socket probe at 23:27:39 returned `CONNECTED`, with exactly one profile folder.
+- Duplicate-prevention and recovery validation: 145 tests passed across seven
+  focused suites. Network-outage and phone-side logout acceptance remain pending.
 
 ### Live verification attempt: 2026-10-26, approximately 16:50 +04:00
 

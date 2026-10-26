@@ -170,6 +170,151 @@ describe('Explicit local read-only conversation samples', () => {
       expect(client.getChatById).toHaveBeenCalledWith('broken@c.us');
     });
 
+    test('inbox counts read only the chat list: conversations and unread messages', async () => {
+      const fetch = jest.fn();
+      client.getChats.mockResolvedValue([
+        { id: { _serialized: 'a@c.us' }, unreadCount: 3, fetchMessages: fetch },
+        { id: { _serialized: 'a@c.us' }, unreadCount: 3, fetchMessages: fetch },
+        { id: { _serialized: 'b@c.us' }, unreadCount: 0, fetchMessages: fetch },
+        { id: { _serialized: 'team@g.us' }, isGroup: true, unreadCount: 4, fetchMessages: fetch },
+        { id: { _serialized: 'status@broadcast' }, unreadCount: 9, fetchMessages: fetch },
+      ]);
+      const counts = await analysis.counts(phone);
+      expect(counts).toMatchObject({ phone, totalChats: 3, people: 2, groups: 1, unreadChats: 2, unreadMessages: 7 });
+      expect(analysis.getCounts(phone.slice(1))).toBe(counts);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(client.sendSeen).not.toHaveBeenCalled();
+      managers.get(phone).state = 'DISCONNECTED';
+      await expect(analysis.counts(phone)).rejects.toThrow('not active');
+    });
+
+    test('inbox counters follow WhatsApp events in O(1) without re-reading chats', async () => {
+      const { EventEmitter } = await import('node:events');
+      const live = Object.assign(new EventEmitter(), client);
+      clients.set(phone, live);
+      const changes = jest.fn();
+      analysis.onInboxChange = changes;
+      live.getChats = jest.fn().mockResolvedValue([
+        { id: { _serialized: 'a@c.us' }, unreadCount: 3 },
+        { id: { _serialized: 'team@g.us' }, isGroup: true, unreadCount: 0 },
+      ]);
+      live.getState = jest.fn().mockResolvedValue('CONNECTED');
+      await analysis.counts(phone);
+      const now = () => analysis.getCounts(phone);
+      expect(now()).toMatchObject({ totalChats: 2, unreadChats: 1, unreadMessages: 3 });
+
+      live.emit('message', { fromMe: false, from: 'a@c.us', id: { remote: 'a@c.us' } });
+      expect(now()).toMatchObject({ totalChats: 2, unreadChats: 1, unreadMessages: 3 });
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 4 });
+      expect(now().unreadMessages).toBe(4);
+
+      live.emit('unread_count', { id: { _serialized: 'team@g.us' }, isGroup: true, unreadCount: 2 });
+      live.emit('message', { fromMe: false, from: 'team@g.us', id: { remote: 'team@g.us' } });
+      expect(now()).toMatchObject({ unreadChats: 2, unreadMessages: 6 });
+
+      live.emit('message', { fromMe: false, from: 'new@c.us', id: { remote: 'new@c.us' } });
+      expect(now()).toMatchObject({ totalChats: 3, unreadChats: 2, unreadMessages: 6 });
+      live.emit('unread_count', { id: { _serialized: 'new@c.us' }, unreadCount: 1 });
+      expect(now()).toMatchObject({ totalChats: 3, people: 2, groups: 1, unreadChats: 3, unreadMessages: 7 });
+      live.emit('message', { fromMe: true, from: 'me@c.us', id: { remote: 'a@c.us' } });
+      live.emit('message', { fromMe: false, from: 'status@broadcast', id: { remote: 'status@broadcast' } });
+      expect(now().unreadMessages).toBe(7);
+
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 0 });
+      expect(now()).toMatchObject({ unreadChats: 2, unreadMessages: 3 });
+      live.emit('chat_removed', { id: { _serialized: 'new@c.us' } });
+      expect(now()).toMatchObject({ totalChats: 2, unreadChats: 1, unreadMessages: 2 });
+      expect(live.getChats).toHaveBeenCalledTimes(1);
+      expect(changes).toHaveBeenCalled();
+
+      clients.set(phone, client);
+      expect(analysis.getCounts(phone)).toBeNull();
+    });
+
+    test('rapid and duplicate events use exact deltas, never a time-window guess', async () => {
+      const { EventEmitter } = await import('node:events');
+      const live = Object.assign(new EventEmitter(), client);
+      clients.set(phone, live);
+      live.getChats.mockResolvedValue([{ id: { _serialized: 'a@c.us' }, unreadCount: 3 }]);
+      analysis.onInboxChange = jest.fn();
+      await analysis.counts(phone);
+      const message = { from: 'a@c.us', id: { remote: 'a@c.us' } };
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 4 });
+      live.emit('message', message);
+      live.emit('message_create', message);
+      live.emit('message', message);
+      expect(analysis.getCounts(phone).unreadMessages).toBe(4);
+      expect(analysis.onInboxChange).toHaveBeenCalledTimes(1);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 4 });
+      expect(analysis.onInboxChange).toHaveBeenCalledTimes(1);
+      live.emit('message', message);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 5 });
+      expect(analysis.getCounts(phone).unreadMessages).toBe(5);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 0 });
+      expect(analysis.getCounts(phone)).toMatchObject({ unreadMessages: 0, unreadChats: 0 });
+      live.emit('message_create', { fromMe: true, to: 'new@c.us' });
+      expect(analysis.getCounts(phone)).toMatchObject({ totalChats: 2, unreadMessages: 0 });
+      await analysis.counts(phone);
+      expect(live.getChats).toHaveBeenCalledTimes(1);
+      expect(live.listenerCount('unread_count')).toBe(1);
+    });
+
+    test('events during baseline loading win over an older snapshot without losing new chats', async () => {
+      const { EventEmitter } = await import('node:events');
+      const live = Object.assign(new EventEmitter(), client);
+      clients.set(phone, live);
+      let finish;
+      live.getChats.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+      const baseline = analysis.counts(phone);
+      await new Promise(resolve => setImmediate(resolve));
+      const joined = analysis.counts(phone);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 4 });
+      live.emit('chat_removed', { id: { _serialized: 'removed@c.us' } });
+      live.emit('message', { from: 'new@c.us' });
+      live.emit('message', { from: 'existing@c.us' });
+      expect(analysis.getCounts(phone)).toBeNull();
+      finish([
+        { id: { _serialized: 'a@c.us' }, unreadCount: 3 },
+        { id: { _serialized: 'removed@c.us' }, unreadCount: 9 },
+        { id: { _serialized: 'existing@c.us' }, unreadCount: 2 },
+      ]);
+      expect(await baseline).toMatchObject({ totalChats: 3, unreadMessages: 6, unreadChats: 2 });
+      expect(await joined).toBe(analysis.getCounts(phone));
+      expect(live.getChats).toHaveBeenCalledTimes(1);
+      expect(live.listenerCount('message')).toBe(1);
+    });
+
+    test('a failed baseline can be retried without duplicated event listeners', async () => {
+      const { EventEmitter } = await import('node:events');
+      const live = Object.assign(new EventEmitter(), client);
+      clients.set(phone, live);
+      live.getChats.mockRejectedValueOnce(new Error('Chat list unavailable')).mockResolvedValue([]);
+      await expect(analysis.counts(phone)).rejects.toThrow('Chat list unavailable');
+      expect(analysis.getCounts(phone)).toBeNull();
+      await analysis.counts(phone);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 4 });
+      expect(analysis.getCounts(phone)).toMatchObject({ totalChats: 1, unreadMessages: 4 });
+      expect(live.listenerCount('unread_count')).toBe(1);
+      managers.get(phone).state = 'DISCONNECTED';
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 7 });
+      expect(analysis.getCounts(phone)).toBeNull();
+    });
+
+    test('a ready lifecycle refreshes the baseline without registering duplicate listeners', async () => {
+      const { EventEmitter } = await import('node:events');
+      const live = Object.assign(new EventEmitter(), client);
+      clients.set(phone, live);
+      live.getChats.mockResolvedValue([{ id: { _serialized: 'a@c.us' }, unreadCount: 3 }]);
+      await analysis.counts(phone);
+      live.getChats.mockResolvedValue([{ id: { _serialized: 'a@c.us' }, unreadCount: 4 }]);
+      await analysis.counts(phone, { refresh: true });
+      expect(analysis.getCounts(phone).unreadMessages).toBe(4);
+      expect(live.getChats).toHaveBeenCalledTimes(2);
+      expect(live.listenerCount('unread_count')).toBe(1);
+      live.emit('unread_count', { id: { _serialized: 'a@c.us' }, unreadCount: 5 });
+      expect(analysis.getCounts(phone).unreadMessages).toBe(5);
+    });
+
     test('a disconnect during the report aborts it and stores nothing', async () => {
       const only = chat('a@c.us', 'A', 1, []);
       only.fetchMessages.mockImplementation(async () => {

@@ -2,6 +2,7 @@ import pkg from "whatsapp-web.js";
 import fs from 'fs';
 import path from 'path';
 import { SESSIONS_DIR, WEB_CACHE_DIR } from '../sessions/SessionManager.js';
+import { sanitizeClientId } from '../sessions/SessionLoginDetector.js';
 const { LocalAuth, Client } = pkg;
 
 /**
@@ -25,7 +26,7 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
   // CRITICAL FIX: Sanitize ClientID to remove invalid characters (+, spaces, etc.)
   // WhatsApp Web.js only allows: alphanumeric, underscores, hyphens
   // Phone numbers like "+971505760056" need to become "971505760056"
-  const sanitizedClientID = String(ClientID).replace(/^\+/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const sanitizedClientID = sanitizeClientId(ClientID);
 
   console.log(`🔧 Creating WhatsApp client for: ${ClientID}${retryCount > 0 ? ` (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})` : ''}`);
 

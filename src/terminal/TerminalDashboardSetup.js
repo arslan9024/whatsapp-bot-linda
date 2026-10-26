@@ -69,10 +69,15 @@ export function setupTerminalInputListener(opts) {
     });
     const stopAccountClient = phone => recovery.stopAccount(phone);
     const restoreAccount = phone => recovery.recover(phone);
-    const conversationAnalysis = new TerminalConversationAnalysis({ accountClients, getFlowDeps });
+    const conversationAnalysis = new TerminalConversationAnalysis({
+      accountClients, getFlowDeps,
+      onInboxChange: () => terminalHealthDashboard?.requestDashboardRefresh?.(),
+    });
     terminalHealthDashboard?.setConversationReporter?.({
       run: (phone, options) => conversationAnalysis.overview(phone, options),
       get: phone => conversationAnalysis.getReport(phone),
+      counts: (phone, options) => conversationAnalysis.counts(phone, options),
+      getCounts: phone => conversationAnalysis.getCounts(phone),
     });
     const callbacks = {
       onCampaigns: onOpenCampaigns,

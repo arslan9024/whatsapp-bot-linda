@@ -2,7 +2,13 @@ import path from 'path';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 
 // Local Storage keys WhatsApp Web writes only after a device is logged in.
-const AUTH_MARKERS = ['last-wid-md', 'last-wid'];
+// Newer builds hash most keys and no longer write last-wid*, but still write the
+// app-state/history-sync keys below, which never appear on an unlinked profile
+// (WANoiseInfo / WAWebEncKeySalt / WAMms4Conn exist before login, so they are not markers).
+export const AUTH_MARKERS = [
+  'last-wid-md', 'last-wid',
+  'WASyncdPrimaryAllowsAllMutations', 'WAHistorySyncRemainingPausedSeconds', 'hour-24-from-phone',
+];
 const cache = new Map();
 
 export const sanitizeClientId = id => String(id).replace(/^\+/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -45,13 +51,14 @@ export function hasSavedLogin(sessionsDir, clientId) {
 
 /**
  * Chooses the LocalAuth profile to restore: a profile holding a real login wins,
- * then the persisted profile, then any existing profile, then the first candidate.
+ * then the persisted profile, then any existing profile, then the explicit fallback
+ * (the normalized phone for new accounts) or first candidate.
  */
-export function chooseProfile({ persisted, candidates, hasArtifacts, hasLogin }) {
+export function chooseProfile({ persisted, candidates, fallback, hasArtifacts, hasLogin }) {
   const ids = [...new Set([persisted, ...candidates].filter(Boolean).map(sanitizeClientId))];
   return ids.find(id => hasArtifacts(id) && hasLogin(id) === true) ||
     (persisted && sanitizeClientId(persisted)) ||
-    ids.find(id => hasArtifacts(id)) || ids[0];
+    ids.find(id => hasArtifacts(id)) || (fallback && sanitizeClientId(fallback)) || ids[0];
 }
 
 export async function waitForSavedLogin(check, { timeoutMs = 60000, intervalMs = 3000 } = {}) {

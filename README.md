@@ -74,11 +74,51 @@ cp .env.example .env
 # Edit .env with your settings
 ```
 
+Alternatively, keep private files under the root `secrets` folder, whose entire
+contents are ignored by Git. The shared `secrets/.env` can contain settings for
+Linda and other applications. To load it with the bot on PowerShell:
+
+```powershell
+$env:DOTENV_CONFIG_PATH = Join-Path $PWD 'secrets\.env'
+npm run dev
+```
+
+Linda reads only the variable names supported by its runtime; unrelated settings
+do not enable integrations automatically. Shared names such as `PORT`,
+`NODE_ENV` and database URLs must be appropriate for Linda too. The REST API
+requires `API_ACCESS_TOKEN` before it can start.
+
+The root `.env` remains the default; files are not moved automatically. Git
+ignoring prevents new files from being added normally, but does not encrypt them,
+untrack previously committed files, or protect them from host backup/sync tools.
+
 3. **Add Google API Credentials**
 ```bash
 # Place your keys.json in config/google/
 # Obtained from Google Cloud Console
 ```
+
+For Goraha Gmail Contacts (separate from Sheets/Drive service accounts), save a
+Desktop OAuth client as `secrets/goraha-bot-people-app.json`. Enable People API,
+add `goraha.properties@gmail.com` as a test user when in Testing, and allow the
+`https://www.googleapis.com/auth/contacts` scope. Then run:
+
+```powershell
+npm run contacts:authorize
+```
+
+Open the printed link on the same computer and sign in as
+`goraha.properties@gmail.com`. The setup uses a loopback callback, state and
+PKCE, verifies the account email and a read request, and saves a refresh token
+to `secrets/goraha-contacts-token.json`. No contacts are modified by setup.
+Incomplete callback requests do not end setup; complete the original Google
+sign-in flow within ten minutes. If consent is denied or setup expires, run the
+command again and use its new link rather than reloading an old callback URL.
+The Contacts bridge uses this token; CRM OAuth and Sheets/Drive credentials are
+unchanged. Normal token refreshes are persisted. Protect the secrets folder with
+appropriate Windows ACLs. Testing-mode refresh tokens for Contacts generally
+expire after seven days; reauthorize as needed and review production publishing
+requirements before relying on unattended operation.
 
 4. **Run the Bot**
 ```bash
@@ -454,6 +494,14 @@ This improves availability but cannot guarantee uninterrupted uptime: the bot
 process, computer and network must stay running, and WhatsApp may require
 phone approval again after logout or session revocation.
 
+Each account reuses one resolved LocalAuth profile across restore and relink.
+New accounts default to the phone number without `+`; existing saved profile IDs
+are retained so a working login is not silently moved. Device-status metadata is
+stored separately in `data/device-status/<phone-without-plus>.json`, never in an
+extra `session-+<phone>` directory. Keep the configured session path aligned with
+the selected profile. Old profile folders are not automatically deleted or merged:
+stop the bot, confirm which profile to keep, and explicitly approve cleanup.
+
 About 8 seconds after an account logs in, Linda reads its chat list and counts the
 messages in each chat. This is read-only: no messages are sent or marked as read.
 Progress shows in the process area.
@@ -472,6 +520,13 @@ When the master is online, the MESSAGE ANALYZER section shows:
 - total conversations (people / groups) and unread counts
 - the last conversation: name, time, and a short preview of the last message
 - the most recent chats, each with its message count
+
+The live Inbox line takes one chat-list baseline per connected client, then uses
+WhatsApp events rather than a 30-second recount loop. `unread_count` supplies the
+exact new count for a chat: changing 3 to 4 adds only 1 to the total; reading it
+back to 0 subtracts 4. Message events discover chats but never independently add
+unread messages, avoiding double counts when events arrive in either order.
+Reconnect takes a fresh baseline. Dashboard redraws do not fetch the chat list.
 
 Other online accounts get a one-line summary.
 

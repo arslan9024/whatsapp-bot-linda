@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as XLSX from '@e965/xlsx';
+import { describeWorkingHours, msUntilWorkingHours } from './WorkingHours.js';
 
 const MAX_CONTACTS = 5000;
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -154,12 +155,14 @@ export default class CampaignWorkspace {
     sendRecipient,
     checkRecipient,
     log = console.error,
+    workingHours = null,
   }) {
     this.directory = directory;
     this.accounts = accounts;
     this.sendRecipient = sendRecipient;
     this.checkRecipient = checkRecipient;
     this.log = log;
+    this.workingHours = workingHours;
     this.campaigns = [];
     this.jobs = new Map();
     this.waiters = new Map();
@@ -530,6 +533,18 @@ export default class CampaignWorkspace {
       await this.wait(campaign);
       if (campaign.status !== 'running') {
         return;
+      }
+      const closedForMs = this.workingHours
+        ? msUntilWorkingHours(this.workingHours)
+        : 0;
+      if (closedForMs) {
+        campaign.nextSendAt = Date.now() + closedForMs;
+        this.persist();
+        this.log(
+          `Campaign "${campaign.name}" waiting: outside working hours (${describeWorkingHours(this.workingHours)}); resumes in ${Math.ceil(closedForMs / 60000)} min.`,
+          'info',
+        );
+        continue;
       }
       const permission = await this.checkRecipient(campaign, contact);
       if (campaign.status !== 'running') {
