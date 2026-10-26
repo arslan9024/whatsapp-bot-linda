@@ -22,7 +22,7 @@ All DAMAC Hills 2 data is now synced and operational in your **MongoDB Atlas Whi
 
 ### MongoDB Atlas Connection (Active)
 ```
-URI: mongodb+srv://arslanmalikgoraha_db_user:WhiteCaves2024@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB
+URI: mongodb+srv://arslanmalikgoraha_db_user:<password>@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB
 Database: WhiteCavesDB
 Status: ✅ Connected & Verified
 ```
@@ -30,8 +30,8 @@ Status: ✅ Connected & Verified
 ### Environment Variables (.env)
 ```bash
 # Main configuration from root .env
-MONGODB_URI=mongodb+srv://arslanmalikgoraha_db_user:WhiteCaves2024@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
-DATABASE_URL=mongodb+srv://arslanmalikgoraha_db_user:WhiteCaves2024@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://arslanmalikgoraha_db_user:<password>@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
+DATABASE_URL=mongodb+srv://arslanmalikgoraha_db_user:<password>@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
 ```
 
 ---

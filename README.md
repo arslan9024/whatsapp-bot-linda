@@ -141,6 +141,13 @@ even when Node does not report a TTY. With no readable stdin, use the explicit
 
 ### Compact device dashboard and session recovery
 
+In an interactive terminal the dashboard is split into three pinned, colored panels
+that always stay above the logs: **OUTPUT** (cyan, device status), **FEATURES**
+(green, every feature with its ID and usage counter) and **INPUT**
+(yellow, the current question, active pairing code, or command hints). Logs
+scroll only in the area below them. QR codes temporarily use the full screen.
+Set `NO_COLOR=1` for plain colors or `LINDA_PLAIN_TERMINAL=1` to disable pinning.
+
 The terminal shows one row per device with **ACTIVE**, **OFFLINE**, **LINKING**,
 **AUTHENTICATED**, or **LOGGED OUT** state and saved-session availability.
 Authentication alone is not an active connection: only WhatsApp's `ready` event
@@ -362,6 +369,37 @@ not menu navigation.
 The WhatsApp catalog lists usage, examples, enabled/authentication metadata, and
 whether a handler is registered. A registered handler may still be a placeholder;
 catalog entries do not execute WhatsApp-only commands from the terminal.
+
+### Feature IDs, counters and restored tools
+
+Every terminal feature has a fixed ID (`F1`–`F33`) and a usage counter shown in the
+green FEATURES panel and in the summary line. Type `features` for the full list,
+or run any feature by ID: `f11` (list devices), `f7 +9715…` (reactivate a device),
+`f21 0501234567` (validate a number). Counters persist in
+`data/feature-usage.json` (git-ignored). Features marked `*` were restored from
+the archived project:
+
+| ID | Command | What it does |
+|----|---------|--------------|
+| F17 | `score [+phone]` | 0–100 health score, rating, trend, prediction and tips (offline devices are capped at CRITICAL) |
+| F20 | `send <number> <message>` | Send one message from a connected account after a y/N confirmation |
+| F21 | `validate <number>` | Normalize (UAE default), check the format and confirm the number is on WhatsApp |
+| F24 | `sentiment <text>` | Emoji, keyword and punctuation sentiment score |
+| F25 | `intent <text>` | Intent (pricing, viewing, complaint…) with confidence and a suggested reply |
+| F26 | `similar <a> \| <b>` | Compare two names or phone numbers |
+| F27 | `dedupe <file>` | Find exact and likely duplicate contacts in a CSV, XLSX or JSON file (max 10 MB) |
+
+The same actions are in the numbered menu under **8. Messaging & intelligence**
+(and `6.5` for the feature list).
+
+Maintenance tools:
+
+```bash
+npm run security:scan            # scan tracked files for leaked credentials (exit 1 on findings)
+npm run security:scan -- --staged
+npm run doctor:google            # check every Google service account can get a token
+npm run doctor:google -- --offline
+```
 
 ---
 

@@ -526,7 +526,7 @@ DAMAC_OWNER_SHEET=Owners!A:Z
 DAMAC_CONTACT_SHEET=Contacts!A:Z
 
 # MongoDB (already configured)
-MONGODB_URI=mongodb+srv://arslanmalikgoraha_db_user:WhiteCaves2024@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://arslanmalikgoraha_db_user:<password>@whitecavesdb.opetsag.mongodb.net/WhiteCavesDB?retryWrites=true&w=majority
 ```
 
 ---

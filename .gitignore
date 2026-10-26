@@ -137,3 +137,6 @@ coverage/
 Thumbs.db
 .DS_Store
 data/campaign-workspace/
+
+# Feature usage counters (local)
+data/feature-usage.json

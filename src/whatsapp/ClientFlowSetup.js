@@ -222,7 +222,7 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     }
     connManager.clearQRTimer();
     deviceLinkedManager?.startLinkingAttempt(phoneNumber);
-    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true);
+    terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true, { kind: 'code', code });
     // Pairing codes belong only in the local terminal, not persistent logs.
     console.log(`\nWhatsApp pairing code for ${phoneNumber}: ${code}`);
     console.log('On that phone: WhatsApp > Settings (iPhone) or menu (Android) > Linked devices');
@@ -255,7 +255,7 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
       if (mode === 'code' || !connManager.handleQR(qr)) {
         return;
       }
-      terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true);
+      terminalHealthDashboard?.setLinkingChallenge?.(phoneNumber, true, { kind: 'qr' });
 
       if (deviceLinkedManager) {
         deviceLinkedManager.startLinkingAttempt(phoneNumber);

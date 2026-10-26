@@ -5,6 +5,7 @@ const action = (label, command, fields = [], extra = {}) => ({ label, command, f
 const field = (label, defaultValue, pattern) => ({ label, defaultValue, pattern });
 const phoneField = field('Phone number including country code', undefined, /^\+?[1-9]\d{6,14}$/);
 const spreadsheetField = field('Spreadsheet ID (no spaces)', undefined, /^\S+$/);
+const numberField = field('Number (digits, optional +)', undefined, /^\+?\d{5,15}$/);
 const sheetField = field('Sheet name (no spaces)', undefined, /^\S+$/);
 
 export default class TerminalNumberMenu {
@@ -104,6 +105,7 @@ export default class TerminalNumberMenu {
           action('Text command help', 'help'),
           action('Exit terminal monitoring', 'quit', [], { confirm: true }),
           action('Campaigns (terminal only; headless sending)', 'campaigns'),
+          action('Feature list with counters (F<id>)', 'features'),
         ] },
         { label: `WhatsApp command catalog (${commands.length}; reference only)`, children: categories.map(category => ({
           label: category,
@@ -121,9 +123,19 @@ export default class TerminalNumberMenu {
               ].filter(Boolean).join('\n'),
             })),
         })) },
+        { label: 'Messaging & intelligence (restored)', children: [
+          action('Send one message (confirm first)', 'send', [numberField, field('Message')]),
+          action('Validate a number', 'validate', [numberField]),
+          action('Health scores (all accounts)', 'score'),
+          action('Sentiment of text', 'sentiment', [field('Text')]),
+          action('Intent of text', 'intent', [field('Text')]),
+          action('Compare names/phones', 'similar', [field('Two values separated by |, e.g. Ali Khan | Aly Khan')]),
+          action('Find duplicate contacts in file', 'dedupe', [field('CSV/XLSX/JSON file path')]),
+        ] },
       ],
     };
-    const terminalActions = this.root.children.slice(0, 6)
+    const catalogNode = this.root.children[6];
+    const terminalActions = this.root.children.filter(node => node !== catalogNode)
       .reduce((total, node) => total + this.countActions(node), 0);
     this.summary += ` | Terminal actions: ${terminalActions}`;
     this.path = [];

@@ -13,6 +13,19 @@
 
 ---
 
+## Restored archive features and feature counters
+
+- Every terminal feature now has an ID (`F1`–`F33`) and a persisted usage counter (`data/feature-usage.json`). They are shown in a new green **FEATURES** panel pinned between OUTPUT and INPUT. Run any feature with `f<id> [args]` or `#<id>`; type `features` for the full list.
+- Restored from `archive/legacy-code` without DB or legacy dependencies: `SentimentAnalyzer`, `IntentClassifier` (`src/intelligence/`), `DeduplicationService` (`src/services/`) and `HealthScorer` (`src/accounts/`, now with in-memory history).
+- New terminal commands: `score`, `sentiment`, `intent`, `similar`, `dedupe`, `validate`, `send` (with confirmation). They are also in numbered menu section 8.
+- New tools: `npm run security:scan` (Node port of `scan-secrets.ps1`) and `npm run doctor:google` (Google service-account token check).
+- Security: redacted a MongoDB Atlas password committed in two docs files. It is still in git history, so rotate it.
+- Not restored, because current code covers them or they depend on the old DB: RateLimiter (covered by CampaignRateLimiter), DeadLetterQueueService, validateDatabaseIntegrity, verifySystem (covered by `npm run doctor`).
+
+## Pinned terminal panels
+
+- Terminal dashboard now renders a cyan **OUTPUT** panel and a yellow **INPUT** panel pinned above scrolling logs (VT scroll region; `src/terminal/TerminalLayout.js`). Questions and pairing codes appear in the INPUT panel; QR codes unpin temporarily. `NO_COLOR` / `LINDA_PLAIN_TERMINAL=1` supported.
+
 ## Project Restructure — `src/` layout
 
 - Replaced the flat `code/` tree with a domain-organised `src/` (core, sessions, accounts, connection, linking, terminal, whatsapp, commands, campaigns, api, database, integrations, analytics, intelligence, services, shared). All imports and `jest.mock` paths were rewritten.

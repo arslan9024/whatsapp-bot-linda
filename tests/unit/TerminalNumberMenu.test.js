@@ -49,7 +49,7 @@ describe('Counted hierarchical terminal menus', () => {
     const catalog = menu.root.children[6];
     expect(leaves(catalog)).toHaveLength(registry.getAllCommands().length);
     expect(new Set(leaves(catalog).map(item => item.label)).size).toBe(registry.getAllCommands().length);
-    const terminalLeaves = menu.root.children.slice(0, 6).flatMap(leaves);
+    const terminalLeaves = menu.root.children.filter(node => node !== catalog).flatMap(leaves);
     expect(menu.summary).toContain(`Terminal actions: ${terminalLeaves.length}`);
     expect(output).toHaveBeenCalledWith(expect.stringContaining('[2 items; 2 actions/references]'));
   });
@@ -202,6 +202,15 @@ describe('Counted hierarchical terminal menus', () => {
     } finally {
       command.enabled = originalEnabled;
     }
+  });
+
+  test('restored messaging and intelligence actions are reachable as 8.x', () => {
+    expect(menu.handleInput('8.2')).toEqual({ handled: true });
+    expect(menu.handleInput('0501234567').command).toBe('validate 0501234567');
+    menu.handleInput('8.6');
+    expect(menu.handleInput('Ali Khan | Aly Khan').command).toBe('similar Ali Khan | Aly Khan');
+    expect(menu.handleInput('8.3').command).toBe('score');
+    expect(menu.handleInput('6.5').command).toBe('features');
   });
 
   test('all canonical terminal actions are present', () => {

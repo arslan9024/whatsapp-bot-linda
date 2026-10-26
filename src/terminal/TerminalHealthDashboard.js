@@ -18,6 +18,13 @@ import accountHealthMonitor from '../accounts/AccountHealthMonitor.js';
 import TerminalNumberMenu from './TerminalNumberMenu.js';
 import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
+import TerminalLayout, { colorize, PANEL_COLORS } from './TerminalLayout.js';
+import FeatureCatalog from './FeatureCatalog.js';
+import {
+  dedupeLines, intentLines, pickClient, scoreLines, sendSingleMessage, sentimentLines, similarLines, validateLines,
+} from './TerminalFeatureCommands.js';
+
+const COMMAND_HINT = 'link-code | link-qr | recover <phone> | restore-sessions | campaigns | features | f<id> | menu | help';
 
 class TerminalHealthDashboard {
   constructor() {
@@ -37,6 +44,46 @@ class TerminalHealthDashboard {
     this.lastNotice = '';
     this.dashboardRefreshTimer = null;
     this.commandRunning = false;
+    this.layout = new TerminalLayout(process.stdout);
+    this.layout.onResize = () => this.displayHealthDashboard(true);
+    this.activeQuestion = null;
+    this.pairingCodes = new Map();
+    this.features = new FeatureCatalog();
+  }
+
+  /** FEATURES panel: numbered features with usage counters (compact summary on short windows). */
+  featurePanel() {
+    return {
+      title: 'FEATURES · F<id> COUNTERS (* restored)',
+      lines: width => [this.features.summaryLine(), ...this.features.gridLines(width)],
+      compactLines: [this.features.summaryLine()],
+    };
+  }
+
+  /** Pinned, colored OUTPUT/INPUT panels are used only in an interactive terminal. */
+  get usePanels() {
+    return process.env.NODE_ENV !== 'test' && this.layout.enabled;
+  }
+
+  inputPanelLines() {
+    if (this.activeQuestion) {
+      return [...this.activeQuestion.split('\n').map(line => line.trimEnd()).filter(Boolean),
+        '→ Type your answer at the prompt below and press Enter.'];
+    }
+    if (this.pairingCodes.size) {
+      return [
+        ...[...this.pairingCodes].map(([phone, code]) => `Pairing code for ${phone}: ${code}`),
+        'Phone: WhatsApp > Linked devices > Link a device > Link with phone number instead.',
+        'Code delayed, expired, or failed? Type r (or code <phone>) and press Enter for a new code.',
+      ];
+    }
+    return ['Type a command at the prompt below and press Enter.', COMMAND_HINT];
+  }
+
+  /** Redraw only the INPUT panel (questions/codes can change while the dashboard is frozen). */
+  renderInputPanel() {
+    if (!this.usePanels) return;
+    this.layout.updateInput({ title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() });
   }
 
   /**
@@ -103,9 +150,14 @@ class TerminalHealthDashboard {
     return true;
   }
 
-  setLinkingChallenge(phoneNumber, active) {
+  setLinkingChallenge(phoneNumber, active, details = {}) {
     if (active) this.linkingChallenges.add(phoneNumber);
     else this.linkingChallenges.delete(phoneNumber);
+    if (active && details.kind === 'code' && details.code) this.pairingCodes.set(phoneNumber, details.code);
+    else if (!active || details.kind === 'qr') this.pairingCodes.delete(phoneNumber);
+    // A QR code needs the whole screen; panels are pinned again on the next dashboard render.
+    if (active && details.kind === 'qr') this.layout.release();
+    else this.renderInputPanel();
   }
 
   recordNotice(message, level = 'info') {
@@ -208,7 +260,7 @@ class TerminalHealthDashboard {
       this.rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
-        prompt: '▶ Linda Bot > '
+        prompt: colorize('▶ Linda Bot > ', PANEL_COLORS.input, { bold: true })
       });
     }
     return this.rl;
@@ -248,6 +300,12 @@ class TerminalHealthDashboard {
 
       const rl = this.initializeInput();
       this.isSelectingLinkingMethod = true;
+      this.activeQuestion = question;
+      this.renderInputPanel();
+      // While the question is pinned in the INPUT panel, the prompt line stays short.
+      const prompt = this.layout.current && this.usePanels
+        ? colorize('▶ Answer > ', PANEL_COLORS.input, { bold: true })
+        : question;
       try {
         while (true) {
           const answer = await new Promise((resolve, reject) => {
@@ -263,7 +321,7 @@ class TerminalHealthDashboard {
             const controller = new AbortController();
             rl.once('close', onClose);
             rl.question(
-              question,
+              prompt,
               { signal: controller.signal },
               (input) => {
                 clearTimeout(timer);
@@ -282,6 +340,8 @@ class TerminalHealthDashboard {
         }
       } finally {
         this.isSelectingLinkingMethod = false;
+        this.activeQuestion = null;
+        this.renderInputPanel();
       }
     };
     const selection = this.linkingPromptQueue.then(select);
@@ -355,10 +415,26 @@ class TerminalHealthDashboard {
       ...lines,
       this.lastCommand ? `Last command: ${this.lastCommand}` : '',
       this.lastNotice ? `Notice: ${this.lastNotice}` : '',
-      'link-code | link-qr | recover <phone> | restore-sessions | campaigns | menu | help',
+      this.features.summaryLine(),
+      COMMAND_HINT,
     ].filter(Boolean).join('\n');
-    if (!force && screen === this.lastDashboard) return;
+    const usePanels = this.usePanels;
+    if (!force && screen === this.lastDashboard && (!usePanels || this.layout.current)) return;
     this.lastDashboard = screen;
+    if (usePanels) {
+      // Feature counters get their own panel; drop the summary and hint lines from OUTPUT.
+      const outputLines = screen.split('\n').slice(1, -2);
+      const result = this.layout.render(
+        { title: 'OUTPUT · LINDA DEVICE DASHBOARD', lines: outputLines },
+        { title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() },
+        this.featurePanel(),
+      );
+      // A full re-pin clears the log area, so put the prompt back.
+      if (result === 'repinned' && this.isMonitoring && !this.commandRunning && !this.isSelectingLinkingMethod) {
+        this.rl?.prompt(true);
+      }
+      return;
+    }
     // Replace the terminal viewport, never the scrollback or redirected output.
     if (process.stdout.isTTY) {
       readline.cursorTo(process.stdout, 0, 0);
@@ -654,11 +730,22 @@ class TerminalHealthDashboard {
         }
         return;
       }
+      const shortcut = this.features.resolve(input);
+      if (shortcut?.error) {
+        console.log(shortcut.error);
+        if (this.isMonitoring) this.rl.prompt();
+        return;
+      }
+      if (shortcut) input = shortcut.command;
       try {
-        const selection = this.numberMenu.handleInput(input);
+        const selection = shortcut ? {} : this.numberMenu.handleInput(input);
         if (selection.command) {
           input = selection.command;
         } else if (selection.handled) {
+          if (/^menu$/i.test(input.trim())) {
+            this.features.record('menu');
+            this.renderInputPanel();
+          }
           if (this.isMonitoring) {
             this.rl.prompt();
           }
@@ -699,8 +786,84 @@ class TerminalHealthDashboard {
       }
       this.commandRunning = true;
       this.lastCommand = input_original;
+      this.features.record(command);
       try {
       switch (command) {
+        case 'features':
+          for (const line of this.features.listLines()) console.log(line);
+          break;
+
+        case 'sentiment':
+        case 'intent': {
+          const text = input_original.slice(parts[0].length).trim();
+          if (!text) {
+            console.log(`Usage: ${command} <text>`);
+            break;
+          }
+          for (const line of command === 'sentiment' ? sentimentLines(text) : intentLines(text)) console.log(line);
+          break;
+        }
+
+        case 'similar':
+          for (const line of similarLines(input_original.slice(parts[0].length))) console.log(line);
+          break;
+
+        case 'dedupe': {
+          const file = input_original.slice(parts[0].length).trim().replace(/^["']|["']$/g, '');
+          if (!file) {
+            console.log('Usage: dedupe <contacts.csv|contacts.xlsx|contacts.json>');
+            break;
+          }
+          for (const line of await dedupeLines(file)) console.log(line);
+          break;
+        }
+
+        case 'score':
+          for (const line of await scoreLines(this.connectionManagers, parts[1] || null)) console.log(line);
+          break;
+
+        case 'validate': {
+          if (!parts[1]) {
+            console.log('Usage: validate <number>');
+            break;
+          }
+          const sender = pickClient(this.accountClients, this.connectionManagers,
+            this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber);
+          for (const line of await validateLines(parts.slice(1).join(''), sender?.client)) console.log(line);
+          break;
+        }
+
+        case 'send': {
+          const number = parts[1];
+          const message = number ? input_original.slice(input_original.indexOf(number) + number.length).trim() : '';
+          if (!number || !message) {
+            console.log('Usage: send <number> <message>');
+            break;
+          }
+          const sender = pickClient(this.accountClients, this.connectionManagers,
+            this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber);
+          if (!sender) {
+            console.log('No active WhatsApp connection. Reactivate a device first (recover <phone>).');
+            break;
+          }
+          const preview = message.length > 60 ? `${message.slice(0, 57)}...` : message;
+          const answer = await this.queuedChoice(
+            `\nSend from ${sender.phone} to ${number}:\n  "${preview}"\nConfirm y/yes or n/no [n]: `,
+            { '': 'no', n: 'no', no: 'no', y: 'yes', yes: 'yes' },
+            'Enter y/yes or n/no.',
+            'Send confirmation timed out; nothing was sent.',
+            'Send cancelled; nothing was sent.',
+          );
+          if (answer !== 'yes') {
+            console.log('Send cancelled; nothing was sent.');
+            break;
+          }
+          const result = await sendSingleMessage(sender.client, number, message);
+          this.lastNotice = `Sent to ${result.to} from ${sender.phone}`;
+          console.log(`✅ Sent to ${result.to} from ${sender.phone}${result.id ? ` (id ${result.id})` : ''}`);
+          break;
+        }
+
         case 'campaigns':
           if (!onCampaigns) throw new Error('Terminal campaigns are unavailable.');
           await onCampaigns();
@@ -1385,7 +1548,17 @@ class TerminalHealthDashboard {
           console.log(`    list                      → List all devices`);
           console.log(`    masters                   → Show all master accounts`);
           console.log(`    servants                  → Show all servant accounts`);
+          console.log(`\n  MESSAGING & INTELLIGENCE (restored):`);
+          console.log(`    send <number> <message>   → Send one message from the master (asks to confirm)`);
+          console.log(`    validate <number>         → Normalize/validate a number; checks WhatsApp when online`);
+          console.log(`    score [+phone]            → Health score 0-100 with trend and recommendations`);
+          console.log(`    sentiment <text>          → Sentiment score, label and mood of a text`);
+          console.log(`    intent <text>             → Classify intent and suggested reply strategy`);
+          console.log(`    similar <a> | <b>         → Compare two names or phone numbers`);
+          console.log(`    dedupe <file>             → Find duplicate contacts in CSV/XLSX/JSON`);
           console.log(`\n  SYSTEM:`);
+          console.log(`    features                  → List all features with IDs (F1-F${this.features.features.length}) and usage counters`);
+          console.log(`    f<id> [args] / #<id>      → Run a feature by number, e.g. f8 or f21 0501234567`);
           console.log(`    help                      → Show this help message`);
           console.log(`    quit / exit               → Exit monitoring\n`);
           break;
@@ -1393,9 +1566,11 @@ class TerminalHealthDashboard {
         case 'quit':
         case 'exit':
           console.log(`\n👋 Exiting device manager...\n`);
+          this.features.flush();
           this.isMonitoring = false;
           this.stopAutoRefresh();
           clearTimeout(this.dashboardRefreshTimer);
+          this.layout.close();
           if (this.rl) {
             this.rl.close();
             this.rl = null;
@@ -1417,7 +1592,7 @@ class TerminalHealthDashboard {
         console.error(`Command failed: ${error.message}`);
       } finally {
         this.commandRunning = false;
-        if (!['help', 'menu', 'campaigns'].includes(command)) this.refreshDashboard();
+        if (!['help', 'menu', 'campaigns', 'features'].includes(command)) this.refreshDashboard();
       }
       if (this.isMonitoring && !this.isSelectingLinkingMethod) {
         this.rl.prompt();
@@ -1426,6 +1601,7 @@ class TerminalHealthDashboard {
 
     this.rl.on('close', () => {
       this.isMonitoring = false;
+      this.layout.close();
       this.stopAutoRefresh();
       clearTimeout(this.dashboardRefreshTimer);
     });
@@ -1711,6 +1887,8 @@ class TerminalHealthDashboard {
    */
   close() {
     this.stopAutoRefresh();
+    this.features.flush();
+    this.layout.close();
     if (this.rl) {
       this.rl.close();
       this.rl = null;
