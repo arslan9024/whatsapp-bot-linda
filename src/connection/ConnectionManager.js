@@ -23,7 +23,7 @@
  * @since Phase 14 - February 15, 2026 (error categorization, enhanced QR, active health)
  */
 
-import { categorizeError, QRAutoRegenerator, ActiveHealthChecker } from './ConnectionEnhancements.js';
+import { categorizeError, QRAutoRegenerator, getLiveConnectionState } from './ConnectionEnhancements.js';
 
 export default class ConnectionManager {
   /**
@@ -86,6 +86,8 @@ export default class ConnectionManager {
     this.lastActivityTime = Date.now();
     this.healthCheckInterval = null;
     this.keepAliveInterval = null;
+    this.healthCheckPending = false;
+    this.healthCheckFailures = 0;
 
     // Recovery tracking
     this.lastSuccessfulConnection = null;
@@ -290,8 +292,8 @@ export default class ConnectionManager {
     this.log(`[${this.phoneNumber}] Reconnect in ${Math.round(delay / 1000)}s (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`, 'info');
 
     if (this.reconnectAttempts > this.maxReconnectAttempts) {
-      this.log(`[${this.phoneNumber}] ❌ Max reconnect attempts exceeded`, 'error');
-      this.setState('SUSPENDED');
+      this.log(`[${this.phoneNumber}] Retry budget exhausted; cooling down before retrying the saved session.`, 'warn');
+      this.activateCircuitBreaker();
       return;
     }
 
@@ -345,6 +347,8 @@ export default class ConnectionManager {
     if (this.errorResetTimer) clearTimeout(this.errorResetTimer);
 
     this.errorResetTimer = setTimeout(() => {
+      this.errorResetTimer = null;
+      if (this.isDestroyed || this.authRequired || this.state !== 'SUSPENDED') return;
       this.log(`[${this.phoneNumber}] Circuit breaker reset (trip #${this.circuitBreakerTrips})`, 'info');
       this.errorCount = 0;
       this.reconnectAttempts = 0;
@@ -363,17 +367,36 @@ export default class ConnectionManager {
 
   startHealthCheck() {
     if (this.healthCheckInterval) return;
-    const CHECK_INTERVAL = 30000;
-    const INACTIVITY_TIMEOUT = 300000;
+    this.healthCheckFailures = 0;
+    this.healthCheckInterval = setInterval(() => this.checkConnectionHealth(), 30000);
+  }
 
-    this.healthCheckInterval = setInterval(() => {
-      if (this.state !== 'CONNECTED') return;
-      const inactiveTime = Date.now() - this.lastActivityTime;
-      if (inactiveTime > INACTIVITY_TIMEOUT) {
-        this.log(`[${this.phoneNumber}] ⚠️  Detected stale session (${Math.round(inactiveTime / 1000)}s inactive)`, 'warn');
-        this.handleStaleSession();
+  async checkConnectionHealth() {
+    if (this.state !== 'CONNECTED' || this.isDestroyed || this.healthCheckPending) return;
+    const client = this.client;
+    this.healthCheckPending = true;
+    try {
+      const state = await getLiveConnectionState(client);
+      if (client !== this.client || this.isDestroyed || this.state !== 'CONNECTED') return;
+      if (state !== 'CONNECTED') throw new Error(`WhatsApp state is ${state || 'unknown'}`);
+      this.healthCheckFailures = 0;
+      this.recordActivity();
+    } catch (error) {
+      if (client !== this.client || this.isDestroyed || this.state !== 'CONNECTED') return;
+      this.healthCheckFailures++;
+      this.log(`[${this.phoneNumber}] Live connection check failed (${this.healthCheckFailures}/3): ${error.message}`, 'warn');
+      if (this.healthCheckFailures >= 3) {
+        this.connectionFailureReason = error.message;
+        this.stopHealthCheck();
+        this.stopKeepAlive();
+        this._ctx.deviceLinkedManager?.updateDeviceMetadata(this.phoneNumber, {
+          status: 'offline', isOnline: false, lastError: error.message,
+        });
+        await this.handleStaleSession();
       }
-    }, CHECK_INTERVAL);
+    } finally {
+      this.healthCheckPending = false;
+    }
   }
 
   stopHealthCheck() {
@@ -392,7 +415,7 @@ export default class ConnectionManager {
   startKeepAlive() {
     if (this.keepAliveInterval) return;
     this.keepAliveInterval = setInterval(() => {
-      if (this.state === 'CONNECTED') this.recordActivity();
+      this.checkConnectionHealth();
     }, 60000);
   }
 

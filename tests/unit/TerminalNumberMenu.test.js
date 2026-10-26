@@ -218,6 +218,9 @@ describe('Counted hierarchical terminal menus', () => {
     expect(menu.handleInput('+15551234567')).toEqual({ handled: true });
     expect(menu.handleInput('1').command).toBe('disconnect +15551234567');
     expect(menu.handleInput('1.18').command).toBe('health');
+    expect(menu.handleInput('1.19').command).toBe('restore master');
+    expect(menu.handleInput('1.20').command).toBe('master check');
+    expect(menu.handleInput('1.21').command).toBe('master ready');
     menu.handleInput('8.9');
     menu.handleInput('+15551234567');
     expect(menu.handleInput('').command).toBe('chats +15551234567');
@@ -244,6 +247,16 @@ describe('Counted hierarchical terminal menus', () => {
     const cells = menu.gridCells(() => 1);
     expect(cells).toContain('2.2 link-qr ×1');
     expect(cells.some(cell => cell.startsWith('1.8 ') || cell.startsWith('7.'))).toBe(false);
+  });
+
+  test('sections group every code with action and usage counters for the INPUT board', () => {
+    const sections = menu.sections(command => (command === 'recover' ? 2 : 0));
+    expect(sections.map(section => section.code)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    expect(sections[0].cells).toContain('1.16 recover ×2');
+    expect(sections[0].cells).toContain('1.19 restore master ×0');
+    expect(sections[0].cells.find(cell => cell.startsWith('1.8 '))).toMatch(/^1\.8 ▸Select account\/device \(\d+\)$/);
+    expect(sections[0].uses).toBe(2);
+    expect(sections[6]).toMatchObject({ reference: true, cells: [] });
   });
 
   test('all canonical terminal actions are present', () => {
@@ -289,6 +302,37 @@ describe('Numbered input reaches the real terminal command dispatcher', () => {
 
   const flush = () => new Promise(resolve => setImmediate(resolve));
 
+  test('startup checks the master first and numbered readiness commands reach their callback', async () => {
+    dashboard.rl.close();
+    dashboard.rl = readline.createInterface({ input, output: new PassThrough(), terminal: false });
+    const checkMaster = jest.fn().mockResolvedValue(false);
+    await dashboard.startInteractiveMonitoring({ onCheckMaster: checkMaster });
+    expect(checkMaster).toHaveBeenCalledTimes(1);
+    expect(checkMaster).toHaveBeenLastCalledWith();
+    input.write('1.20\n');
+    await flush();
+    expect(checkMaster).toHaveBeenLastCalledWith({ recover: false });
+    input.write('1.21\n');
+    await flush();
+    expect(checkMaster).toHaveBeenLastCalledWith({ recover: true });
+    input.write('MASTER CHECK\n');
+    await flush();
+    expect(checkMaster).toHaveBeenLastCalledWith({ recover: false });
+    expect(checkMaster).toHaveBeenCalledTimes(4);
+  });
+
+  test('the actual prompt keeps all-command help visible', () => {
+    dashboard.rl.close();
+    dashboard.rl = null;
+    const create = jest.spyOn(readline, 'createInterface').mockReturnValue({
+      close: jest.fn(),
+    });
+    dashboard.initializeInput();
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: expect.stringContaining('features = all commands | help'),
+    }));
+  });
+
   test('numbered spreadsheet read preserves ID and range case in the real callback', async () => {
     input.write('5.1\nAbC123\nSheetOne!A1:B9\n');
     await flush();
@@ -312,6 +356,22 @@ describe('Numbered input reaches the real terminal command dispatcher', () => {
     await flush();
     expect(onLink).toHaveBeenNthCalledWith(1, 'code');
     expect(onLink).toHaveBeenNthCalledWith(2, 'qr');
+  });
+
+  test('restore master and playbook steps reactivate the master without relinking', async () => {
+    dashboard.rl.close();
+    dashboard.rl = readline.createInterface({ input, output: new PassThrough(), terminal: false });
+    dashboard.masterPhoneNumber = '+15551234567';
+    const restoreAccount = jest.fn().mockResolvedValue(true);
+    await dashboard.startInteractiveMonitoring({ onRestoreAccount: restoreAccount });
+    input.write('restore master\n');
+    await flush();
+    input.write('p1.1\n');
+    await flush();
+    expect(restoreAccount).toHaveBeenNthCalledWith(1, '+15551234567');
+    expect(restoreAccount).toHaveBeenNthCalledWith(2, '+15551234567');
+    expect(dashboard.features.actionCount('p1')).toBe(1);
+    expect(dashboard.features.actionCount('restore master')).toBe(1);
   });
 
   test('typed local session and conversation commands dispatch without sending WhatsApp messages', async () => {

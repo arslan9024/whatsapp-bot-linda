@@ -12,6 +12,7 @@ import { stripVTControlCharacters } from 'node:util';
 
 const CSI = '\x1b[';
 const MIN_LOG_ROWS = 8;
+const MIN_OUTPUT_ROWS = 8;
 // magenta / green / yellow / cyan / blue
 export const PANEL_COLORS = { header: '35', features: '32', input: '33', output: '36', process: '34' };
 
@@ -98,7 +99,7 @@ export class TerminalLayout {
     const width = Math.max(40, Math.min(this.stream.columns || 100, 140) - 1);
     const rows = this.stream.rows || 24;
     const available = rows - MIN_LOG_ROWS;
-    const inputLines = this.buildPanel(input, PANEL_COLORS.input, width);
+    let inputLines = this.buildPanel(input, PANEL_COLORS.input, width);
     const processLines = [this.processBar(width)];
     let headerLines = header ? this.buildPanel(header, PANEL_COLORS.header, width) : [];
     let outputLines = this.buildPanel(output, PANEL_COLORS.output, width);
@@ -110,6 +111,10 @@ export class TerminalLayout {
     }
     if (header?.compactLines && !fits()) {
       headerLines = this.buildPanel({ title: header.title, lines: header.compactLines }, PANEL_COLORS.header, width);
+    }
+    // Keep at least MIN_OUTPUT_ROWS of OUTPUT visible: shrink the INPUT board to its compact form first.
+    if (input?.compactLines && !fits() && available - fixed() - 2 < MIN_OUTPUT_ROWS) {
+      inputLines = this.buildPanel({ title: input.title, lines: input.compactLines }, PANEL_COLORS.input, width);
     }
     const outputBudget = available - fixed() - 2;
     if (!fits() && outputBudget >= 3) {

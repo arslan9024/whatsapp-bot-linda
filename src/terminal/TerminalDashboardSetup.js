@@ -12,6 +12,7 @@ import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import { getSessionRecovery } from '../sessions/SessionRecoveryService.js';
 import { TerminalConversationAnalysis } from './TerminalConversationAnalysis.js';
+import { getLiveConnectionState } from '../connection/ConnectionEnhancements.js';
 
 /**
  * @param {Object} opts
@@ -78,6 +79,55 @@ export function setupTerminalInputListener(opts) {
       onCampaignInput,
       isCampaignMenuActive,
       onRestoreAccount: restoreAccount,
+      onCheckMaster: async ({ recover = false } = {}) => {
+        const phone = accountConfigManager?.getMasterPhoneNumber?.() || terminalHealthDashboard.masterPhoneNumber;
+        if (!phone) {
+          logBot('MASTER NOT CONFIGURED. Choose link-code or link-qr. All options: features | help.', 'warn');
+          return false;
+        }
+        const account = accountConfigManager?.getAllAccounts().find(item => item.phoneNumber === phone);
+        if (account?.enabled === false) {
+          logBot(`MASTER ${phone} IS DISABLED. Enable the account before recovery. All options: features | help.`, 'warn');
+          return false;
+        }
+        const client = accountClients.get(phone);
+        if (client) {
+          try {
+            if (await getLiveConnectionState(client) === 'CONNECTED') {
+              logBot(`MASTER ${phone} ONLINE (live check). Ready to continue. All options: features | menu | help.`, 'success');
+              return true;
+            }
+          } catch (error) {
+            logBot(`Master connection check failed: ${error.message}`, 'warn');
+          }
+        }
+        const manager = getFlowDeps().connectionManagers.get(phone);
+        if (manager?.isInitializing || manager?.isReconnecting || recovery.pending.has(phone)) {
+          logBot(`MASTER ${phone} CONNECTING. Wait, then run master check. All options: features | help.`, 'info');
+          return false;
+        }
+        if (!canRestoreSaved(phone)) {
+          logBot(`MASTER ${phone} OFFLINE; fresh authentication is required. Choose link-code or link-qr. All options: features | help.`, 'warn');
+          return false;
+        }
+        if (!recover) {
+          logBot(`MASTER ${phone} OFFLINE. First: master ready (restore saved session, no new code). If restore fails: relink master ${phone}. All options: features | help.`, 'warn');
+          return false;
+        }
+        logBot(`Restoring master ${phone} from its saved session...`, 'info');
+        try {
+          await restoreAccount(phone);
+        } catch (error) {
+          logBot(`Master restore failed: ${error.message}. Retry master ready, or choose relink master ${phone} to authenticate.`, 'error');
+          throw error;
+        }
+        const restored = accountClients.get(phone);
+        if (!restored || await getLiveConnectionState(restored) !== 'CONNECTED') {
+          throw new Error(`Master ${phone} is not online after restore. Run master check; if needed, relink master ${phone}.`);
+        }
+        logBot(`MASTER ${phone} ONLINE (live check). Ready to continue. All options: features | menu | help.`, 'success');
+        return true;
+      },
       onDisconnectAccount: async phone => {
         await recovery.disconnect(phone);
         conversationAnalysis.clear(phone);

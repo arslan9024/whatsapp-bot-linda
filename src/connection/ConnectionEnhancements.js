@@ -14,6 +14,21 @@
  * @since Phase 14 - February 15, 2026
  */
 
+/** Bound browser RPCs so an unresponsive page cannot block readiness or recovery. */
+export async function getLiveConnectionState(client, timeoutMs = 10000) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => client.getState()),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('WhatsApp connection check timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Categorize connection errors for smarter recovery strategies
  * @param {string} errorMessage - Error message or code

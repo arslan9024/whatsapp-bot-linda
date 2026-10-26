@@ -77,6 +77,9 @@ export default class TerminalNumberMenu {
           action('Recover session by phone', 'recover', [phoneField]),
           action('Disconnect by phone (keep session)', 'disconnect', [phoneField], { confirm: true }),
           action('Health of all accounts', 'health'),
+          action('Restore master (reactivate saved session, no new code)', 'restore master'),
+          action('Check master live before continuing', 'master check'),
+          action('Make master ready (check, then restore if offline)', 'master ready'),
         ] },
         { label: 'Link master directly (no saved preference)', children: [
           action('Link with pairing code', 'link-code'),
@@ -197,6 +200,30 @@ export default class TerminalNumberMenu {
       });
     });
     return cells;
+  }
+
+  /**
+   * Top-level sections for the INPUT board: `{ code, label, uses, actions, cells }` where each
+   * cell is `code command ×n` (submenus show `code ▸label`). The WhatsApp catalog has no cells.
+   */
+  sections(count = () => 0) {
+    if (!this.root) this.refresh(false);
+    return this.root.children.map((section, s) => {
+      const code = String(s + 1);
+      if (section === this.catalogNode) {
+        return { code, label: section.label, uses: 0, actions: 0, cells: [], reference: true };
+      }
+      let uses = 0;
+      const cells = section.children.map((child, i) => {
+        const childCode = `${code}.${i + 1}`;
+        if (child.children) return `${childCode} ▸${child.label.replace(/\s*\(.*\)$/, '')} (${child.children.length})`;
+        if (child.info) return `${childCode} ${child.label}`;
+        const used = count(child.command);
+        uses += used;
+        return `${childCode} ${child.command} ×${used}`;
+      });
+      return { code, label: section.label, uses, actions: this.countActions(section), cells };
+    });
   }
 
   nodeAt(path) {

@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import ConnectionManager from '../../src/connection/ConnectionManager.js';
+import { getLiveConnectionState } from '../../src/connection/ConnectionEnhancements.js';
 import SessionCleanupManager from '../../src/sessions/SessionCleanupManager.js';
 import DeviceLinkedManager from '../../src/linking/DeviceLinkedManager.js';
 import LockFileDetector from '../../src/sessions/LockFileDetector.js';
@@ -75,9 +76,101 @@ describe('Non-destructive saved-session reconnect', () => {
   });
 
   afterEach(() => {
+    manager.stopHealthCheck();
+    manager.stopKeepAlive();
     clearTimeout(manager.reconnectTimer);
     clearTimeout(manager.errorResetTimer);
     jest.useRealTimers();
+  });
+
+  test('live checks await WhatsApp and only a verified response updates activity', async () => {
+    manager.setState('CONNECTED');
+    const lastActivity = manager.lastActivityTime;
+    client.getState.mockResolvedValue('CONNECTED');
+    await jest.advanceTimersByTimeAsync(1000);
+    await manager.checkConnectionHealth();
+    expect(manager.lastActivityTime).toBeGreaterThan(lastActivity);
+    expect(manager.healthCheckFailures).toBe(0);
+    client.getState.mockResolvedValue('DISCONNECTED');
+    const verifiedActivity = manager.lastActivityTime;
+    await manager.checkConnectionHealth();
+    expect(manager.lastActivityTime).toBe(verifiedActivity);
+    expect(manager.healthCheckFailures).toBe(1);
+    client.getState.mockResolvedValue('CONNECTED');
+    await manager.checkConnectionHealth();
+    expect(manager.healthCheckFailures).toBe(0);
+    expect(manager.reconnectTimer).toBeNull();
+  });
+
+  test('three live failures recover a stale session even when keep-alive timers are running', async () => {
+    manager.setState('CONNECTED');
+    manager.startHealthCheck();
+    manager.startKeepAlive();
+    await manager.checkConnectionHealth();
+    await manager.checkConnectionHealth();
+    expect(manager.reconnectTimer).toBeNull();
+    await manager.checkConnectionHealth();
+    expect(manager.state).toBe('DISCONNECTED');
+    expect(manager.reconnectTimer).not.toBeNull();
+    expect(manager.healthCheckInterval).toBeNull();
+    expect(manager.keepAliveInterval).toBeNull();
+    expect(context.deviceLinkedManager.updateDeviceMetadata).toHaveBeenCalledWith(
+      manager.phoneNumber, expect.objectContaining({ status: 'offline', isOnline: false }),
+    );
+  });
+
+  test('hung probes time out, do not overlap, and ignore results from a replaced client', async () => {
+    manager.setState('CONNECTED');
+    client.getState.mockImplementation(() => new Promise(() => {}));
+    const first = manager.checkConnectionHealth();
+    await manager.checkConnectionHealth();
+    await jest.advanceTimersByTimeAsync(10000);
+    await first;
+    expect(client.getState).toHaveBeenCalledTimes(1);
+    expect(manager.healthCheckFailures).toBe(1);
+    let finish;
+    client.getState.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const second = manager.checkConnectionHealth();
+    await jest.advanceTimersByTimeAsync(0);
+    manager.client = {};
+    finish('DISCONNECTED');
+    await second;
+    expect(manager.healthCheckFailures).toBe(1);
+    expect(manager.reconnectTimer).toBeNull();
+  });
+
+  test('bounded live state checks release their timeout on success and reject on timeout', async () => {
+    client.getState.mockResolvedValue('CONNECTED');
+    expect(await getLiveConnectionState(client)).toBe('CONNECTED');
+    expect(jest.getTimerCount()).toBe(0);
+    client.getState.mockImplementation(() => new Promise(() => {}));
+    const check = expect(getLiveConnectionState(client)).rejects.toThrow('timed out');
+    await jest.advanceTimersByTimeAsync(10000);
+    await check;
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('exhausted retries resume after cooldown instead of suspending forever', async () => {
+    manager.reconnectAttempts = manager.maxReconnectAttempts;
+    manager.scheduleReconnect();
+    expect(manager.state).toBe('SUSPENDED');
+    expect(manager.errorResetTimer).not.toBeNull();
+    expect(manager.reconnectTimer).toBeNull();
+    await jest.advanceTimersByTimeAsync(60000);
+    expect(manager.reconnectAttempts).toBe(1);
+    expect(manager.reconnectTimer).not.toBeNull();
+    expect(manager.state).toBe('DISCONNECTED');
+  });
+
+  test.each(['authentication', 'shutdown', 'connected'])('cooldown cannot restart after %s', async reason => {
+    manager.reconnectAttempts = manager.maxReconnectAttempts;
+    manager.scheduleReconnect();
+    if (reason === 'authentication') manager.authRequired = true;
+    if (reason === 'shutdown') manager.isDestroyed = true;
+    if (reason === 'connected') manager.state = 'CONNECTED';
+    await jest.advanceTimersByTimeAsync(60000);
+    expect(manager.reconnectTimer).toBeNull();
+    expect(context.createClient).not.toHaveBeenCalled();
   });
 
   test('protocol errors schedule one reconnect and expose the original error without deleting data or counting linking attempts', async () => {

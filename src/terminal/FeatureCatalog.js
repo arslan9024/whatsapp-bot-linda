@@ -53,7 +53,7 @@ export const FEATURES = Object.freeze([
 ]);
 
 const DEFAULT_FILE = path.join(process.cwd(), 'data', 'feature-usage.json');
-const MULTI_WORD = new Set(['link', 'relink', 'goraha', 'analytics', 'sheets']);
+const MULTI_WORD = new Set(['link', 'relink', 'goraha', 'analytics', 'sheets', 'restore']);
 
 export class FeatureCatalog {
   /**

@@ -22,12 +22,13 @@ import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import TerminalLayout, { colorize, PANEL_COLORS } from './TerminalLayout.js';
 import FeatureCatalog from './FeatureCatalog.js';
+import TerminalPlaybooks, { PLAYBOOKS } from './TerminalPlaybooks.js';
 import { conversationReportLines, conversationSummaryLines } from './TerminalConversationAnalysis.js';
 import {
   dedupeLines, intentLines, pickClient, scoreLines, sendSingleMessage, sentimentLines, similarLines, validateLines,
 } from './TerminalFeatureCommands.js';
 
-const COMMAND_HINT = 'Type a feature code (e.g. 1.13, 8.2) | features = full numbered list | menu | link-code | link-qr | recover <phone> | help';
+const COMMAND_HINT = 'First: master check | master ready = restore if offline | features = all commands | menu = choose options | help';
 const APP_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).version || '?';
@@ -71,6 +72,11 @@ class TerminalHealthDashboard {
     this.activeQuestion = null;
     this.pairingCodes = new Map();
     this.features = new FeatureCatalog();
+    this.playbooks = new TerminalPlaybooks(
+      this.numberMenu,
+      () => this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber || null,
+      key => this.features.actionCount(key),
+    );
     this.startedAt = Date.now();
     this.conversationReporter = null;
     this.conversationJobs = new Map();
@@ -211,13 +217,48 @@ class TerminalHealthDashboard {
     return job.promise;
   }
 
-  /** FEATURES panel: dotted feature codes with usage counters (compact summary on short windows). */
+  /** FEATURES sub-header: numbered sections with action and usage counters. */
   featurePanel() {
     const count = command => this.features.actionCount(command);
     return {
-      title: 'FEATURES · CODE COMMAND ×USES · type the code · features = full numbered list',
-      lines: width => [this.features.summaryLine(), ...gridLines(this.numberMenu.gridCells(count), width)],
+      title: 'FEATURES · SECTIONS [code] ACTIONS ×USES · every code is on the INPUT board',
+      lines: width => [this.features.summaryLine(), ...gridLines(this.sectionTabs(count), width)],
       compactLines: [this.features.summaryLine()],
+    };
+  }
+
+  sectionTabs(count) {
+    return [
+      ...this.numberMenu.sections(count).map(section => (section.reference
+        ? `[${section.code}] WhatsApp !commands (reference)`
+        : `[${section.code}] ${section.label.replace(/\s*\(.*\)$/, '')} ${section.actions} ×${section.uses}`)),
+      `[P] Playbooks P1-P${PLAYBOOKS.length}`,
+    ];
+  }
+
+  /**
+   * INPUT board (idle): every section with its codes and counters, then the numbered
+   * problem → step playbooks. Short windows get one line per section instead.
+   */
+  inputBoard() {
+    const count = command => this.features.actionCount(command);
+    const sections = this.numberMenu.sections(count);
+    const footer = 'Type a code (1.16), a playbook step (p1.1) or a command, then Enter · 0 back · 00 home · menu · p = playbooks · help';
+    return {
+      lines: width => [
+        ...sections.flatMap(section => (section.reference
+          ? [`[${section.code}] ${section.label} - type ${section.code} to browse`]
+          : [`[${section.code}] ${section.label.toUpperCase()} · ${section.actions} actions · used ×${section.uses}`,
+            ...gridLines(section.cells, width - 2).map(line => `  ${line}`)])),
+        'PLAYBOOKS · problem → steps · p<n> = show steps · p<n>.<step> = run step',
+        ...this.playbooks.summaryLines().map(line => `  ${line}`),
+        footer,
+      ],
+      compactLines: width => [
+        ...gridLines(sections.map(section => `[${section.code}] ${section.label.replace(/\s*\(.*\)$/, '')} ${section.reference ? '(ref)' : `${section.actions} ×${section.uses}`}`), width),
+        ...gridLines(PLAYBOOKS.map(p => `P${p.id} ${p.problem.replace(/\s*\(.*\)$/, '')} ×${this.features.actionCount(`p${p.id}`)}`), width),
+        `Enlarge the window for every code. ${footer}`,
+      ],
     };
   }
 
@@ -252,10 +293,17 @@ class TerminalHealthDashboard {
     return ['Type a command at the prompt below and press Enter.', COMMAND_HINT];
   }
 
+  /** INPUT panel: the active question / pairing code, otherwise the full command board. */
+  inputPanel() {
+    const title = 'INPUT · YOUR ACTION';
+    if (this.activeQuestion || this.pairingCodes.size) return { title, lines: this.inputPanelLines() };
+    return { title: `${title} · ALL OPTIONS & PLAYBOOKS`, ...this.inputBoard() };
+  }
+
   /** Redraw only the INPUT panel (questions/codes can change while the dashboard is frozen). */
   renderInputPanel() {
     if (!this.usePanels) return;
-    this.layout.updateInput({ title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() });
+    this.layout.updateInput(this.inputPanel());
   }
 
   /**
@@ -432,7 +480,7 @@ class TerminalHealthDashboard {
       this.rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
-        prompt: colorize('▶ Linda Bot > ', PANEL_COLORS.input, { bold: true })
+        prompt: colorize('▶ Linda Bot [features = all commands | help] > ', PANEL_COLORS.input, { bold: true })
       });
     }
     return this.rl;
@@ -615,7 +663,7 @@ class TerminalHealthDashboard {
       const outputLines = screen.split('\n').slice(2, -2);
       const result = this.layout.render(
         { title: `OUTPUT · DEVICES & ${masterInfo?.online ? 'MESSAGE ANALYZER' : 'RELINK MASTER'}`, lines: outputLines },
-        { title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() },
+        this.inputPanel(),
         this.featurePanel(),
         this.headerPanel(masterInfo, devicesLine),
       );
@@ -871,6 +919,7 @@ class TerminalHealthDashboard {
       onListDevices,
       onRestoreAllSessions,  // NEW: Restore all previous sessions (Phase 28)
       onRestoreAccount,
+      onCheckMaster,
       onDisconnectAccount,
       onListChats,
       onAnalyzeChat,
@@ -919,6 +968,19 @@ class TerminalHealthDashboard {
           this.rl.prompt();
         }
         return;
+      }
+      if (!this.numberMenu.pending) {
+        const play = this.playbooks.resolve(input);
+        if (play?.lines) {
+          for (const line of play.lines) console.log(line);
+          if (this.isMonitoring) this.rl.prompt();
+          return;
+        }
+        if (play) {
+          this.features.recordInput(`p${play.id}`);
+          console.log(`▶ Playbook P${play.id}: ${play.input}`);
+          input = play.input;
+        }
       }
       const shortcut = this.features.resolve(input);
       if (shortcut?.error) {
@@ -1105,6 +1167,15 @@ class TerminalHealthDashboard {
             }
           } else {
             console.log(`\n⚠️  Usage: 'link master' or 'link master <+phone> [name]'\n`);
+          }
+          break;
+
+        case 'master':
+          if (!parts[1] || ['check', 'ready'].includes(parts[1].toLowerCase())) {
+            if (!onCheckMaster) throw new Error('Master readiness check is unavailable');
+            await onCheckMaster({ recover: parts[1]?.toLowerCase() === 'ready' });
+          } else {
+            console.log('Usage: master check (live status) | master ready (restore if offline). All commands: features | help.');
           }
           break;
 
@@ -1439,6 +1510,23 @@ class TerminalHealthDashboard {
 
         case 'restore-sessions':
         case 'restore':
+          if (parts[1]?.toLowerCase() === 'master') {
+            const masterPhone = parts[2] || this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber;
+            if (!masterPhone) {
+              console.log('\n⚠️  No master is configured yet. Link one: link-code (2.1) or link-qr (2.2)\n');
+              break;
+            }
+            console.log(`\n⏳ Restoring master ${masterPhone} from its saved session (no new code)...`);
+            try {
+              if (!onRestoreAccount) throw new Error('Session restore handler is unavailable');
+              await onRestoreAccount(masterPhone);
+            } catch (error) {
+              this.lastNotice = `Restore master failed: ${error.message}`;
+              console.log(`  ❌ Error during recovery: ${error.message}`);
+              console.log(`  Next step (P1.2): relink master ${masterPhone}\n`);
+            }
+            break;
+          }
           // Restore all previous WhatsApp sessions
           console.clear();
           console.log(`\n╔════════════════════════════════════════════════════════════╗`);
@@ -1718,10 +1806,14 @@ class TerminalHealthDashboard {
           console.log(`    link master <+phone> [n]  → Add additional master WhatsApp account`);
           console.log(`    accounts                  → List all accounts with per-account status`);
           console.log(`\n  ACCOUNT HEALTH & MONITORING:`);
+          console.log('    master check              → Check the master live before continuing');
+          console.log('    master ready              → Check live; restore saved session if offline; show relink options if needed');
           console.log(`    health <+phone>           → Show detailed health for specific account`);
           console.log(`    stats <+phone>            → Show metrics (uptime, messages, errors)`);
           console.log(`    recover <+phone>          → Attempt session restoration for one account`);
           console.log(`    restore-sessions / restore → Restore ALL previous WhatsApp sessions`);
+          console.log(`    restore master [+phone]   → Reactivate the master's saved session (no new code)`);
+          console.log(`    p / p<n> / p<n>.<step>    → Playbooks: list, show steps, run one step (e.g. p1.1)`);
           console.log(`\n  GORAHA BOT (Phase 28):`);
           console.log(`    goraha (or 'goraha status')  → Display contact stats (cached)`);
           console.log(`    goraha verify                → Force verification and recount`);
@@ -1823,8 +1915,18 @@ class TerminalHealthDashboard {
 
     // Initial display
     this.displayHealthDashboard();
+    if (onCheckMaster) {
+      this.commandRunning = true;
+      try {
+        await onCheckMaster();
+      } catch (error) {
+        console.error(`Master readiness check failed: ${error.message}`);
+      } finally {
+        this.commandRunning = false;
+      }
+    }
     if (this.autoFeatureList) this.printFeatureList();
-    console.log('Type any feature code from the list (e.g. 2.1 = link-code, 2.2 = link-qr, 8.2 = validate). features = show the list again.');
+    console.log(COMMAND_HINT);
     this.rl.prompt();
   }
 

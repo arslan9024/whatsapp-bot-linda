@@ -335,6 +335,58 @@ describe('Terminal recovery opens the real saved headless session', () => {
     expect(options.deviceLinkedManager.markDeviceLinked).not.toHaveBeenCalled();
   });
 
+  test('master readiness uses a live check and never reopens a connected master', async () => {
+    const live = { getState: jest.fn().mockResolvedValue('CONNECTED') };
+    options.accountClients.set(phone, live);
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(true);
+    expect(live.getState).toHaveBeenCalledTimes(1);
+    expect(options.createClient).not.toHaveBeenCalled();
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('ONLINE (live check)'), 'success');
+  });
+
+  test('master check offers restore first but does not initiate recovery', async () => {
+    expect(await callbacks.onCheckMaster()).toBe(false);
+    expect(options.createClient).not.toHaveBeenCalled();
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('First: master ready'), 'warn');
+  });
+
+  test('master ready restores the original profile and verifies the new connection', async () => {
+    newClient.getState = jest.fn().mockResolvedValue('CONNECTED');
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(true);
+    expect(options.createClient).toHaveBeenCalledWith('original-master-profile');
+    expect(newClient.getState).toHaveBeenCalled();
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('ONLINE (live check)'), 'success');
+  });
+
+  test('master ready does not claim success when restore leaves the client offline', async () => {
+    newClient.getState = jest.fn().mockResolvedValue('DISCONNECTED');
+    await expect(callbacks.onCheckMaster({ recover: true })).rejects.toThrow('not online after restore');
+  });
+
+  test.each(['logged_out', 'auth_failed', 'auth_required'])('master ready requests explicit authentication for %s', async status => {
+    deps.sessionStateManager.getDeviceMetadata = () => ({ status, clientId: 'original-master-profile' });
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(false);
+    expect(options.createClient).not.toHaveBeenCalled();
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('link-code or link-qr'), 'warn');
+  });
+
+  test('master ready waits for in-flight recovery instead of opening another client', async () => {
+    deps.connectionManagers.set(phone, { isReconnecting: true });
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(false);
+    expect(options.createClient).not.toHaveBeenCalled();
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('CONNECTING'), 'info');
+  });
+
+  test('missing master and saved login offer linking choices', async () => {
+    options.accountConfigManager.getMasterPhoneNumber = () => null;
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(false);
+    expect(options.logBot).toHaveBeenCalledWith(expect.stringContaining('MASTER NOT CONFIGURED'), 'warn');
+    options.accountConfigManager.getMasterPhoneNumber = () => phone;
+    SessionManager.canRestoreSession.mockReturnValue(false);
+    expect(await callbacks.onCheckMaster({ recover: true })).toBe(false);
+    expect(options.createClient).not.toHaveBeenCalled();
+  });
+
   test('active accounts are not reopened; offline clients are destroyed exactly once before recovery', async () => {
     const old = {
       getState: jest.fn().mockResolvedValue('CONNECTED'),

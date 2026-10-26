@@ -138,6 +138,27 @@ describe('TerminalLayout', () => {
     layout.close();
   });
 
+  test('compacts a tall INPUT board so OUTPUT keeps visible rows, and keeps it full when it fits', () => {
+    const board = {
+      title: 'INPUT',
+      lines: Array.from({ length: 30 }, (_, i) => `code row ${i + 1}`),
+      compactLines: width => [`compact board ${width}`],
+    };
+    const short = fakeTty({ rows: 40 });
+    const layout = new TerminalLayout(short);
+    expect(layout.render(output, board)).toBe('repinned');
+    expect(short.output).toMatch(/compact board \d+/);
+    expect(short.output).not.toContain('code row 30');
+    layout.close();
+
+    const tall = fakeTty({ rows: 60 });
+    const full = new TerminalLayout(tall);
+    full.render(output, board);
+    expect(tall.output).toContain('code row 30');
+    expect(tall.output).not.toContain('compact board');
+    full.close();
+  });
+
   test('re-pins after a terminal resize', () => {
     const stream = fakeTty();
     const layout = new TerminalLayout(stream);
