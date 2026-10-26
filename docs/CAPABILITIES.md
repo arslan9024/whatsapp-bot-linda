@@ -216,7 +216,8 @@
 | `DEVELOPER_GUIDE.md` | Setup and development workflow |
 | `CODING_STANDARDS.md` | Coding conventions and rules |
 | `COPILOT_CONTEXT.md` | AI/dev context for contributors |
-| `plans/FUTURE_UPGRADES.md` | Detailed technical upgrade backlog |
+| `plans/README.md` | Engineering program: vision, RUP plan, algorithms, flowcharts, SRS, design, 100× roadmap |
+| `plans/ARCHIVE/legacy-plans/FUTURE_UPGRADES.md` | Older technical upgrade backlog (superseded by `plans/07-roadmap`) |
 | `README.md` | General project overview |
 
 ---

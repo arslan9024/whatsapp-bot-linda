@@ -13,6 +13,20 @@
 
 ---
 
+## Engineering plans program (docs/plans)
+
+- `docs/plans` is now a numbered RUP program: `00-vision`, then `01-rup` (phases, iterations, risk list), `02-problems` (PS-001…PS-020), `03-algorithms` (ALG-001…ALG-020 with invariants, complexity and current-code gaps), `04-flowcharts` (Mermaid FC-001…FC-020), `05-srs` (FR-001…FR-033, NFR-001…NFR-008), `06-design` (layers, modules M-01…M-14, ADRs) and `07-roadmap` (levels L0–L6 toward 100×).
+- `TRACEABILITY.md` links every problem to its algorithm, flowchart, requirements, module, tests, menu codes and status.
+- New `npm run plans:check` (`tools/plans-check.js`) checks IDs, required sections, flowcharts, status agreement and relative links. It also runs inside `npm test` via `tests/unit/PlansCheck.test.js`.
+- The older plans moved to `docs/plans/ARCHIVE/legacy-plans/`, and the master session plan moved to `docs/plans/01-rup/iterations/E1-master-session.md`.
+
+## Input board and playbooks
+
+- INPUT now shows every option by section, with its code, command and use counter. On short windows it switches to a compact grid of sections and playbooks.
+- FEATURES is now a section bar: `[n] section · actions · ×uses`.
+- New playbooks P1–P10 give numbered steps for common problems. `p` lists them, `p<n>` shows the steps, and `p<n>.<step>` runs one step with the master phone filled in. Each run is counted.
+- New `restore master [+phone]` command and menu code `1.19`. It reactivates the master's saved session without a new code.
+
 ## Full terminal UI and conversation report
 
 - The terminal UI now runs top to bottom: HEADER (magenta), FEATURES (green), INPUT (yellow), OUTPUT (cyan), then a blue PROCESS VIEWBOARD bar with the scrolling logs below it.

@@ -220,7 +220,7 @@ still valid or that the bot is currently connected.
 ### Master account readiness and local conversation inspection
 
 The current design and live acceptance checklist are in
-[the master-account session plan](docs/plans/MASTER_ACCOUNT_SESSION_PLAN.md).
+[the master-account session plan](docs/plans/01-rup/iterations/E1-master-session.md).
 Successful automated tests are not proof of live WhatsApp authentication.
 
 - `disconnect <phone>` closes only that account and retains its saved session.
@@ -391,13 +391,68 @@ top to bottom:
 
 1. **HEADER** (magenta): Linda version, Node version, PID, start time and uptime,
    the master account status, device totals and what Linda is doing now.
-2. **FEATURES** (green): the sub-header with every feature code and its counter.
-3. **INPUT** (yellow): your command or the current question.
+2. **FEATURES** (green): the sub-header with the numbered sections, each with its
+   action count and total uses.
+3. **INPUT** (yellow): the current question or pairing code. Otherwise it is the full
+   input board: every section with each code, command and use counter, then the
+   playbooks (see below).
 4. **OUTPUT** (cyan): devices plus the conversation report.
 5. **PROCESS VIEWBOARD** (blue bar): logs and processing scroll below it.
 
-On short windows the features and header switch to one line each, and long OUTPUT
-is cut with a `… +N more lines` note.
+On short windows the features and header switch to one line each. If OUTPUT would
+drop below 8 rows, the input board switches to a compact grid of sections and
+playbooks. Long OUTPUT is cut with a `… +N more lines` note.
+
+#### Playbooks (problem → numbered steps)
+
+Each playbook is an ordered algorithm for one problem. Every step is a fixed menu
+code. Run the next step only if the previous one did not fix the problem.
+
+| Input | What it does |
+| --- | --- |
+| `p` | list every playbook with its steps |
+| `p1` | show the steps of P1 with the real commands |
+| `p1.1` | run step 1 of P1 (`{master}` is filled with the master phone) |
+
+| # | Problem | Steps |
+| --- | --- | --- |
+| P1 | Restore master (offline but still linked) | 1.16 recover → 1.9 relink master → 2.1 link-code |
+| P2 | Link a new master | 2.1 link-code → 2.2 link-qr → 1.3 masters |
+| P3 | Pairing code delayed or failed | 1.12 code → 2.2 link-qr → 1.9 relink master |
+| P4 | Sessions missing after restart | 1.7 restore → 1.18 health → 1.16 recover |
+| P5 | Device removed / logged out | 1.13 device → 1.9 relink master → 1.7 restore |
+| P6 | Add a servant account | 1.10 relink servant → 1.4 servants → 1.14 health |
+| P7 | Analyze conversations | 8.11 convos → 8.9 chats → 8.10 analyze |
+| P8 | Send a message safely | 8.2 validate → 8.1 send |
+| P9 | Clean contacts | 3.2 goraha verify → 3.4 goraha filter → 8.7 dedupe |
+| P10 | Daily health check | 6.1 status → 1.18 health → 8.3 score → 4.3 analytics uptime |
+
+Steps that need a value you have not given (a phone, file or number) ask for it.
+`restore master [+phone]` (menu `1.19`) reactivates the master's saved session
+without a new code.
+
+#### Master-first readiness and automatic recovery
+
+The prompt always shows `features = all commands | help`; `menu` offers numbered
+choices. Startup checks the master's live WhatsApp state, rather than treating a
+saved login as proof that it is online.
+
+- `master check` (`1.20`): check the live master connection before continuing.
+- `master ready` (`1.21`): check first, then restore the saved login if offline,
+  without creating a new pairing code or replacing an already connected client.
+- If authentication was revoked or no saved login exists, choose `link-code` or
+  `link-qr`. If restoration fails, Linda shows the error and the relink command.
+  Relinking is never silently forced.
+
+While connected, bounded live checks detect unresponsive sessions; three failed
+checks trigger saved-session recovery. Temporary disconnects use exponential
+backoff. After ten retries, a progressive cooldown (up to 30 minutes) allows
+recovery to resume instead of suspending forever. Explicit local disconnect,
+shutdown, and authentication-required states still stop automatic recovery.
+
+This improves availability but cannot guarantee uninterrupted uptime: the bot
+process, computer and network must stay running, and WhatsApp may require
+phone approval again after logout or session revocation.
 
 About 8 seconds after an account logs in, Linda reads its chat list and counts the
 messages in each chat. This is read-only: no messages are sent or marked as read.
@@ -656,7 +711,7 @@ All documentation is organized in `docs/`:
 | `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md` | Architecture overview and developer guide |
 | `docs/CODING_STANDARDS.md`, `docs/CAPABILITIES.md` | Coding standards and feature capabilities |
 | `docs/guides/` | Setup, deployment, and reference guides |
-| `docs/plans/` | Current implementation plans (e.g. master-account session plan) |
+| `docs/plans/` | Engineering program: vision → RUP → problems → algorithms → flowcharts → SRS → design → 100× roadmap, linked by `TRACEABILITY.md` and checked by `npm run plans:check` ([index](docs/plans/README.md)) |
 | `docs/api/` | API documentation and references |
 | `docs/architecture/` | Architecture diagrams and decisions |
 | `docs/security/` | Security audits and remediation guides |

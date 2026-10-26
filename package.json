@@ -54,6 +54,7 @@
         "test:phase5": "npm run test:communication && echo '' && npm run test:commission && echo '' && npm run test:analytics && echo '' && npm run test:invoice && echo '' && npm run test:notification",
         "test:all-features": "npm run phase5-express && echo '' && npm run test:phase5 && echo '' && npm run test:bridge",
         "security:scan": "node tools/scan-secrets.js",
+        "plans:check": "node tools/plans-check.js",
         "doctor:google": "node tools/diagnose-google.js"
     },
     "nodemonConfig": {

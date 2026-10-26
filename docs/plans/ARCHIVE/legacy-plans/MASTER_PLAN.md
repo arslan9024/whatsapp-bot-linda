@@ -2,7 +2,7 @@
 
 ## Current priority: master WhatsApp sessions (2026-10-26)
 
-Use [MASTER_ACCOUNT_SESSION_PLAN.md](MASTER_ACCOUNT_SESSION_PLAN.md) as the
+Use [MASTER_ACCOUNT_SESSION_PLAN.md](../../01-rup/iterations/E1-master-session.md) as the
 detailed acceptance plan for linking, local-only authentication storage,
 automatic recovery, terminal account management and read-only conversation
 analysis. Implementation and automated tests are not live authentication proof.

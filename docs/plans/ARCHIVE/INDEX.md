@@ -217,7 +217,7 @@ Current Week (Feb 7, 2026)
 ## 🔗 Cross-References
 
 ### From This Archive to Other Docs
-→ [Master Plan](../LINDA_BOT_MASTER_PLAN.md) - Future vision  
+→ [Master Plan](legacy-plans/LINDA_BOT_MASTER_PLAN.md) - Future vision  
 → [Project Status](../PROJECT_STATUS.md) - Current status  
 → [Phases Index](../PHASES/INDEX.md) - Phase documentation  
 → [Getting Started](../GETTING_STARTED/INDEX.md) - User guides  

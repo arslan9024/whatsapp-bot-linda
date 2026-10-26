@@ -3,8 +3,8 @@
 Updated: 2026-10-26
 Status: implemented and automatically tested; live acceptance pending.
 
-This is the detailed feature plan linked from [MASTER_PLAN.md](MASTER_PLAN.md).
-The older [LINDA_BOT_MASTER_PLAN.md](LINDA_BOT_MASTER_PLAN.md) is historical context,
+This is the detailed feature plan linked from [MASTER_PLAN.md](../../ARCHIVE/legacy-plans/MASTER_PLAN.md).
+The older [LINDA_BOT_MASTER_PLAN.md](../../ARCHIVE/legacy-plans/LINDA_BOT_MASTER_PLAN.md) is historical context,
 not evidence of production readiness.
 
 ## 1. Scope and contract

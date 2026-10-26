@@ -176,10 +176,10 @@ This folder contains technical documentation, architecture guides, API reference
 ## 🔗 Key Links
 
 ### Within This Project
-- [Master Plan](../LINDA_BOT_MASTER_PLAN.md)
-- [Project Status](../PROJECT_STATUS.md)
-- [Phase Documentation](../PHASES/INDEX.md)
-- [Getting Started](../GETTING_STARTED/INDEX.md)
+- [Master Plan](../ARCHIVE/legacy-plans/LINDA_BOT_MASTER_PLAN.md)
+- [Plans program (status, IDs)](../README.md)
+- [RUP phases and iterations](../01-rup/RUP_PLAN.md)
+- [Getting Started](../../guides/GETTING_STARTED.md)
 
 ### External Documentation
 - [WhatsApp Web.js Docs](https://docs.wwebjs.dev)
@@ -344,7 +344,7 @@ Phase 7 (Future) - Scale
 **Status:** Index Complete, Documents In Progress
 
 👉 **Available Now:**
-- [TECHNOLOGY_STACK.md](./TECHNOLOGY_STACK.md)
+- [Software design (architecture, modules, stack)](../06-design/SOFTWARE_DESIGN.md)
 
 👉 **Coming Soon (Phase 5):**
 - ARCHITECTURE.md

@@ -2,7 +2,7 @@
 
 > Historical roadmap. Current decisions and acceptance criteria are in
 > [MASTER_PLAN.md](MASTER_PLAN.md) and
-> [MASTER_ACCOUNT_SESSION_PLAN.md](MASTER_ACCOUNT_SESSION_PLAN.md).
+> [MASTER_ACCOUNT_SESSION_PLAN.md](../../01-rup/iterations/E1-master-session.md).
 > Earlier checkmarks and readiness percentages below are historical claims,
 > not current live verification.
 
