@@ -143,7 +143,10 @@ describe('Compact truthful terminal device dashboard', () => {
     dashboard.setConversationReporter(reporter);
 
     dashboard.displayHealthDashboard();
-    expect(console.log.mock.calls.at(-1)[0]).toContain(`CONVERSATIONS ${phone}: no report yet`);
+    const first = console.log.mock.calls.at(-1)[0];
+    expect(first).toContain(`MESSAGE ANALYZER · MASTER ${phone} ONLINE`);
+    expect(first).toContain('No report yet');
+    expect(first).not.toContain('RELINK ·');
 
     dashboard.onAccountReady(phone, 1000);
     expect(reporter.run).not.toHaveBeenCalled();
@@ -154,9 +157,10 @@ describe('Compact truthful terminal device dashboard', () => {
 
     dashboard.displayHealthDashboard(true);
     const screen = console.log.mock.calls.at(-1)[0];
-    expect(screen).toContain(`CONVERSATIONS · MASTER ${phone}`);
+    expect(screen).toContain(`MESSAGE ANALYZER · MASTER ${phone} ONLINE`);
     expect(screen).toContain('Last conversation: #1 Ali');
     expect(screen).toContain('#1 Ali 5 | #2 Team 2');
+    expect(screen).toContain(`8.10 analyze ${phone} <#>`);
 
     process.env.LINDA_AUTO_CHAT_REPORT = '0';
     reporter.run.mockClear();
@@ -164,6 +168,38 @@ describe('Compact truthful terminal device dashboard', () => {
     jest.advanceTimersByTime(50);
     expect(reporter.run).not.toHaveBeenCalled();
     delete process.env.LINDA_AUTO_CHAT_REPORT;
+  });
+
+  test('offline master shows the RELINK section (reactivate first) instead of the message analyzer', () => {
+    const phone = devices[0].phoneNumber;
+    dashboard.accountConfigManager.getMasterPhoneNumber = () => phone;
+    dashboard.setConversationReporter({ run: jest.fn(), get: () => null });
+    services.register('sessionStateManager', {
+      getDeviceMetadata: number => number === phone ? { clientId: 'master-profile', deviceLinked: true, lastError: 'Target closed' } : {},
+    });
+    devices[0].status = 'unlinked';
+    devices[0].isOnline = false;
+    dashboard.setConnectionSources(new Map(), new Map());
+    dashboard.displayHealthDashboard();
+    let screen = console.log.mock.calls.at(-1)[0];
+    expect(screen).toContain(`RELINK · MASTER ${phone} OFFLINE`);
+    expect(screen).toContain(`1.16 recover ${phone} (reactivate, no new code)`);
+    expect(screen).toContain(`1.9 relink master ${phone}`);
+    expect(screen).toContain('Last error: Target closed');
+    expect(screen.match(/Target closed/g)).toHaveLength(1);
+    expect(screen).not.toContain('MESSAGE ANALYZER');
+
+    devices[0].status = 'logged_out';
+    dashboard.displayHealthDashboard();
+    screen = console.log.mock.calls.at(-1)[0];
+    expect(screen).toContain(`RELINK · MASTER ${phone} LOGGED OUT`);
+    expect(screen).toContain('Removed or logged out on the phone');
+    expect(screen).toContain('2.1 link-code | 2.2 link-qr');
+    expect(screen).not.toContain('1.16 recover');
+  });
+
+  test('no configured master shows link options', () => {
+    expect(dashboard.masterSectionLines(null).join('\n')).toContain('NO MASTER ACCOUNT LINKED');
   });
 
   test('header panel carries Linda details and master status', () => {

@@ -401,7 +401,18 @@ is cut with a `… +N more lines` note.
 
 About 8 seconds after an account logs in, Linda reads its chat list and counts the
 messages in each chat. This is read-only: no messages are sent or marked as read.
-Progress shows in the process area. When the master is online, OUTPUT shows:
+Progress shows in the process area.
+
+The master section of OUTPUT depends on the master's state:
+
+- **Master online:** a **MESSAGE ANALYZER** section with the report and the analyzer
+  codes (`8.11` convos, `8.9` chats, `8.10` analyze).
+- **Master offline:** a **RELINK** section. If the phone still lists the device and a
+  saved session exists, it suggests `1.16 recover <phone>` first (reactivate, no new
+  code). It suggests `1.9 relink master <phone>` only if that fails. A logged-out
+  master gets relink and `2.1` / `2.2` link options plus the last error.
+
+When the master is online, the MESSAGE ANALYZER section shows:
 
 - total conversations (people / groups) and unread counts
 - the last conversation: name, time, and a short preview of the last message

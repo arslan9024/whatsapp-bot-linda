@@ -95,23 +95,67 @@ class TerminalHealthDashboard {
     };
   }
 
-  /** Conversation report lines for OUTPUT: full summary for the online master, one line per other account. */
+  /** One-line conversation summaries for online non-master accounts. */
   conversationLines(onlinePhones = []) {
     if (!this.conversationReporter) return [];
     const lines = [];
-    for (const { phone, master } of onlinePhones) {
+    for (const { phone } of onlinePhones) {
       const report = this.conversationReporter.get(phone);
       if (this.conversationJobs.has(phone)) {
         lines.push(`CONVERSATIONS ${phone}: analyzing… ${this.conversationJobs.get(phone).progress || ''}`.trimEnd());
       } else if (!report) {
         lines.push(`CONVERSATIONS ${phone}: no report yet (type convos ${phone})`);
-      } else if (master) {
-        lines.push(`CONVERSATIONS · MASTER ${phone}`, ...conversationSummaryLines(report).map(line => `  ${line}`));
       } else {
         lines.push(`CONVERSATIONS ${phone}: ${report.totalChats} chats · ${report.totalMessages}${report.cappedChats ? '+' : ''} messages · ` +
           `last: ${report.last ? report.last.name : 'none'} · full list: convos ${phone}`);
       }
     }
+    return lines;
+  }
+
+  /**
+   * Master section of OUTPUT: the MESSAGE ANALYZER when the master is online, otherwise the
+   * RELINK section (reactivate the saved session first, relink only when needed).
+   */
+  masterSectionLines(info) {
+    if (!info) {
+      const phone = this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber;
+      return [
+        `RELINK · ${phone ? `MASTER ${phone} NOT SET UP ON THIS COMPUTER` : 'NO MASTER ACCOUNT LINKED'}`,
+        '  Link with pairing code: 2.1 link-code | Link with QR: 2.2 link-qr',
+      ];
+    }
+    const { phone } = info;
+    if (info.online) {
+      const lines = [`MESSAGE ANALYZER · MASTER ${phone} ONLINE`];
+      const report = this.conversationReporter?.get(phone);
+      if (!this.conversationReporter) {
+        lines.push('  Conversation reports are unavailable in this run.');
+      } else if (this.conversationJobs.has(phone)) {
+        lines.push(`  Analyzing conversations… ${this.conversationJobs.get(phone).progress || 'reading chat list'}`.trimEnd());
+      } else if (report) {
+        lines.push(...conversationSummaryLines(report).map(line => `  ${line}`));
+      } else {
+        lines.push('  No report yet; it runs automatically after login, or type 8.11 now.');
+      }
+      lines.push(`  Analyzer: 8.11 convos (full report) | 8.9 chats ${phone} | 8.10 analyze ${phone} <#>`);
+      return lines;
+    }
+    const lines = [`RELINK · MASTER ${phone} ${info.status}`];
+    if (info.inProgress) {
+      lines.push('  Reconnecting now; wait a moment. If it stalls: ' +
+        `1.16 recover ${phone} | 1.9 relink master ${phone}`);
+      return lines;
+    }
+    if (info.canRestore && info.previouslyLinked && !info.loggedOut) {
+      lines.push(`  Still linked on the phone; saved session found → 1.16 recover ${phone} (reactivate, no new code)`);
+      lines.push(`  Only if that fails: 1.9 relink master ${phone} (new pairing code or QR)`);
+    } else {
+      lines.push(`  ${info.loggedOut ? 'Removed or logged out on the phone' : 'No saved session on this computer'}` +
+        ` → 1.9 relink master ${phone} (pairing code or QR)`);
+      lines.push('  Or link fresh: 2.1 link-code | 2.2 link-qr');
+    }
+    if (info.lastError) lines.push(`  Last error: ${String(info.lastError).replace(/\s+/g, ' ').slice(0, 160)}`);
     return lines;
   }
 
@@ -524,9 +568,16 @@ class TerminalHealthDashboard {
       const master = phone === (this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber);
       const link = loggedOut ? 'NOT LINKED (logged out)' : previouslyLinked ? 'LINKED' :
         status === 'LINKING' ? 'LINKING' : 'NOT LINKED';
-      if (master) masterInfo = { phone, status, link, online: online && !loggedOut };
+      if (master) {
+        masterInfo = {
+          phone, status, link, online: online && !loggedOut, canRestore, previouslyLinked, loggedOut,
+          inProgress: Boolean(inProgress), authRequired: Boolean(authRequired),
+          lastError: manager?.connectionFailureReason || device.lastError || metadata.lastError || '',
+        };
+      }
       if (online && !loggedOut) onlinePhones.push({ phone, master });
       lines.push(`${++deviceNumber}. ${device.displayName || device.name || phone}${master ? ' [MASTER]' : ''} | ${phone} | Link: ${link} | Connection: ${status} | session: ${canRestore ? `saved (${clientId})` : online ? 'active; save pending' : 'relink needed'}`);
+      if (master) continue; // The master's reconnect guidance lives in its RELINK / ANALYZER section.
       if (previouslyLinked && !online && !loggedOut && !inProgress) {
         lines.push(`   Linked device; currently offline. ${
           !canRestore ? `No saved WhatsApp login on this computer; relink needed: relink ${master ? 'master' : 'servant'} ${phone}` :
@@ -541,7 +592,10 @@ class TerminalHealthDashboard {
       }
     }
     const devicesLine = `Devices: ${rows.size} | Linked: ${linked} | Active (online): ${active} | Offline: ${rows.size - active} | Saved sessions: ${saved}`;
-    const conversationLines = this.conversationLines(onlinePhones);
+    const conversationLines = [
+      ...this.masterSectionLines(masterInfo),
+      ...this.conversationLines(onlinePhones.filter(entry => !entry.master)),
+    ];
     const screen = [
       'LINDA | DEVICE DASHBOARD',
       devicesLine,
@@ -560,7 +614,7 @@ class TerminalHealthDashboard {
       // Title and device totals move to the HEADER; feature counters get their own panel.
       const outputLines = screen.split('\n').slice(2, -2);
       const result = this.layout.render(
-        { title: 'OUTPUT · DEVICES & CONVERSATIONS', lines: outputLines },
+        { title: `OUTPUT · DEVICES & ${masterInfo?.online ? 'MESSAGE ANALYZER' : 'RELINK MASTER'}`, lines: outputLines },
         { title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() },
         this.featurePanel(),
         this.headerPanel(masterInfo, devicesLine),

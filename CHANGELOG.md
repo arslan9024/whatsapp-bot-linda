@@ -19,6 +19,7 @@
 - On short windows the header and features compact to one line each, and long OUTPUT is truncated instead of unpinning.
 - After login, Linda analyzes every conversation read-only: total chats, the last conversation, and message counts per chat.
 - When the master is online, the report appears in OUTPUT.
+- OUTPUT now switches by master state: online shows the MESSAGE ANALYZER section, and offline shows the RELINK section. The RELINK section suggests reactivating the saved session first (`1.16 recover`), then relinking (`1.9`, `2.1`, `2.2`).
 - New `convos [phone]` command, menu code `8.11` and feature `F34`.
 - Environment variables: `LINDA_AUTO_CHAT_REPORT`, `LINDA_CHAT_REPORT_DELAY_MS`, `LINDA_CHAT_REPORT_LIMIT`, `LINDA_CHAT_REPORT_MAX_CHATS`.
 
