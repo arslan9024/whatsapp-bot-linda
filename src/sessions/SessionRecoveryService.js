@@ -1,4 +1,5 @@
 import { SessionManager } from './SessionManager.js';
+import { getLiveConnectionState } from '../connection/ConnectionEnhancements.js';
 
 export class SessionRecoveryService {
   constructor({ getFlowDeps, setupClientFlow, createClient, accountClients, accountConfigManager }) {
@@ -130,7 +131,7 @@ export class SessionRecoveryService {
       throw new Error(`Connection already in progress for ${phone}`);
     }
     const oldClient = this.accountClients.get(phone);
-    if (oldClient && await oldClient.getState().catch(error => {
+    if (oldClient && !connectionManager && await getLiveConnectionState(oldClient).catch(error => {
       deps.logBot(`Could not read existing connection for ${phone}: ${error.message}`, 'warn');
       return null;
     }) === 'CONNECTED') return true;

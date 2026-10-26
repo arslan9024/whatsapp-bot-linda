@@ -17,7 +17,8 @@ must never be shown as "needs relink".
 ## Input
 - Events: `start`, `qr`, `code`, `authenticated`, `ready`, `disconnected(reason)`,
   `auth_failure`, `logout`, `restore_failed`, `user_relink`.
-- Facts: `hasSavedSession` (boolean), `linkedBefore` (boolean).
+- Facts: saved login availability, previous linking evidence, current bounded
+  live check, client ownership, local pause and account enabled flag.
 
 ## Output
 - `state ∈ S` and `nextAction(state)`.
@@ -28,11 +29,18 @@ must never be shown as "needs relink".
 | `UNLINKED` | Never linked, no saved session | `2.1 link-code` |
 | `PAIRING` | Code or QR shown, waiting for the phone | Enter the code on the phone · `1.12` new code |
 | `AUTHENTICATED` | Credentials accepted, chats loading | wait |
-| `ONLINE` | Ready, live socket | — (analyzer available) |
-| `LINKED_OFFLINE` | Saved session exists, no live socket | `1.19 restore master` |
+| `ONLINE` | Ready lifecycle established; live check confirms connection when requested | Continue; keep current client |
+| `LINKED_OFFLINE` | Saved login is eligible for restore, no live connection | `1.21 master ready` or `1.19 restore master` |
 | `RESTORING` | Restore in progress | wait (bounded by ALG-003) |
 | `NEEDS_AUTH` | WhatsApp rejected the saved session | `1.9 relink master` |
 | `LOGGED_OUT` | The phone removed the device | `1.9 relink master` |
+
+These are normalized documentation states, not a unified runtime enum.
+Keep device linking, local login and live connection as separate fields.
+`PAUSED`, `DISABLED`, `IN_PROGRESS` and `NOT_CONFIGURED` are control/readiness
+decisions in [ALG-003](ALG-003-master-restore.md), not extra persisted states
+silently added to this table. A phone-side linked-device entry can coexist with
+an offline browser or a missing local profile.
 
 ## Invariants
 - I1. δ (the transition function) is **total**: every (state, event) pair has
@@ -43,6 +51,9 @@ must never be shown as "needs relink".
   as the first action in this state.
 
 ## Algorithm
+Apply the lifecycle transitions below only for the current client. Then resolve
+the operator's readiness decision using ALG-003, with enabled/pause/ownership
+guards and a live check. Persisted flags alone must not override live evidence.
 ```text
 1. on start:          s ← hasSavedSession ? RESTORING : UNLINKED
 2. on qr | code:      s ← PAIRING
@@ -76,7 +87,10 @@ Planned: `src/accounts/ConnectionStateMachine.js` exporting `STATES`,
 `transition(s, e)` and `nextAction(s)`, and every module uses it.
 
 ## Verification
-- Unit: a table-driven test of all 80 (state, event) pairs checking totality
-  and I2 and I3.
+- Current: `TerminalSessionDashboard`, `SessionRecoveryService` and
+  `SavedSessionReconnect` cover live-vs-persisted evidence, readiness, pause and
+  stale-client rejection.
+- Planned: a table-driven test of the unified transition function after that
+  module exists. Do not claim all state/event pairs are already covered.
 - Live: put the phone in airplane mode, then check that the dashboard shows
   `LINKED_OFFLINE` and offers `1.19`, not relink.

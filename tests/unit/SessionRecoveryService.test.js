@@ -167,6 +167,40 @@ describe('Shared session recovery lifecycle (real flow and connection manager)',
     expect(deps.allInitializedAccounts).toEqual([next]);
   });
 
+  test('manual restore does not hang indefinitely on an unresponsive old browser', async () => {
+    client.getState.mockImplementation(() => new Promise(() => {}));
+    accounts.set(phone, client);
+    const next = makeClient();
+    next.initialize.mockImplementation(async () => { next.emit('ready'); });
+    createClient.mockResolvedValue(next);
+    const result = recovery.recover(phone);
+    await jest.advanceTimersByTimeAsync(10000);
+    expect(await result).toBe(true);
+    expect(client.destroy).toHaveBeenCalledTimes(1);
+    expect(accounts.get(phone)).toBe(next);
+    expect(deps.logBot).toHaveBeenCalledWith(
+      expect.stringContaining('connection check timed out'), 'warn',
+    );
+  });
+
+  test('automatic stale-session recovery replaces the browser even if its cached state looks connected', async () => {
+    const first = recovery.recover(phone);
+    await flush();
+    client.emit('ready');
+    await first;
+    const manager = deps.connectionManagers.get(phone);
+    client.getState.mockResolvedValue('CONNECTED');
+    const next = makeClient();
+    next.initialize.mockImplementation(async () => { next.emit('ready'); });
+    createClient.mockResolvedValue(next);
+    await manager.handleStaleSession();
+    await jest.advanceTimersByTimeAsync(6001);
+    expect(client.destroy).toHaveBeenCalledTimes(1);
+    expect(accounts.get(phone)).toBe(next);
+    expect(manager.state).toBe('CONNECTED');
+    expect(manager.healthCheckInterval).not.toBeNull();
+  });
+
   test('local disconnect keeps authentication metadata and blocks automatic but not explicit recovery', async () => {
     const result = recovery.recover(phone);
     await flush();

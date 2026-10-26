@@ -7,6 +7,10 @@
 
 Node numbers match the step numbers in ALG-002. Rounded nodes are terminals; diamonds are decisions.
 
+These are normalized lifecycle states, not proof from saved metadata alone.
+Use [FC-003](FC-003-master-restore.md) for the configured/enabled, live-check,
+in-progress and pause decisions before selecting recovery.
+
 ```mermaid
 flowchart TD
   S([start]) --> A1{"1 · saved session?"}
@@ -23,6 +27,6 @@ flowchart TD
   RESTORING -- "6 · auth_failure / needs fresh auth" --> NEEDS_AUTH
   NEEDS_AUTH -- "7 · user relink" --> PAIRING
   LOGGED_OUT -- "7 · user relink" --> PAIRING
-  LINKED_OFFLINE -- "ALG-006 reconnect" --> RESTORING
+  LINKED_OFFLINE -- "master ready or eligible ALG-006 retry" --> RESTORING
   ONLINE -.-> P["8 · persist state ALG-005 + show next action"]
 ```

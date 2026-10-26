@@ -29,6 +29,14 @@ can be traced from the vision down to code and tests.
 
 ## Numbering rules
 
+For the master-account workflow, start with the
+[readiness scenario table and algorithm](03-algorithms/ALG-003-master-restore.md),
+then the [readiness flowchart](04-flowcharts/FC-003-master-restore.md).
+[Live monitoring and reconnect batches](03-algorithms/ALG-006-reconnect-backoff.md)
+explain how an online master recovers from later outages. The
+[E1 operating checklist](01-rup/iterations/E1-master-session.md) ties these
+steps to terminal commands and live acceptance.
+
 The numbers form a contract. Never reuse or renumber an ID; retire it
 instead.
 

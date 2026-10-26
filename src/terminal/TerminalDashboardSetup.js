@@ -93,7 +93,7 @@ export function setupTerminalInputListener(opts) {
         const client = accountClients.get(phone);
         if (client) {
           try {
-            if (await getLiveConnectionState(client) === 'CONNECTED') {
+            if (await getLiveConnectionState(client) === 'CONNECTED' && accountClients.get(phone) === client) {
               logBot(`MASTER ${phone} ONLINE (live check). Ready to continue. All options: features | menu | help.`, 'success');
               return true;
             }

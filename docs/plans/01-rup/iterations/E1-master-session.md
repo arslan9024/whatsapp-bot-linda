@@ -65,6 +65,33 @@ Keep existing direct `link-code`, `link-qr`, `recover`, and `restore-sessions`.
 Explicit recovery or a restart reconnects; this is not phone-side logout.
 Confirmed authentication-required/logged-out state is not erased by disconnect.
 
+### Master-first operating algorithm
+
+The authoritative decision table and steps are in
+[ALG-003](../../03-algorithms/ALG-003-master-restore.md), with
+[FC-003](../../04-flowcharts/FC-003-master-restore.md) as its visual flow.
+Separate these three facts: phone-side linked-device evidence, saved local login
+availability, and the current live connection.
+
+1. Run `master check` (`1.20`). Startup also performs this check after saved-session
+   restoration. A current CONNECTED client is kept, never relinked unnecessarily.
+2. If connecting or waiting for pairing approval, finish that operation and
+   recheck. Do not launch duplicate recovery.
+3. If offline with an eligible saved login, run `master ready` (`1.21`).
+   Restore the same profile, wait for ready and verify live before continuing.
+4. If a network/browser restore fails, preserve credentials, show the actual
+   cause and retry after addressing it. Do not classify every failure as logout.
+5. If credentials are missing/revoked, choose `link-code` or `link-qr` explicitly
+   and approve on the phone. `master ready` never silently forces registration.
+6. While connected, follow
+   [ALG-006](../../03-algorithms/ALG-006-reconnect-backoff.md): real probes,
+   three-failure stale detection, retry batches and progressive cooldown.
+7. Respect intentional local pause, disabled account and shutdown. Keep
+   `features`, `menu` and `help` visible as operator escape routes.
+
+Readiness is a point-in-time verified condition, not a guarantee of 24/7 service.
+No real-account readiness is claimed by updating this plan.
+
 ## 4. Persistence and privacy
 
 - Write metadata to an exclusive temporary file, flush it, then atomically rename.

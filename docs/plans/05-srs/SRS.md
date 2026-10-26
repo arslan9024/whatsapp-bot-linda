@@ -23,8 +23,8 @@ through `whatsapp-web.js`. All control is through a numbered terminal menu
 |---|---|
 | Master | The owner's primary WhatsApp account. It controls the servants. |
 | Servant | An additional account that Linda operates. |
-| Linked | The device is paired, so a saved profile exists. It can still be offline. |
-| Online | The client reported `ready` and can send and receive now. |
+| Linked | Evidence that the device was paired; phone-side linking and local saved-login availability are separate facts. Either can become stale or disappear. |
+| Online | The client completed `ready`; a bounded live CONNECTED check verifies readiness when requested. This is not an uninterrupted-uptime guarantee. |
 | Menu code | A dotted number like `1.19` that names exactly one action. Codes are append-only. |
 | Playbook | A numbered recipe `P1…Pn` of menu codes for a whole task. |
 | Counter | A persistent use count for each feature, shown as `×n`. |
@@ -76,14 +76,14 @@ Verification: **T** = automated test, **D** = demonstration, **I** = inspection.
 | FR-001 | Linda shall refuse to start a second instance for the same project folder, and shall leave the browsers and sessions untouched when it refuses. | PS-001 | M | T `BotInstanceGuard` | Implemented |
 | FR-002 | The system shall keep, for each account, exactly one connection state from {UNLINKED, PAIRING, AUTHENTICATED, ONLINE, RESTORING, LINKED_OFFLINE, NEEDS_AUTH, LOGGED_OUT}. | PS-002 | M | T | Implemented |
 | FR-003 | The dashboard shall show linked status and online status separately, plus the next action code for the current state. | PS-002 | M | D, T `TerminalLayout` | Implemented |
-| FR-004 | `1.19 restore master` shall try the automatic rungs (soft reconnect, then restore from the same profile) before asking the user anything. | PS-003 | M | T `SavedSessionReconnect` | Implemented |
+| FR-004 | `1.20 master check` shall check live without starting recovery; `1.21 master ready` shall retain a connected client or restore an eligible saved login on the same profile and verify it live before reporting ready. `1.19 restore master` shall remain available for direct recovery. Missing login or fresh authentication shall offer explicit linking, never silently register a device. | PS-003 | M | T `TerminalSessionDashboard`, `TerminalNumberMenu`, `SessionRecoveryService` | Implemented |
 | FR-005 | Restore shall never delete or replace the saved profile without the user's explicit confirmation. | PS-003 | M | T, I | Implemented |
 | FR-006 | `2.1 link-code` shall show the pairing code with a countdown. It shall refresh the code on `refresh` or when the code expires, up to A attempts. | PS-004 | M | T | Implemented |
 | FR-007 | After A failed attempts, pairing shall stop and suggest `2.2 link-qr` and playbook P3. | PS-004 | S | T | Implemented |
 | FR-008 | Session state shall be saved atomically: temp file, fsync, then rename. A crash during a save shall leave a readable file. | PS-005 | M | T | Implemented |
 | FR-009 | On start, Linda shall restore every account that was online at shutdown and print `restored k/n` with the failures. | PS-005 | M | T, D | Implemented |
-| FR-010 | Reconnection shall use capped backoff with jitter and shall stop after M attempts. | PS-006 | M | T (fake clock) | Partial |
-| FR-011 | A circuit breaker (CLOSED, OPEN, HALF_OPEN) shall stop retries while WhatsApp keeps failing. | PS-006 | S | T | Partial |
+| FR-010 | Reconnection shall use capped exponential backoff with jitter and at most ten scheduled attempts per batch, followed by progressive cooldown and an eligible new batch, rather than permanent suspension after transient failure. Background recovery shall respect authentication, local pause, disable and shutdown guards. | PS-006 | M | T `SavedSessionReconnect`, `SessionRecoveryService` (fake clock) | Implemented |
+| FR-011 | Live probes shall detect stale sessions without synthetic activity ticks. A circuit breaker shall suppress launches during cooldown, recheck eligibility before resuming, and ultimately provide unified CLOSED/OPEN/HALF_OPEN states with durable history. Named states and durable history remain planned. | PS-006 | S | T | Partial |
 | FR-012 | Each disconnect shall be classified as LOGGED_OUT, NEEDS_AUTH, CONFLICT, NETWORK or UNKNOWN, and the matching next action shall be shown. | PS-007 | M | T (decision table) | Partial |
 | FR-013 | Accounts shall start masters first, with at most K concurrent launches and B live browsers. Excess accounts shall be deferred, not dropped. | PS-008 | M | T | Partial |
 

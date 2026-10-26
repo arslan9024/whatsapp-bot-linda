@@ -9,7 +9,7 @@ without saying how. The how is written in `ALG-nnn` with the same number.
 |---|---|---|---|---|---|
 | PS-001 | Only one Linda may own the browsers and sessions | automatic at start | G-2 | Implemented | E2 |
 | PS-002 | Tell linked / online / offline / needs-auth apart | `1.18`, dashboard | G-2 | Implemented | E1 |
-| PS-003 | Bring the master back online from the saved session | `1.19`, `1.16`, `P1` | G-2 | Implemented | E1 |
+| PS-003 | Check master readiness; restore the saved login before relinking | `1.20`, `1.21`, `1.19`, `1.16`, `P1` | G-2 | Implemented | E1 |
 | PS-004 | Link a device by pairing code, refreshing it when late | `2.1`, `1.12`, `P2`, `P3` | G-2 | Implemented | E1 |
 | PS-005 | Persist sessions so a restart restores exactly what ran | `1.7`, `P4` | G-3 | Implemented | E1 |
 | PS-006 | Reconnect without storms or endless loops | automatic | G-2 | Partial | C1 |
@@ -42,10 +42,13 @@ enough. **Solved when:** every account is always in exactly one of the
 documented states, and the dashboard shows that state and the next action.
 
 ### PS-003 — Restore the master
-The master is still linked but offline after a restart or a network drop.
-**Solved when:** Linda restores it from the saved session without a new
-code, falls back to a guided relink only when WhatsApp requires it, and never
-loops forever.
+The master may have a phone-side linked-device entry yet no live session, or
+even no usable local login on this computer.
+**Solved when:** Linda checks live first, keeps an online client, waits for
+in-flight work, and restores an eligible saved login without a new code.
+Missing/revoked credentials require explicit pairing; transient failures keep
+the profile and expose the real error. A foreground readiness action performs
+one recovery attempt rather than an endless interactive ladder.
 
 ### PS-004 — Pairing code with refresh
 Pairing codes expire, and the user may be slow or the link may fail.
@@ -62,7 +65,11 @@ that was online.
 ### PS-006 — Reconnect without storms
 Fixed backoff synchronizes many accounts and hammers WhatsApp.
 **Solved when:** reconnect delays are randomized and capped, an account that
-keeps failing is paused by a circuit breaker, and total attempts are bounded.
+keeps failing is paused by a circuit breaker, and attempts are bounded per
+batch. Eligible transient failures resume after progressive cooldown rather
+than stopping permanently; authentication, pause, disable and shutdown guards
+remain respected. Durable breaker history and unified named breaker states
+remain gaps, so this problem is still Partial.
 
 ### PS-007 — Logout and device removal
 **Solved when:** these are told apart from network drops within one event,

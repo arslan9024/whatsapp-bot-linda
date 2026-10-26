@@ -966,8 +966,9 @@ async function initializeBot() {
     }
     logBot("", "info");
 
-    logBot("🔗 TO LINK MASTER WHATSAPP ACCOUNT:", "info");
-    logBot("   Type: link master", "info");
+    logBot("MASTER FIRST: master check | master ready (restore if offline)", "info");
+    logBot("   If authentication is required: link-code | link-qr", "info");
+    logBot("   All commands: features | menu | help", "info");
     logBot("", "info");
 
     isInitializing = false;
