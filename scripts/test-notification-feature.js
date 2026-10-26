@@ -56,12 +56,12 @@ async function setup() {
   await mongoose.connect(uri);
 
   // Import schemas so models register
-  await import('../code/Database/NotificationSchema.js');
+  await import('../src/database/schemas/NotificationSchema.js');
 
   // Also register models the scanners reference
-  try { await import('../code/Database/InvoiceSchema.js'); } catch {}
-  try { await import('../code/Database/PropertyTenancySchema.js'); } catch {}
-  try { await import('../code/Database/CommissionRuleSchema.js'); } catch {}
+  try { await import('../src/database/schemas/InvoiceSchema.js'); } catch {}
+  try { await import('../src/database/schemas/PropertyTenancySchema.js'); } catch {}
+  try { await import('../src/database/schemas/CommissionRuleSchema.js'); } catch {}
 }
 
 async function cleanup() {
@@ -83,9 +83,9 @@ let notificationService;
 let NotificationCommands;
 
 async function loadModules() {
-  const svc = await import('../code/Services/NotificationService.js');
+  const svc = await import('../src/services/NotificationService.js');
   notificationService = svc.default;
-  const cmd = await import('../code/Commands/NotificationCommands.js');
+  const cmd = await import('../src/commands/NotificationCommands.js');
   NotificationCommands = cmd.default;
 }
 

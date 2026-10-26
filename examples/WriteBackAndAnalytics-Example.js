@@ -16,10 +16,10 @@
  * ============================================================================
  */
 
-import WriteBackService from '../code/Services/WriteBackService.js';
-import { AnalyticsService } from '../code/Services/AnalyticsService.js';
+import WriteBackService from '../src/services/WriteBackService.js';
+import { AnalyticsService } from '../src/services/AnalyticsService.js';
 import { google } from 'googleapis';
-import { getPowerAgent } from '../code/GoogleAPI/main.js';
+import { getPowerAgent } from '../src/integrations/google/api/main.js';
 
 async function main() {
   console.log(`

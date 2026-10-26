@@ -7,11 +7,11 @@
  */
 
 import { strict as assert } from 'assert';
-import FailoverDetectionService from '../code/services/FailoverDetectionService.js';
-import FailoverOrchestrator from '../code/services/FailoverOrchestrator.js';
-import LoadBalancingService from '../code/services/LoadBalancingService.js';
-import HighAvailabilityMonitor from '../code/services/HighAvailabilityMonitor.js';
-import { Logger } from '../code/utils/logger.js';
+import FailoverDetectionService from '../src/services/FailoverDetectionService.js';
+import FailoverOrchestrator from '../src/services/FailoverOrchestrator.js';
+import LoadBalancingService from '../src/services/LoadBalancingService.js';
+import HighAvailabilityMonitor from '../src/services/HighAvailabilityMonitor.js';
+import { Logger } from '../src/core/Logger.js';
 
 // Test utilities
 const logger = new Logger('Phase11Tests');

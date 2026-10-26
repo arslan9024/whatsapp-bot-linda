@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-const moduleURL = pathToFileURL(path.resolve('code', 'utils', 'SessionStateManager.js')).href;
+const moduleURL = pathToFileURL(path.resolve('src', 'sessions', 'SessionStateManager.js')).href;
 const run = body => execFileSync(process.execPath, ['--input-type=module', '-e', `
   import fs from 'node:fs';
   import os from 'node:os';

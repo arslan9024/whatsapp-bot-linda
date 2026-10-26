@@ -13,11 +13,12 @@
 # CREDENTIALS & KEYS (CRITICAL - NEVER COMMIT)
 # =================================================================
 # Google API Keys
-code/GoogleAPI/keys*.json
-code/GoogleAPI/*-keys.json
-code/GoogleAPI/*.json
-code/Integration/Google/keys.json
-code/Integration/Google/*/keys.json
+config/google/keys*.json
+config/google/*-keys.json
+config/google/*token*.json
+.tokens/
+src/integrations/google/keys.json
+src/integrations/google/*/keys.json
 config/google-credentials.json
 config/*-credentials.json
 config/*-keys.json
@@ -54,7 +55,7 @@ secrets*.json
 # ================================================================= 
 # SESSION & STATE FILES
 # =================================================================
-sessions/
+/sessions/
 session-*/
 .wwebjs_auth/
 .wwebjs_cache/
@@ -111,8 +112,8 @@ outputs/
 backups/
 *.csv
 *.txt
-code/Integration/Google/keys.json
-code/Integration/Google/*/keys.json
+src/integrations/google/keys.json
+src/integrations/google/*/keys.json
 *.pem
 *-key.json
 .env.google

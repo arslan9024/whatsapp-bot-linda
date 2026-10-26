@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const MessageTemplateEngine = require('../../code/WhatsAppBot/Handlers/MessageTemplateEngine');
+const MessageTemplateEngine = require('../../src/whatsapp/handlers/MessageTemplateEngine');
 const { MockLogger, MockEventEmitter } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

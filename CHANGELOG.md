@@ -13,6 +13,17 @@
 
 ---
 
+## Project Restructure — `src/` layout
+
+- Replaced the flat `code/` tree with a domain-organised `src/` (core, sessions, accounts, connection, linking, terminal, whatsapp, commands, campaigns, api, database, integrations, analytics, intelligence, services, shared). All imports and `jest.mock` paths were rewritten.
+- Moved the API servers to `src/api/`. Moved `bots-config.json`, `alertRules.json` and Google account/key files to `config/`. Moved runtime JSON to `data/app/`, which nodemon no longer watches.
+- Archived ~246 unreferenced legacy files (~55k lines) and unused scripts under `archive/` (excluded from Jest, ESLint and nodemon).
+- Consolidated root documentation and plans under `docs/`. Historical phase reports and notes are in `docs/archive/`.
+- Mongoose models now reuse an already-compiled model instead of throwing `OverwriteModelError` when both schema entry points load.
+- Updated npm scripts, `nodemon.json`, Jest/ESLint config, the CI workflow, `.gitignore` and `tools/doctor.js` for the new paths.
+
+---
+
 ## Phase History
 
 ### Phase 1 — Core WhatsApp Client

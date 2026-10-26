@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const WhatsAppMultiAccountManager = require('../../code/WhatsAppBot/Handlers/WhatsAppMultiAccountManager');
+const WhatsAppMultiAccountManager = require('../../src/whatsapp/handlers/WhatsAppMultiAccountManager');
 const { MockLogger } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 
 describe('Real ESM session profile resolution', () => {
   test('session and cache paths remain project-relative when launched from another directory', () => {
-    const url = pathToFileURL(path.resolve('code', 'utils', 'SessionManager.js')).href;
+    const url = pathToFileURL(path.resolve('src', 'sessions', 'SessionManager.js')).href;
     const result = execFileSync(process.execPath, ['--input-type=module', '-e', `
       import os from 'node:os';
       process.chdir(os.tmpdir());
@@ -17,7 +17,7 @@ describe('Real ESM session profile resolution', () => {
   });
 
   test('preserves persisted client ID, discovers configured sessionPath and falls back to phone without exposing authentication data', () => {
-    const url = pathToFileURL(path.resolve('code', 'utils', 'SessionManager.js')).href;
+    const url = pathToFileURL(path.resolve('src', 'sessions', 'SessionManager.js')).href;
     const result = execFileSync(process.execPath, ['--input-type=module', '-e', `
       import { SessionManager } from ${JSON.stringify(url)};
       const existing = new Set(['actual-profile', 'phone-profile', '15550000001']);

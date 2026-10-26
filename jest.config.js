@@ -31,13 +31,13 @@ export default {
   
   // Coverage configuration
   collectCoverageFrom: [
-    'code/**/*.js',
-    '!code/**/*.test.js',
-    '!code/**/*.spec.js',
-    '!code/**/tests/**',
-    '!code/**/backupfiles/**',
-    '!code/**/test-*.js',
-    '!code/**/verify-*.js'
+    'src/**/*.js',
+    '!src/**/*.test.js',
+    '!src/**/*.spec.js',
+    '!src/**/tests/**',
+    '!src/**/backupfiles/**',
+    '!src/**/test-*.js',
+    '!src/**/verify-*.js'
   ],
 
   // Reporter configuration

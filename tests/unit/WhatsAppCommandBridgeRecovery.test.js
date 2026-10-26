@@ -1,9 +1,9 @@
-import { WhatsAppCommandBridge } from '../../code/WhatsAppBot/WhatsAppCommandBridge.js';
-import DeviceLinkedManager from '../../code/utils/DeviceLinkedManager.js';
-import { SessionManager } from '../../code/utils/SessionManager.js';
-import services from '../../code/utils/ServiceRegistry.js';
+import { WhatsAppCommandBridge } from '../../src/whatsapp/WhatsAppCommandBridge.js';
+import DeviceLinkedManager from '../../src/linking/DeviceLinkedManager.js';
+import { SessionManager } from '../../src/sessions/SessionManager.js';
+import services from '../../src/core/ServiceRegistry.js';
 
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     canRestoreSession: jest.fn(),
     resolveClientId: jest.fn(),

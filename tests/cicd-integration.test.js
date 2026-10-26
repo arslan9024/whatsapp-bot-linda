@@ -364,7 +364,7 @@ describe('CI/CD Integration Tests', () => {
     test('Action plan document exists', () => {
       const actionPlanPath = path.join(
         __dirname,
-        '../PHASE_4_MILESTONE_5_ACTION_PLAN.md'
+        '../docs/archive/PHASE_4_MILESTONE_5_ACTION_PLAN.md'
       );
       expect(fs.existsSync(actionPlanPath)).toBe(true);
       console.log('  ✓ Action plan document exists');
@@ -373,7 +373,7 @@ describe('CI/CD Integration Tests', () => {
     test('Action plan documents workflows', () => {
       const actionPlanPath = path.join(
         __dirname,
-        '../PHASE_4_MILESTONE_5_ACTION_PLAN.md'
+        '../docs/archive/PHASE_4_MILESTONE_5_ACTION_PLAN.md'
       );
       const content = fs.readFileSync(actionPlanPath, 'utf8');
       
@@ -386,7 +386,7 @@ describe('CI/CD Integration Tests', () => {
     test('Action plan documents scripts', () => {
       const actionPlanPath = path.join(
         __dirname,
-        '../PHASE_4_MILESTONE_5_ACTION_PLAN.md'
+        '../docs/archive/PHASE_4_MILESTONE_5_ACTION_PLAN.md'
       );
       const content = fs.readFileSync(actionPlanPath, 'utf8');
       

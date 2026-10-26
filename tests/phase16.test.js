@@ -155,7 +155,7 @@ const mockConfig = {
 
 describe('QRScanSpeedAnalyzer', () => {
   // Placeholder imports - would be actual in real tests
-  // import QRScanSpeedAnalyzer from '../code/utils/QRScanSpeedAnalyzer.js';
+  // import QRScanSpeedAnalyzer from '../src/linking/QRScanSpeedAnalyzer.js';
 
   describe('Initialization', () => {
     it('should initialize with valid config', () => {

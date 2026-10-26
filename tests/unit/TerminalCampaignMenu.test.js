@@ -4,8 +4,8 @@ import path from 'node:path';
 import * as XLSX from '@e965/xlsx';
 import CampaignWorkspace, {
   normalizeRecipients,
-} from '../../code/Services/CampaignWorkspace.js';
-import TerminalCampaignMenu from '../../code/utils/TerminalCampaignMenu.js';
+} from '../../src/campaigns/CampaignWorkspace.js';
+import TerminalCampaignMenu from '../../src/terminal/TerminalCampaignMenu.js';
 
 describe('Terminal-only headless campaign controls', () => {
   let directory;

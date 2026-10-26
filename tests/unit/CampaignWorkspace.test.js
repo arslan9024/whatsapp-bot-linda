@@ -8,7 +8,7 @@ import CampaignWorkspace, {
   personalize,
   exportCampaignResults,
   sendingDelay,
-} from '../../code/Services/CampaignWorkspace.js';
+} from '../../src/campaigns/CampaignWorkspace.js';
 
 const phone = '+15550000001';
 const rows = [

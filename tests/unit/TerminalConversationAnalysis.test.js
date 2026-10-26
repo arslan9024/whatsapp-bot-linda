@@ -1,4 +1,4 @@
-import { TerminalConversationAnalysis } from '../../code/utils/TerminalConversationAnalysis.js';
+import { TerminalConversationAnalysis } from '../../src/terminal/TerminalConversationAnalysis.js';
 
 describe('Explicit local read-only conversation samples', () => {
   const phone = '+15550000001';

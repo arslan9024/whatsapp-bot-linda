@@ -1,4 +1,4 @@
-import { escapeRegex, validateApiRequest } from '../../code/middleware/apiRequestValidation.js';
+import { escapeRegex, validateApiRequest } from '../../src/api/middleware/apiRequestValidation.js';
 
 describe('API request validation', () => {
   function run(query = {}, body = {}, method = 'GET') {

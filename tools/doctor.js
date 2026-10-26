@@ -71,7 +71,7 @@ function checkCoreFiles() {
 // ─── CHECK 2: Google key files ───────────────────────────────────────
 function checkGoogleKeys() {
   const keyPaths = [
-    'code/GoogleAPI/keys.json',
+    'config/google/keys.json',
     // GmailOne keys are OAuth format — validated separately
   ];
   const errors = [];
@@ -91,7 +91,7 @@ function checkGoogleKeys() {
   }
 
   if (found === 0) {
-    fail(2, 'Google key files', 'No key files found (expected code/GoogleAPI/keys.json)');
+    fail(2, 'Google key files', 'No key files found (expected config/google/keys.json)');
   } else if (errors.length) {
     fail(2, 'Google key files', errors.join('; '));
   } else {
@@ -101,7 +101,7 @@ function checkGoogleKeys() {
 
 // ─── CHECK 3: accounts.json structure ────────────────────────────────
 function checkAccountsJson() {
-  const filePath = r('code/GoogleAPI/accounts.json');
+  const filePath = r('config/google/accounts.json');
   if (!fs.existsSync(filePath)) {
     fail(3, 'accounts.json registry', 'File not found');
     return;
@@ -124,7 +124,7 @@ function checkAccountsJson() {
 
 // ─── CHECK 4: browserCleanup safe ────────────────────────────────────
 function checkBrowserCleanup() {
-  const filePath = r('code/utils/browserCleanup.js');
+  const filePath = r('src/connection/browserCleanup.js');
   if (!fs.existsSync(filePath)) {
     fail(4, 'browserCleanup.js safe kill', 'File not found');
     return;
@@ -146,7 +146,7 @@ function checkBrowserCleanup() {
 
 // ─── CHECK 5: WhatsAppCommandBridge session-aware guard ──────────────
 function checkCommandBridgeGuard() {
-  const filePath = r('code/WhatsAppBot/WhatsAppCommandBridge.js');
+  const filePath = r('src/whatsapp/WhatsAppCommandBridge.js');
   if (!fs.existsSync(filePath)) {
     fail(5, 'CommandBridge session-aware guard', 'File not found');
     return;
@@ -223,7 +223,7 @@ function checkNpmScripts() {
 
 // ─── CHECK 10: No node.exe kill anywhere ─────────────────────────────
 function checkNoNodeKillAnywhere() {
-  const searchDirs = ['code/utils', 'code/WhatsAppBot'];
+  const searchDirs = fs.readdirSync(r('src'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `src/${d.name}`);
   const dangerous  = [];
 
   for (const dir of searchDirs) {
@@ -252,7 +252,7 @@ function checkNoNodeKillAnywhere() {
 
 // ─── CHECK 11: ServiceRegistry exports ───────────────────────────────
 async function checkServiceRegistry() {
-  const filePath = r('code/utils/ServiceRegistry.js');
+  const filePath = r('src/core/ServiceRegistry.js');
   if (!fs.existsSync(filePath)) {
     fail(11, 'ServiceRegistry exports', 'File not found');
     return;
@@ -274,7 +274,7 @@ async function checkServiceRegistry() {
 
 // ─── CHECK 12: Logger exports + methods ──────────────────────────────
 async function checkLogger() {
-  const filePath = r('code/utils/Logger.js');
+  const filePath = r('src/core/Logger.js');
   if (!fs.existsSync(filePath)) {
     fail(12, 'Logger exports', 'File not found');
     return;

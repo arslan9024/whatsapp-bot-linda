@@ -4,22 +4,22 @@ import readline from 'node:readline';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { setupClientFlow } from '../../code/WhatsAppBot/ClientFlowSetup.js';
-import { TerminalHealthDashboard } from '../../code/utils/TerminalHealthDashboard.js';
-import { ManualLinkingHandler } from '../../code/utils/ManualLinkingHandler.js';
-import { CreatingNewWhatsAppClient } from '../../code/WhatsAppBot/CreatingNewWhatsAppClient.js';
-import AutoSessionRestoreManager from '../../code/utils/AutoSessionRestoreManager.js';
-import { SessionManager } from '../../code/utils/SessionManager.js';
+import { setupClientFlow } from '../../src/whatsapp/ClientFlowSetup.js';
+import { TerminalHealthDashboard } from '../../src/terminal/TerminalHealthDashboard.js';
+import { ManualLinkingHandler } from '../../src/linking/ManualLinkingHandler.js';
+import { CreatingNewWhatsAppClient } from '../../src/whatsapp/CreatingNewWhatsAppClient.js';
+import AutoSessionRestoreManager from '../../src/sessions/AutoSessionRestoreManager.js';
+import { SessionManager } from '../../src/sessions/SessionManager.js';
 
-jest.mock('../../code/WhatsAppBot/CreatingNewWhatsAppClient.js', () => ({
+jest.mock('../../src/whatsapp/CreatingNewWhatsAppClient.js', () => ({
   CreatingNewWhatsAppClient: jest.fn(),
 }));
 
-jest.mock('../../code/utils/browserCleanup.js', () => ({
+jest.mock('../../src/connection/browserCleanup.js', () => ({
   sleep: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     canRestoreSession: jest.fn().mockReturnValue(true),
     hasSessionArtifacts: jest.fn().mockReturnValue(true),
@@ -27,12 +27,12 @@ jest.mock('../../code/utils/SessionManager.js', () => ({
   },
 }));
 
-jest.mock('../../code/utils/AccountHealthMonitor.js', () => ({
+jest.mock('../../src/accounts/AccountHealthMonitor.js', () => ({
   __esModule: true,
   default: {},
 }));
 
-jest.mock('../../code/utils/ConnectionManager.js', () => ({
+jest.mock('../../src/connection/ConnectionManager.js', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(true),
@@ -642,7 +642,7 @@ describe('Real connection initialization deadline', () => {
   });
 
   test('allows more than 45 seconds to link and clears its timeout after success', async () => {
-    const RealConnectionManager = jest.requireActual('../../code/utils/ConnectionManager.js').default;
+    const RealConnectionManager = jest.requireActual('../../src/connection/ConnectionManager.js').default;
     let finish;
      const client = Object.assign(new EventEmitter(), {
        initialize: jest.fn(() => new Promise(resolve => {
@@ -661,7 +661,7 @@ describe('Real connection initialization deadline', () => {
   });
 
   test('times out at five minutes and reports the failure', async () => {
-    const RealConnectionManager = jest.requireActual('../../code/utils/ConnectionManager.js').default;
+    const RealConnectionManager = jest.requireActual('../../src/connection/ConnectionManager.js').default;
     const client = Object.assign(new EventEmitter(), { initialize: jest.fn(() => new Promise(() => {})) });
     const manager = new RealConnectionManager(phone, client, jest.fn());
     manager.attemptSmartRecovery = jest.fn().mockReturnValue(false);

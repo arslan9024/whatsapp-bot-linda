@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { chooseProfile, hasSavedLogin, waitForSavedLogin } from '../../code/utils/SessionLoginDetector.js';
+import { chooseProfile, hasSavedLogin, waitForSavedLogin } from '../../src/sessions/SessionLoginDetector.js';
 
 describe('Saved WhatsApp login detection', () => {
   let sessionsDir;

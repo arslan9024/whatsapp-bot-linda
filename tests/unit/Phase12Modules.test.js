@@ -18,7 +18,7 @@ let services;
 beforeEach(() => {
   // Isolate every test from the singleton's accumulated state
   jest.resetModules();
-  ServiceRegistryModule = require('../../code/utils/ServiceRegistry.js');
+  ServiceRegistryModule = require('../../src/core/ServiceRegistry.js');
   services = ServiceRegistryModule.default || ServiceRegistryModule;
   services.clear(); // Belt & suspenders
 });
@@ -94,7 +94,7 @@ describe('ProcessErrorHandlers', () => {
   let isNonCriticalError;
 
   beforeAll(() => {
-    const mod = require('../../code/utils/ProcessErrorHandlers.js');
+    const mod = require('../../src/core/ProcessErrorHandlers.js');
     isNonCriticalError = mod.isNonCriticalError;
   });
 
@@ -127,7 +127,7 @@ describe('ProcessErrorHandlers', () => {
 
   test('installProcessErrorHandlers registers both handlers', () => {
     const originalListenerCount = process.listenerCount('unhandledRejection');
-    const mod = require('../../code/utils/ProcessErrorHandlers.js');
+    const mod = require('../../src/core/ProcessErrorHandlers.js');
     mod.installProcessErrorHandlers(jest.fn());
     expect(process.listenerCount('unhandledRejection')).toBeGreaterThan(originalListenerCount);
     // Clean up
@@ -145,7 +145,7 @@ describe('GracefulShutdown', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    const mod = require('../../code/utils/GracefulShutdown.js');
+    const mod = require('../../src/core/GracefulShutdown.js');
     createGracefulShutdown = mod.createGracefulShutdown;
   });
 
@@ -233,7 +233,7 @@ describe('GracefulShutdown', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 describe('StartupDiagnostics', () => {
   test('printStartupDiagnostics does not throw', () => {
-    const mod = require('../../code/utils/StartupDiagnostics.js');
+    const mod = require('../../src/core/StartupDiagnostics.js');
     const print = mod.printStartupDiagnostics;
 
     // Suppress console.log output during test
@@ -267,7 +267,7 @@ describe('StartupDiagnostics', () => {
   });
 
   test('prints connection manager statuses', () => {
-    const mod = require('../../code/utils/StartupDiagnostics.js');
+    const mod = require('../../src/core/StartupDiagnostics.js');
     const print = mod.printStartupDiagnostics;
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -313,13 +313,13 @@ describe('StartupDiagnostics', () => {
 // OperationalAnalytics) that use `import.meta.url`, which Jest/CJS cannot parse.
 // We mock those heavy dependencies so the test focuses on the branch logic.
 
-jest.mock('../../code/Services/AIContextIntegration.js', () => ({
+jest.mock('../../src/intelligence/AIContextIntegration.js', () => ({
   AIContextIntegration: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(true),
   })),
 }));
 
-jest.mock('../../code/Services/OperationalAnalytics.js', () => ({
+jest.mock('../../src/analytics/OperationalAnalytics.js', () => ({
   OperationalAnalytics: jest.fn().mockImplementation(() => ({})),
 }));
 
@@ -337,14 +337,14 @@ describe('DatabaseInitializer', () => {
   test('skips initialization when AKOYA_ORGANIZED_SHEET_ID is not set', async () => {
     delete process.env.AKOYA_ORGANIZED_SHEET_ID;
     const logBot = jest.fn();
-    const mod = require('../../code/utils/DatabaseInitializer.js');
+    const mod = require('../../src/core/DatabaseInitializer.js');
     const initializeDatabase = mod.initializeDatabase;
 
     await initializeDatabase(logBot);
 
     // Should log "Initializing..." but NOT register any services
     expect(logBot).toHaveBeenCalledWith(expect.stringContaining('Initializing database'), 'info');
-    const svcMod = require('../../code/utils/ServiceRegistry.js');
+    const svcMod = require('../../src/core/ServiceRegistry.js');
     const svc = svcMod.default || svcMod;
     expect(svc.has('databaseContext')).toBe(false);
   });

@@ -1,14 +1,14 @@
 import { PassThrough } from 'node:stream';
 import readline from 'node:readline';
-import TerminalNumberMenu from '../../code/utils/TerminalNumberMenu.js';
-import { TerminalHealthDashboard } from '../../code/utils/TerminalHealthDashboard.js';
-import registry from '../../code/Commands/LindaCommandRegistry.js';
-import services from '../../code/utils/ServiceRegistry.js';
+import TerminalNumberMenu from '../../src/terminal/TerminalNumberMenu.js';
+import { TerminalHealthDashboard } from '../../src/terminal/TerminalHealthDashboard.js';
+import registry from '../../src/commands/LindaCommandRegistry.js';
+import services from '../../src/core/ServiceRegistry.js';
 
-jest.mock('../../code/utils/AccountHealthMonitor.js', () => ({
+jest.mock('../../src/accounts/AccountHealthMonitor.js', () => ({
   __esModule: true, default: {},
 }));
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: { hasSessionArtifacts: () => false, resolveClientId: phone => phone },
 }));
 

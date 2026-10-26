@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import mongoose from 'mongoose';
-import CampaignWorkspace from '../../code/Services/CampaignWorkspace.js';
-import ContactConsentService from '../../code/Services/ContactConsentService.js';
-import { campaignService } from '../../code/Services/CampaignService.js';
-import { campaignRateLimiter } from '../../code/Services/CampaignRateLimiter.js';
-import { createTerminalCampaigns } from '../../code/utils/CampaignWorkspaceSetup.js';
+import CampaignWorkspace from '../../src/campaigns/CampaignWorkspace.js';
+import ContactConsentService from '../../src/campaigns/ContactConsentService.js';
+import { campaignService } from '../../src/campaigns/CampaignService.js';
+import { campaignRateLimiter } from '../../src/campaigns/CampaignRateLimiter.js';
+import { createTerminalCampaigns } from '../../src/campaigns/CampaignWorkspaceSetup.js';
 
 jest.mock('mongoose', () => ({
   __esModule: true,
@@ -20,18 +20,18 @@ jest.mock('whatsapp-web.js', () => ({
       .mockImplementation((mime, data, name) => ({ mime, data, name })),
   },
 }));
-jest.mock('../../code/Services/ContactConsentService.js', () => ({
+jest.mock('../../src/campaigns/ContactConsentService.js', () => ({
   __esModule: true,
   default: { getConsent: jest.fn() },
 }));
-jest.mock('../../code/Services/CampaignService.js', () => ({
+jest.mock('../../src/campaigns/CampaignService.js', () => ({
   campaignService: {
     reserveCampaignMessage: jest.fn(),
     completeReservedCampaignMessage: jest.fn(),
     failReservedCampaignMessage: jest.fn(),
   },
 }));
-jest.mock('../../code/Services/CampaignRateLimiter.js', () => ({
+jest.mock('../../src/campaigns/CampaignRateLimiter.js', () => ({
   campaignRateLimiter: { canSendMessage: jest.fn(), recordOutcome: jest.fn() },
 }));
 

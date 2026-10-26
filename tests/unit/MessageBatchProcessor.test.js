@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const MessageBatchProcessor = require('../../code/WhatsAppBot/Handlers/MessageBatchProcessor');
+const MessageBatchProcessor = require('../../src/whatsapp/handlers/MessageBatchProcessor');
 const { MockLogger, MockEventEmitter } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

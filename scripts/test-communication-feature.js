@@ -9,10 +9,10 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Import schemas and services
-import CommunicationTemplate from '../code/Database/CommunicationTemplateSchema.js';
-import CommunicationLog from '../code/Database/CommunicationLogSchema.js';
-import CommunicationService from '../code/Database/CommunicationService.js';
-import ContactConsentService from '../code/Services/ContactConsentService.js';
+import CommunicationTemplate from '../src/database/schemas/CommunicationTemplateSchema.js';
+import CommunicationLog from '../src/database/schemas/CommunicationLogSchema.js';
+import CommunicationService from '../src/database/services/CommunicationService.js';
+import ContactConsentService from '../src/campaigns/ContactConsentService.js';
 
 let mongoServer;
 let passed = 0;

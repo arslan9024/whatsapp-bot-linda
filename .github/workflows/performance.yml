@@ -5,7 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - 'tests/performance/**'
-      - 'code/**'
+      - 'src/**'
   pull_request:
     branches: [main, develop]
 

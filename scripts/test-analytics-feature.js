@@ -24,14 +24,14 @@ import {
   PropertyAnalytics,
   AgentAnalytics,
   CustomReport
-} from '../code/Database/AnalyticsSchema.js';
+} from '../src/database/schemas/AnalyticsSchema.js';
 
 // Import source schemas our engine aggregates from
-import { Commission, Deal, AgentMetrics, Payment } from '../code/Database/CommissionSchema.js';
+import { Commission, Deal, AgentMetrics, Payment } from '../src/database/schemas/CommissionSchema.js';
 
 // Import service & commands
-import analyticsService from '../code/Services/PortfolioAnalyticsService.js';
-import AnalyticsCommands from '../code/Commands/AnalyticsCommands.js';
+import analyticsService from '../src/analytics/PortfolioAnalyticsService.js';
+import AnalyticsCommands from '../src/commands/AnalyticsCommands.js';
 
 // ========================================================================
 // TEST INFRASTRUCTURE

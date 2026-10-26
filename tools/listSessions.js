@@ -7,7 +7,7 @@
  */
 
 import 'dotenv/config';
-import SessionManager from "../code/utils/SessionManager.js";
+import SessionManager from "../src/sessions/SessionManager.js";
 
 async function main() {
   console.log("\n╔════════════════════════════════════════════════════════════╗");

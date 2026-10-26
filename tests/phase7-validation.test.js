@@ -27,28 +27,28 @@ describe('Phase 7: Advanced Features Validation', () => {
   beforeAll(() => {
     // Load modules with .default for ESM→CJS interop via babel-jest
     try {
-      const adMod = require('../code/Analytics/AnalyticsDashboard.js');
+      const adMod = require('../src/analytics/AnalyticsDashboard.js');
       AnalyticsDashboard = adMod.default || adMod;
     } catch (e) {
       console.log('AnalyticsDashboard load error:', e.message);
     }
 
     try {
-      const acMod = require('../code/Admin/AdminConfigInterface.js');
+      const acMod = require('../src/core/AdminConfigInterface.js');
       AdminConfigInterface = acMod.default || acMod;
     } catch (e) {
       console.log('AdminConfigInterface load error:', e.message);
     }
 
     try {
-      const cfMod = require('../code/Conversation/AdvancedConversationFeatures.js');
+      const cfMod = require('../src/intelligence/AdvancedConversationFeatures.js');
       AdvancedConversationFeatures = cfMod.default || cfMod;
     } catch (e) {
       console.log('AdvancedConversationFeatures load error:', e.message);
     }
 
     try {
-      const rgMod = require('../code/Reports/ReportGenerator.js');
+      const rgMod = require('../src/analytics/reports/ReportGenerator.js');
       ReportGenerator = rgMod.default || rgMod;
     } catch (e) {
       console.log('ReportGenerator load error:', e.message);

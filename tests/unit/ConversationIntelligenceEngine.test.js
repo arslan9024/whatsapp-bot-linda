@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const ConversationIntelligenceEngine = require('../../code/WhatsAppBot/Handlers/ConversationIntelligenceEngine');
+const ConversationIntelligenceEngine = require('../../src/whatsapp/handlers/ConversationIntelligenceEngine');
 const { MockLogger } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

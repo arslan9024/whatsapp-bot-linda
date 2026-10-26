@@ -1,7 +1,8 @@
 {
   "watch": [
     "index.js",
-    "code/**/*.js",
+    "src/**/*.js",
+    "config/**/*.json",
     ".env"
   ],
   "ignore": [
@@ -11,7 +12,11 @@
     ".git/**/*",
     "**/*.json~",
     "device-status.json",
-    "session-state.json"
+    "session-state.json",
+    "data/**/*",
+    "archive/**/*",
+    "docs/**/*",
+    "tests/**/*"
   ],
   "delay": 2000,
   "env": {

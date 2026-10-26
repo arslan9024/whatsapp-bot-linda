@@ -76,7 +76,7 @@ cp .env.example .env
 
 3. **Add Google API Credentials**
 ```bash
-# Place your keys.json in code/GoogleAPI/
+# Place your keys.json in config/google/
 # Obtained from Google Cloud Console
 ```
 
@@ -213,7 +213,7 @@ still valid or that the bot is currently connected.
 ### Master account readiness and local conversation inspection
 
 The current design and live acceptance checklist are in
-[the master-account session plan](plans/MASTER_ACCOUNT_SESSION_PLAN.md).
+[the master-account session plan](docs/plans/MASTER_ACCOUNT_SESSION_PLAN.md).
 Successful automated tests are not proof of live WhatsApp authentication.
 
 - `disconnect <phone>` closes only that account and retains its saved session.
@@ -367,59 +367,45 @@ catalog entries do not execute WhatsApp-only commands from the terminal.
 
 ## 📁 Project Structure
 
+Application code lives in `src/`, grouped by domain. Configuration, runtime data,
+documentation and archived legacy code each have their own top-level folder.
+
 ```
-WhatsApp-Bot-Linda/
-├── index.js                         # Bot entry point (24/7 production mode)
-├── express-server.js                # Express API server (94 endpoints)
-├── express-server-inmemory.js       # In-memory MongoDB dev server
-├── config.js                        # Configuration management
-├── logger.js                        # Structured logging system
-├── errorHandler.js                  # Centralized error handling
-├── validation.js                    # Input validation utilities
-├── package.json                     # Dependencies & npm scripts
-│
-├── code/                            # Core application (483 files)
-│   ├── WhatsAppBot/                 # WhatsApp client, bootstrap, session mgmt
-│   ├── Commands/                    # Bot command handlers (56 commands)
-│   ├── Database/                    # Mongoose schemas (16 models)
-│   ├── Services/                    # Business logic & calculation engines
-│   ├── Routes/                      # Express API routes (94 endpoints)
-│   ├── Message/                     # Message sending & formatting
-│   ├── Contacts/                    # Contact validation & linking
-│   ├── Campaigns/                   # Bulk messaging campaigns
-│   ├── GoogleSheet/                 # Google Sheets API integration
-│   ├── AI/                          # AI-powered features
-│   ├── Analytics/                   # Real-time analytics
-│   ├── utils/                       # Shared utilities
-│   └── ...                          # 30+ organized modules
-│
-├── bot/                             # Bot framework (hybrid architecture)
-├── scripts/                         # Utility & migration scripts
-├── tests/                           # Jest and feature test suites
-├── docs/                            # All documentation
-│   ├── phases/                      # Phase 1-30 implementation docs
-│   ├── sessions/                    # Session notes & summaries
-│   ├── guides/                      # Setup, deployment & reference guides
-│   ├── delivery/                    # Delivery packages & summaries
-│   ├── architecture/                # Architecture diagrams & decisions
-│   ├── security/                    # Security audits & remediation
-│   ├── bot/                         # Bot framework documentation
-│   ├── project/                     # Project status & dashboards
-│   ├── api/                         # API documentation & references
-│   ├── goraha/                      # Goraha account documentation
-│   ├── qr-device/                   # QR code & device linking docs
-│   └── archive/                     # Historical documentation
-│
-├── config/                          # Configuration files
-├── data/                            # Data files & JSON databases
-├── logs/                            # Application logs
-├── sessions/                        # WhatsApp session storage (git-ignored)
-├── Inputs/                          # Contact lists & configurations
-└── Outputs/                         # Campaign results & reports
+whatsapp-bot-linda/
+├── index.js                 # Bot entry point (npm run dev / npm start)
+├── src/
+│   ├── core/                # Logger, ServiceRegistry, BotInstanceGuard, shutdown, startup diagnostics
+│   ├── sessions/            # SessionManager, login detection, save/restore, keep-alive, cleanup
+│   ├── accounts/            # Account config, bootstrap, health and relinking
+│   ├── connection/          # ConnectionManager, reconnect, circuit breaker, browser cleanup
+│   ├── linking/             # Device linking (pairing code / QR), recovery, diagnostics
+│   ├── terminal/            # Terminal dashboard, menus, interactive setup
+│   ├── whatsapp/            # WhatsApp client, message handlers, command bridge
+│   ├── commands/            # Bot command handlers
+│   ├── campaigns/           # Campaign workspace, scheduler, safety and consent
+│   ├── api/                 # api-server, express-server(-inmemory), routes/, middleware/
+│   ├── database/            # Mongoose schemas/, services/, connection config
+│   ├── integrations/        # google/ (Sheets, Contacts, OAuth) and goraha/
+│   ├── analytics/           # Analytics, dashboards, reports/
+│   ├── intelligence/        # AI / conversation intelligence services
+│   ├── services/            # Other business services
+│   └── shared/              # Shared helpers and static data
+├── config/                  # bots-config.json, alertRules.json, google/ (accounts, keys)
+├── data/                    # Runtime data (data/app, data/local) — not watched by nodemon
+├── bot/                     # Bot framework (hybrid architecture)
+├── tools/                   # doctor, status, session and backup utilities
+├── scripts/                 # npm-referenced feature/API test scripts
+├── tests/                   # Jest unit, integration, security and e2e suites
+├── examples/                # Usage examples
+├── docs/                    # Documentation (guides, api, architecture, plans, project, archive)
+├── archive/                 # Unreferenced legacy code and scripts (kept for reference, not loaded)
+├── sessions/                # WhatsApp session storage (git-ignored)
+└── logs/                    # Application logs
 ```
+
+`archive/` is excluded from Jest, ESLint and nodemon. Nothing in `src/` imports from it.
 
 ---
-
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -522,7 +508,7 @@ npm run test:phase5
 # Run Jest tests
 npm test -- --runInBand
 
-# Generate Jest coverage for application source under code/
+# Generate Jest coverage for application source under src/
 npm run test:coverage -- --runInBand
 
 # Individual feature test scripts
@@ -567,20 +553,20 @@ npm run express-dev
 
 All documentation is organized in `docs/`:
 
-| Folder | Contents |
-|--------|----------|
-| `docs/phases/` | Phase 1-30 implementation documentation (343 files) |
-| `docs/sessions/` | Session notes and work summaries (157 files) |
-| `docs/guides/` | Setup, deployment, and reference guides (57 files) |
-| `docs/delivery/` | Delivery packages and summaries |
+| Path | Contents |
+|------|----------|
+| `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md` | Architecture overview and developer guide |
+| `docs/CODING_STANDARDS.md`, `docs/CAPABILITIES.md` | Coding standards and feature capabilities |
+| `docs/guides/` | Setup, deployment, and reference guides |
+| `docs/plans/` | Current implementation plans (e.g. master-account session plan) |
+| `docs/api/` | API documentation and references |
 | `docs/architecture/` | Architecture diagrams and decisions |
 | `docs/security/` | Security audits and remediation guides |
 | `docs/bot/` | Bot framework documentation |
-| `docs/project/` | Project status dashboards and reports |
-| `docs/api/` | API documentation and references |
+| `docs/project/` | Project context, status dashboards and TODO |
+| `docs/archive/` | Historical phase reports, session notes and legacy code notes |
 
 ---
-
 ## 📄 License
 
 ISC License — See LICENSE file for details.

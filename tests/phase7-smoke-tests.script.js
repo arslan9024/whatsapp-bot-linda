@@ -4,10 +4,10 @@
  * Date: February 14, 2026
  */
 
-import AnalyticsDashboard from '../code/Analytics/AnalyticsDashboard.js';
-import AdminConfigInterface from '../code/Admin/AdminConfigInterface.js';
-import AdvancedConversationFeatures from '../code/Conversation/AdvancedConversationFeatures.js';
-import ReportGenerator from '../code/Reports/ReportGenerator.js';
+import AnalyticsDashboard from '../src/analytics/AnalyticsDashboard.js';
+import AdminConfigInterface from '../src/core/AdminConfigInterface.js';
+import AdvancedConversationFeatures from '../src/intelligence/AdvancedConversationFeatures.js';
+import ReportGenerator from '../src/analytics/reports/ReportGenerator.js';
 
 async function runSmokeTests() {
   console.log('\n' + '='.repeat(70));

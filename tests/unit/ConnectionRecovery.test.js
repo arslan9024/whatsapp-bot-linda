@@ -37,21 +37,21 @@ let loadErrors = [];
 
 beforeAll(() => {
   try {
-    const scm = require('../../code/utils/SessionCleanupManager.js');
+    const scm = require('../../src/sessions/SessionCleanupManager.js');
     SessionCleanupManager = scm.default || scm;
   } catch (e) {
     loadErrors.push(`SessionCleanupManager: ${e.message}`);
   }
 
   try {
-    const bpm = require('../../code/utils/BrowserProcessMonitor.js');
+    const bpm = require('../../src/connection/BrowserProcessMonitor.js');
     BrowserProcessMonitor = bpm.default || bpm;
   } catch (e) {
     loadErrors.push(`BrowserProcessMonitor: ${e.message}`);
   }
 
   try {
-    const lfd = require('../../code/utils/LockFileDetector.js');
+    const lfd = require('../../src/sessions/LockFileDetector.js');
     LockFileDetector = lfd.default || lfd;
   } catch (e) {
     loadErrors.push(`LockFileDetector: ${e.message}`);

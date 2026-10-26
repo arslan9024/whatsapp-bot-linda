@@ -2,10 +2,10 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
-import { acquireBotInstance } from '../../code/utils/BotInstanceGuard.js';
+import { acquireBotInstance } from '../../src/core/BotInstanceGuard.js';
 
 const execute = promisify(execFile);
-const moduleURL = pathToFileURL(path.resolve('code', 'utils', 'BotInstanceGuard.js')).href;
+const moduleURL = pathToFileURL(path.resolve('src', 'core', 'BotInstanceGuard.js')).href;
 
 test('only one process can own the same project and clean release allows a restart', async () => {
   const project = path.resolve('instance-guard-test-' + process.pid);

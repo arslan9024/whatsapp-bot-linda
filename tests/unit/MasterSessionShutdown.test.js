@@ -1,5 +1,5 @@
-import { createGracefulShutdown } from '../../code/utils/GracefulShutdown.js';
-import services from '../../code/utils/ServiceRegistry.js';
+import { createGracefulShutdown } from '../../src/core/GracefulShutdown.js';
+import services from '../../src/core/ServiceRegistry.js';
 
 test('shutdown resolves late-initialized session manager and preserves profile metadata using real persistence API', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {});

@@ -1,5 +1,5 @@
-import CommunicationService from '../../code/Database/CommunicationService.js';
-import CampaignRateLimiter from '../../code/Services/CampaignRateLimiter.js';
+import CommunicationService from '../../src/database/services/CommunicationService.js';
+import CampaignRateLimiter from '../../src/campaigns/CampaignRateLimiter.js';
 
 describe('campaign send safety', () => {
   it('opens the account circuit breaker after repeated failures', async () => {

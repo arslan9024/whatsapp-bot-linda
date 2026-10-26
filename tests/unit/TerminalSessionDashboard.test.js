@@ -1,14 +1,14 @@
 import { EventEmitter } from 'node:events';
-import { TerminalHealthDashboard } from '../../code/utils/TerminalHealthDashboard.js';
-import { setupTerminalInputListener } from '../../code/utils/TerminalDashboardSetup.js';
-import { SessionManager } from '../../code/utils/SessionManager.js';
-import services from '../../code/utils/ServiceRegistry.js';
+import { TerminalHealthDashboard } from '../../src/terminal/TerminalHealthDashboard.js';
+import { setupTerminalInputListener } from '../../src/terminal/TerminalDashboardSetup.js';
+import { SessionManager } from '../../src/sessions/SessionManager.js';
+import services from '../../src/core/ServiceRegistry.js';
 
-jest.mock('../../code/utils/AccountHealthMonitor.js', () => ({
+jest.mock('../../src/accounts/AccountHealthMonitor.js', () => ({
   __esModule: true,
   default: {},
 }));
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     hasSessionArtifacts: jest.fn().mockReturnValue(true),
     canRestoreSession: jest.fn().mockReturnValue(true),

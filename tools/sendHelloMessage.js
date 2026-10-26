@@ -13,9 +13,9 @@
  */
 
 import 'dotenv/config';
-import { CreatingNewWhatsAppClient } from "../code/WhatsAppBot/CreatingNewWhatsAppClient.js";
-import DeviceLinker from "../code/WhatsAppBot/DeviceLinker.js";
-import { checkAndHandleExistingSession } from "../code/utils/interactiveSetup.js";
+import { CreatingNewWhatsAppClient } from "../src/whatsapp/CreatingNewWhatsAppClient.js";
+import DeviceLinker from "../src/linking/DeviceLinker.js";
+import { checkAndHandleExistingSession } from "../src/terminal/interactiveSetup.js";
 
 async function sendHelloMessage(phoneNumber) {
   try {

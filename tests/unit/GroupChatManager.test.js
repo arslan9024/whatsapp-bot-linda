@@ -6,7 +6,7 @@
  * Will be enabled in post-deployment phase
  */
 
-const GroupChatManager = require('../../code/WhatsAppBot/Handlers/GroupChatManager');
+const GroupChatManager = require('../../src/whatsapp/handlers/GroupChatManager');
 const { MockLogger } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

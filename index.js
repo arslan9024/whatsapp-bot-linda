@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import { CreatingNewWhatsAppClient } from "./code/WhatsAppBot/CreatingNewWhatsAppClient.js";
-import { createDeviceStatusFile, updateDeviceStatus } from "./code/utils/deviceStatus.js";
-import { SessionStateManager } from "./code/utils/SessionStateManager.js";
-import { acquireBotInstance } from "./code/utils/BotInstanceGuard.js";
+import { CreatingNewWhatsAppClient } from "./src/whatsapp/CreatingNewWhatsAppClient.js";
+import { createDeviceStatusFile, updateDeviceStatus } from "./src/linking/deviceStatus.js";
+import { SessionStateManager } from "./src/sessions/SessionStateManager.js";
+import { acquireBotInstance } from "./src/core/BotInstanceGuard.js";
 import { fileURLToPath } from "node:url";
 
 // PHASE 20: Secure Credential Management & Interactive Master Setup (February 18, 2026)
@@ -13,119 +13,119 @@ import { fileURLToPath } from "node:url";
 // - EnhancedWhatsAppDeviceLinkingSystem: 400% better linking UX with real-time progress tracking
 // - DeviceLinkingQueue: multi-device parallel linking with queue management
 // - DeviceLinkingDiagnostics: intelligent error recovery with auto-healing strategies
-import GoogleServiceAccountManager from "./code/utils/GoogleServiceAccountManager.js";
-import { InteractiveMasterAccountSelector } from "./code/utils/InteractiveMasterAccountSelector.js";
-import EnhancedQRCodeDisplayV2 from "./code/utils/EnhancedQRCodeDisplayV2.js";
-import ProtocolErrorRecoveryManager from "./code/utils/ProtocolErrorRecoveryManager.js";
-import EnhancedWhatsAppDeviceLinkingSystem from "./code/utils/EnhancedWhatsAppDeviceLinkingSystem.js";
-import DeviceLinkingQueue from "./code/utils/DeviceLinkingQueue.js";
-import DeviceLinkingDiagnostics from "./code/utils/DeviceLinkingDiagnostics.js";
+import GoogleServiceAccountManager from "./src/integrations/google/GoogleServiceAccountManager.js";
+import { InteractiveMasterAccountSelector } from "./src/accounts/InteractiveMasterAccountSelector.js";
+import EnhancedQRCodeDisplayV2 from "./src/linking/EnhancedQRCodeDisplayV2.js";
+import ProtocolErrorRecoveryManager from "./src/connection/ProtocolErrorRecoveryManager.js";
+import EnhancedWhatsAppDeviceLinkingSystem from "./src/linking/EnhancedWhatsAppDeviceLinkingSystem.js";
+import DeviceLinkingQueue from "./src/linking/DeviceLinkingQueue.js";
+import DeviceLinkingDiagnostics from "./src/linking/DeviceLinkingDiagnostics.js";
 
 // PHASE 3-5: Advanced Features (24/7 Production - February 9, 2026)
 // Multi-account orchestration, device recovery, health monitoring, keep-alive system
-import AccountBootstrapManager from "./code/WhatsAppBot/AccountBootstrapManager.js";
-import { DeviceRecoveryManager } from "./code/utils/DeviceRecoveryManager.js";
-import accountHealthMonitor from "./code/utils/AccountHealthMonitor.js";
-import SessionKeepAliveManager from "./code/utils/SessionKeepAliveManager.js";
-import DeviceLinkedManager from "./code/utils/DeviceLinkedManager.js";  // NEW: Device tracking manager
-import { AccountConfigManager } from "./code/utils/AccountConfigManager.js";  // NEW: Dynamic account management
-import { DynamicAccountManager } from "./code/utils/DynamicAccountManager.js";  // NEW: Runtime account manager
+import AccountBootstrapManager from "./src/accounts/AccountBootstrapManager.js";
+import { DeviceRecoveryManager } from "./src/linking/DeviceRecoveryManager.js";
+import accountHealthMonitor from "./src/accounts/AccountHealthMonitor.js";
+import SessionKeepAliveManager from "./src/sessions/SessionKeepAliveManager.js";
+import DeviceLinkedManager from "./src/linking/DeviceLinkedManager.js";  // NEW: Device tracking manager
+import { AccountConfigManager } from "./src/accounts/AccountConfigManager.js";  // NEW: Dynamic account management
+import { DynamicAccountManager } from "./src/accounts/DynamicAccountManager.js";  // NEW: Runtime account manager
 
 // DATABASE & ANALYTICS (Phase 2) — initialization extracted to DatabaseInitializer.js
 // AIContextIntegration and OperationalAnalytics are imported there.
 
 // CONVERSATION ANALYSIS (Session 18)
-import "./code/WhatsAppBot/AnalyzerGlobals.js";
+import "./src/whatsapp/AnalyzerGlobals.js";
 
 // GOOGLE CONTACTS (Phase B - Contact Lookup)
-import ContactLookupHandler from "./code/WhatsAppBot/ContactLookupHandler.js";
+import ContactLookupHandler from "./src/whatsapp/ContactLookupHandler.js";
 
 // GORAHA VERIFICATION (Phase C - Contact Verification)
 // GorahaContactVerificationService is now imported inside MessageRouter.js
 
 // LINDA AI COMMAND SYSTEM (February 11, 2026)
 // Command parsing, routing, conversation learning, ML foundation
-import LindaCommandHandler from "./code/Commands/LindaCommandHandler.js";
-import LindaCommandRegistry from "./code/Commands/LindaCommandRegistry.js";
+import LindaCommandHandler from "./src/commands/LindaCommandHandler.js";
+import LindaCommandRegistry from "./src/commands/LindaCommandRegistry.js";
 
 // PHASE 11: Extracted modules (ClientFlowSetup, MessageRouter)
-import { setupClientFlow } from "./code/WhatsAppBot/ClientFlowSetup.js";
-import { setupMessageListeners as messageRouter } from "./code/WhatsAppBot/MessageRouter.js";
+import { setupClientFlow } from "./src/whatsapp/ClientFlowSetup.js";
+import { setupMessageListeners as messageRouter } from "./src/whatsapp/MessageRouter.js";
 
 // TERMINAL DASHBOARD (Interactive Health Monitoring & Account Re-linking)
-import terminalHealthDashboard from "./code/utils/TerminalHealthDashboard.js";
+import terminalHealthDashboard from "./src/terminal/TerminalHealthDashboard.js";
 
 // CONNECTION MANAGER (Extracted - Phase 10)
-import ConnectionManager from "./code/utils/ConnectionManager.js";
+import ConnectionManager from "./src/connection/ConnectionManager.js";
 
 // SERVICE REGISTRY (Phase 11 - replaces global.XXX)
-import services from "./code/utils/ServiceRegistry.js";
+import services from "./src/core/ServiceRegistry.js";
 
 // PHASE 12: Extracted modules (Error Handlers, Shutdown, Diagnostics, Database)
-import { installProcessErrorHandlers } from "./code/utils/ProcessErrorHandlers.js";
-import { createGracefulShutdown, installShutdownHandlers } from "./code/utils/GracefulShutdown.js";
-import { getSessionRecovery } from "./code/utils/SessionRecoveryService.js";
-import { printStartupDiagnostics } from "./code/utils/StartupDiagnostics.js";
-import { initializeDatabase } from "./code/utils/DatabaseInitializer.js";
+import { installProcessErrorHandlers } from "./src/core/ProcessErrorHandlers.js";
+import { createGracefulShutdown, installShutdownHandlers } from "./src/core/GracefulShutdown.js";
+import { getSessionRecovery } from "./src/sessions/SessionRecoveryService.js";
+import { printStartupDiagnostics } from "./src/core/StartupDiagnostics.js";
+import { initializeDatabase } from "./src/core/DatabaseInitializer.js";
 
 // PHASE 13: Feature initializers & terminal setup
-import { initializeAdvancedFeatures, initializeAutoRecovery, initializePhase1Services } from "./code/utils/FeatureInitializer.js";
-import { setupTerminalInputListener } from "./code/utils/TerminalDashboardSetup.js";
+import { initializeAdvancedFeatures, initializeAutoRecovery, initializePhase1Services } from "./src/core/FeatureInitializer.js";
+import { setupTerminalInputListener } from "./src/terminal/TerminalDashboardSetup.js";
 
 // PHASE 17: Comprehensive Conversation Handling (February 16, 2026)
-import { phase17Orchestrator } from "./code/utils/Phase17Orchestrator.js";
+import { phase17Orchestrator } from "./src/core/Phase17Orchestrator.js";
 
 // CLIENT HEALTH MONITOR: Frame detachment & heartbeat fix (February 17, 2026)
-import clientHealthMonitor from "./code/utils/ClientHealthMonitor.js";
+import clientHealthMonitor from "./src/connection/ClientHealthMonitor.js";
 
 // PHASE 19: CAMPAIGN MANAGER (Bulk Messaging - February 17, 2026)
 // Campaign scheduling, rate limiting, contact filtering, message personalization
-import CampaignScheduler from "./code/utils/CampaignScheduler.js";
-import CampaignService from "./code/Services/CampaignService.js";
-import ContactFilterService from "./code/Services/ContactFilterService.js";
-import CampaignCommandsDefault from "./code/Commands/CampaignCommands.js";
+import CampaignScheduler from "./src/campaigns/CampaignScheduler.js";
+import CampaignService from "./src/campaigns/CampaignService.js";
+import ContactFilterService from "./src/campaigns/ContactFilterService.js";
+import CampaignCommandsDefault from "./src/commands/CampaignCommands.js";
 
 // PHASE 21: MANUAL LINKING HANDLER (February 18, 2026)
 // Disable auto-linking on startup, require user command instead
 // Includes pre-linking health check and graceful error handling
-import { ManualLinkingHandler } from "./code/utils/ManualLinkingHandler.js";
+import { ManualLinkingHandler } from "./src/linking/ManualLinkingHandler.js";
 
 // PHASE 26: GORAHA BOT INTEGRATION (February 19, 2026)
 // Contact statistics and Google service account validation
-import GorahaServicesBridge from "./code/utils/GorahaServicesBridge.js";
+import GorahaServicesBridge from "./src/integrations/goraha/GorahaServicesBridge.js";
 
 // PHASE 27: AUTO-SESSION RESTORE (February 19, 2026)
 // Automatically restores WhatsApp sessions on server restart (nodemon)
 // Prevents need for manual re-linking after every server restart
-import AutoSessionRestoreManager from "./code/utils/AutoSessionRestoreManager.js";
+import AutoSessionRestoreManager from "./src/sessions/AutoSessionRestoreManager.js";
 
 // PHASE 29c: AUTO-RELINKING & CONNECTION MONITORING (February 19, 2026)
 // Auto-restore and relink all accounts on server restart, with real-time health monitoring
 // Tracks online/offline status and provides dashboard updates
-import AutoAccountRelinkingManager from "./code/utils/AutoAccountRelinkingManager.js";
-import AccountConnectionMonitor from "./code/utils/AccountConnectionMonitor.js";
+import AutoAccountRelinkingManager from "./src/accounts/AutoAccountRelinkingManager.js";
+import AccountConnectionMonitor from "./src/accounts/AccountConnectionMonitor.js";
 
 // PHASE 29d: ADVANCED RECOVERY STRATEGIES (February 19, 2026)
 // Auto-reconnect on drops, circuit breaker, graceful degradation
 // Prevents cascading failures and maintains partial service
-import AutoReconnectManager from "./code/utils/AutoReconnectManager.js";
-import CircuitBreakerManager from "./code/utils/CircuitBreakerManager.js";
-import GracefulDegradationManager from "./code/utils/GracefulDegradationManager.js";
+import AutoReconnectManager from "./src/connection/AutoReconnectManager.js";
+import CircuitBreakerManager from "./src/connection/CircuitBreakerManager.js";
+import GracefulDegradationManager from "./src/connection/GracefulDegradationManager.js";
 
 // PHASE 29e: ANALYTICS & REPORTING (February 19, 2026)
 // Real-time metrics collection, uptime monitoring, SLA compliance, comprehensive reporting
 // Tracks cache, database, recovery, relinking, messages, errors, and system health
-import AnalyticsManager from "./code/utils/AnalyticsManager.js";
-import UptimeTracker from "./code/utils/UptimeTracker.js";
-import ReportGenerator from "./code/utils/ReportGenerator.js";
-import MetricsDashboard from "./code/utils/MetricsDashboard.js";
-import GoogleSheetsManager from "./code/utils/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
-import { createTerminalCampaigns } from "./code/utils/CampaignWorkspaceSetup.js";
+import AnalyticsManager from "./src/analytics/AnalyticsManager.js";
+import UptimeTracker from "./src/analytics/UptimeTracker.js";
+import ReportGenerator from "./src/analytics/ReportGenerator.js";
+import MetricsDashboard from "./src/analytics/MetricsDashboard.js";
+import GoogleSheetsManager from "./src/integrations/google/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
+import { createTerminalCampaigns } from "./src/campaigns/CampaignWorkspaceSetup.js";
 
 // PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
 // Allows master accounts to send "linda <command>" messages to primary master
 // for remote command execution with console output capture
-import { WhatsAppCommandBridge } from "./code/WhatsAppBot/WhatsAppCommandBridge.js";
+import { WhatsAppCommandBridge } from "./src/whatsapp/WhatsAppCommandBridge.js";
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)

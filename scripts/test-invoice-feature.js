@@ -73,16 +73,16 @@ let invoiceService;
 let InvoiceCommands;
 
 async function loadModules() {
-  const schema = await import('../code/Database/InvoiceSchema.js');
+  const schema = await import('../src/database/schemas/InvoiceSchema.js');
   Invoice           = schema.Invoice;
   InvoicePayment    = schema.InvoicePayment;
   PaymentReceipt    = schema.PaymentReceipt;
   ReconciliationLog = schema.ReconciliationLog;
 
-  const svc = await import('../code/Services/InvoicePaymentService.js');
+  const svc = await import('../src/services/InvoicePaymentService.js');
   invoiceService = svc.default;
 
-  const cmd = await import('../code/Commands/InvoiceCommands.js');
+  const cmd = await import('../src/commands/InvoiceCommands.js');
   InvoiceCommands = cmd.default;
 }
 

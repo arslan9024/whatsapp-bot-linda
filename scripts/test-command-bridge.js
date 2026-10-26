@@ -139,7 +139,7 @@ async function setup() {
   console.log('🔧 Setting up test environment...\n');
 
   // Override ServiceRegistry get/register before importing bridge
-  const srModule = await import('../code/utils/ServiceRegistry.js');
+  const srModule = await import('../src/core/ServiceRegistry.js');
   const sr = srModule.default;
 
   // Monkey-patch ServiceRegistry for tests
@@ -155,7 +155,7 @@ async function setup() {
   };
 
   const { WhatsAppCommandBridge } = await import(
-    '../code/WhatsAppBot/WhatsAppCommandBridge.js'
+    '../src/whatsapp/WhatsAppCommandBridge.js'
   );
   return WhatsAppCommandBridge;
 }

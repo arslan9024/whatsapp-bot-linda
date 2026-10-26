@@ -21,9 +21,9 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Import schemas and engine
-import { CommissionRule, CalculationRecord } from '../code/Database/CommissionRuleSchema.js';
-import { Commission } from '../code/Database/CommissionSchema.js';
-import CommissionCalculationEngine from '../code/Services/CommissionCalculationEngine.js';
+import { CommissionRule, CalculationRecord } from '../src/database/schemas/CommissionRuleSchema.js';
+import { Commission } from '../src/database/schemas/CommissionSchema.js';
+import CommissionCalculationEngine from '../src/services/CommissionCalculationEngine.js';
 
 // ========================================================================
 // TEST INFRASTRUCTURE

@@ -3,7 +3,7 @@ import {
   getApiCorsOptions,
   requireApiPermission,
   requireApiToken,
-} from '../../code/middleware/apiSecurity.js';
+} from '../../src/api/middleware/apiSecurity.js';
 
 describe('API security middleware', () => {
   const originalToken = process.env.API_ACCESS_TOKEN;

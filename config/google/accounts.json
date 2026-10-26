@@ -1,0 +1,59 @@
+{
+  "accounts": {
+    "PowerAgent": {
+      "id": "poweragent",
+      "name": "serviceman11@heroic-artifact-414519.iam.gserviceaccount.com",
+      "displayName": "PowerAgent (Arslan)",
+      "project": "heroic-artifact-414519",
+      "type": "service_account",
+      "description": "Primary service account for Google Sheets and Drive (Arslan Malik)",
+      "keyPath": "keys.json",
+      "enabled": true,
+      "scopes": [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "active",
+      "createdAt": "2024-01-01",
+      "lastUsed": "2026-02-08",
+      "capabilities": {
+        "sheets": true,
+        "drive": true,
+        "contacts": false
+      }
+    },
+    "GorahaBot": {
+      "id": "gorahabot",
+      "name": "gorahabot@white-caves-fb-486818.iam.gserviceaccount.com",
+      "displayName": "GorahaBot (goraha.properties)",
+      "project": "white-caves-fb-486818",
+      "type": "service_account",
+      "description": "Service account for Google Contacts management (goraha.properties@gmail.com)",
+      "keyPath": "keys-goraha.json",
+      "enabled": true,
+      "scopes": [
+        "https://www.googleapis.com/auth/contacts",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ],
+      "status": "active",
+      "createdAt": "2026-02-08",
+      "lastUsed": "2026-02-08",
+      "capabilities": {
+        "contacts": true,
+        "sheets": true,
+        "drive": true
+      }
+    }
+  },
+  "default": "PowerAgent",
+  "version": "1.1",
+  "format": "Multi-Account Google Services Registry",
+  "notes": "Both accounts use service_account type. Keys stored in config/google/. PowerAgent=heroic-artifact project, GorahaBot=white-caves-fb project.",
+  "metadata": {
+    "totalAccounts": 2,
+    "serviceAccounts": 2,
+    "oauthAccounts": 0,
+    "lastModified": "2026-02-21T00:00:00Z"
+  }
+}

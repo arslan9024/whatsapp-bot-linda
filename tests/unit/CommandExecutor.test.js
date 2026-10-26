@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const CommandExecutor = require('../../code/WhatsAppBot/Handlers/CommandExecutor');
+const CommandExecutor = require('../../src/whatsapp/handlers/CommandExecutor');
 const fixtures = require('../fixtures/fixtures');
 
 describe('CommandExecutor', () => {

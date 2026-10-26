@@ -1,8 +1,8 @@
 import whatsapp from 'whatsapp-web.js';
-import { CreatingNewWhatsAppClient } from '../../code/WhatsAppBot/CreatingNewWhatsAppClient.js';
-import { SESSIONS_DIR, WEB_CACHE_DIR } from '../../code/utils/SessionManager.js';
+import { CreatingNewWhatsAppClient } from '../../src/whatsapp/CreatingNewWhatsAppClient.js';
+import { SESSIONS_DIR, WEB_CACHE_DIR } from '../../src/sessions/SessionManager.js';
 
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SESSIONS_DIR: 'C:\\project\\sessions',
   WEB_CACHE_DIR: 'C:\\project\\.wwebjs_cache',
 }));

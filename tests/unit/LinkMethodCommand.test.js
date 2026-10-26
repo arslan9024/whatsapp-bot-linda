@@ -1,11 +1,11 @@
-import LindaCommandHandler from '../../code/Commands/LindaCommandHandler.js';
-import services from '../../code/utils/ServiceRegistry.js';
+import LindaCommandHandler from '../../src/commands/LindaCommandHandler.js';
+import services from '../../src/core/ServiceRegistry.js';
 
-jest.mock('../../code/Commands/LindaConversationLearner.js', () => ({
+jest.mock('../../src/commands/LindaConversationLearner.js', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({ logCommand: jest.fn().mockResolvedValue(undefined) })),
 }));
-jest.mock('../../code/Commands/CampaignCommands.js', () => ({
+jest.mock('../../src/commands/CampaignCommands.js', () => ({
   __esModule: true, default: {},
 }));
 

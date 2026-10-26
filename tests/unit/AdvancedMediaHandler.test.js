@@ -3,7 +3,7 @@
  * Phase 6 M2 Module 2
  */
 
-const AdvancedMediaHandler = require('../../code/WhatsAppBot/Handlers/AdvancedMediaHandler');
+const AdvancedMediaHandler = require('../../src/whatsapp/handlers/AdvancedMediaHandler');
 const { MockLogger, MockFileService } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');
 

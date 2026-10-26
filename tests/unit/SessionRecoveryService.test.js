@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { getSessionRecovery } from '../../code/utils/SessionRecoveryService.js';
-import { SessionManager } from '../../code/utils/SessionManager.js';
-import { setupClientFlow } from '../../code/WhatsAppBot/ClientFlowSetup.js';
-import AutoSessionRestoreManager from '../../code/utils/AutoSessionRestoreManager.js';
+import { getSessionRecovery } from '../../src/sessions/SessionRecoveryService.js';
+import { SessionManager } from '../../src/sessions/SessionManager.js';
+import { setupClientFlow } from '../../src/whatsapp/ClientFlowSetup.js';
+import AutoSessionRestoreManager from '../../src/sessions/AutoSessionRestoreManager.js';
 
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     resolveClientId: jest.fn((phone, metadata) => metadata.clientId || 'configured-profile'),
     canRestoreSession: jest.fn(() => true),
@@ -113,6 +113,22 @@ describe('Shared session recovery lifecycle (real flow and connection manager)',
     expect(await result).toBe(true);
     expect(createClient).toHaveBeenCalledWith('saved-master');
     expect(deps.connectionManagers.get(phone).state).toBe('CONNECTED');
+  });
+
+  test('ready completes listener setup with the real uptime tracker and failing analytics', async () => {
+    const { default: UptimeTracker } = await import('../../src/analytics/UptimeTracker.js');
+    deps.uptimeTracker = new UptimeTracker();
+    deps.analyticsManager = { recordStatusChange: jest.fn(() => { throw new Error('analytics down'); }) };
+    const result = recovery.recover(phone);
+    await flush();
+    client.emit('ready');
+    expect(await result).toBe(true);
+    await flush();
+    expect(deps.setupMessageListeners).toHaveBeenCalledWith(client, phone, deps.connectionManagers.get(phone));
+    expect(deps.uptimeTracker.accounts.get(phone).online).toBe(true);
+    client.emit('disconnected', 'browser disconnected');
+    await flush();
+    expect(deps.uptimeTracker.accounts.get(phone).online).toBe(false);
   });
 
   test('startup and manual recovery join the same operation instead of launching two clients', async () => {

@@ -3,13 +3,13 @@
  * Phase 6 M2 Module 2 - Tests interactions between handlers
  */
 
-const MessageTemplateEngine = require('../../code/WhatsAppBot/Handlers/MessageTemplateEngine');
-const MessageBatchProcessor = require('../../code/WhatsAppBot/Handlers/MessageBatchProcessor');
-const AdvancedMediaHandler = require('../../code/WhatsAppBot/Handlers/AdvancedMediaHandler');
-const CommandExecutor = require('../../code/WhatsAppBot/Handlers/CommandExecutor');
-const GroupChatManager = require('../../code/WhatsAppBot/Handlers/GroupChatManager');
-const WhatsAppMultiAccountManager = require('../../code/WhatsAppBot/Handlers/WhatsAppMultiAccountManager');
-const ConversationIntelligenceEngine = require('../../code/WhatsAppBot/Handlers/ConversationIntelligenceEngine');
+const MessageTemplateEngine = require('../../src/whatsapp/handlers/MessageTemplateEngine');
+const MessageBatchProcessor = require('../../src/whatsapp/handlers/MessageBatchProcessor');
+const AdvancedMediaHandler = require('../../src/whatsapp/handlers/AdvancedMediaHandler');
+const CommandExecutor = require('../../src/whatsapp/handlers/CommandExecutor');
+const GroupChatManager = require('../../src/whatsapp/handlers/GroupChatManager');
+const WhatsAppMultiAccountManager = require('../../src/whatsapp/handlers/WhatsAppMultiAccountManager');
+const ConversationIntelligenceEngine = require('../../src/whatsapp/handlers/ConversationIntelligenceEngine');
 const HandlerOrchestrator = require('../helpers/HandlerOrchestrator');
 const { MockLogger } = require('../mocks/services');
 const fixtures = require('../fixtures/fixtures');

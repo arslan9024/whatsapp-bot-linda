@@ -14,10 +14,10 @@ jest.mock('fs', () => ({
   mkdirSync: jest.fn(),
 }));
 
-import AnalyticsDashboard from '../code/Analytics/AnalyticsDashboard.js';
-import AdminConfigInterface from '../code/Admin/AdminConfigInterface.js';
-import AdvancedConversationFeatures from '../code/Conversation/AdvancedConversationFeatures.js';
-import ReportGenerator from '../code/Reports/ReportGenerator.js';
+import AnalyticsDashboard from '../src/analytics/AnalyticsDashboard.js';
+import AdminConfigInterface from '../src/core/AdminConfigInterface.js';
+import AdvancedConversationFeatures from '../src/intelligence/AdvancedConversationFeatures.js';
+import ReportGenerator from '../src/analytics/reports/ReportGenerator.js';
 
 describe('Phase 7: Advanced Features Integration Tests', () => {
   let analytics, adminConfig, conversations, reportGen;

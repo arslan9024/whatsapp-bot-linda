@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import ConnectionManager from '../../code/utils/ConnectionManager.js';
-import SessionCleanupManager from '../../code/utils/SessionCleanupManager.js';
-import DeviceLinkedManager from '../../code/utils/DeviceLinkedManager.js';
-import LockFileDetector from '../../code/utils/LockFileDetector.js';
-import { SessionRecoveryService } from '../../code/utils/SessionRecoveryService.js';
+import ConnectionManager from '../../src/connection/ConnectionManager.js';
+import SessionCleanupManager from '../../src/sessions/SessionCleanupManager.js';
+import DeviceLinkedManager from '../../src/linking/DeviceLinkedManager.js';
+import LockFileDetector from '../../src/sessions/LockFileDetector.js';
+import { SessionRecoveryService } from '../../src/sessions/SessionRecoveryService.js';
 
-jest.mock('../../code/utils/SessionManager.js', () => ({
+jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     resolveClientId: () => 'persisted-master-id',
     canRestoreSession: () => true,
