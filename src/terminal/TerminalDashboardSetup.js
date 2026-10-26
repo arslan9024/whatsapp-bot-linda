@@ -69,6 +69,10 @@ export function setupTerminalInputListener(opts) {
     const stopAccountClient = phone => recovery.stopAccount(phone);
     const restoreAccount = phone => recovery.recover(phone);
     const conversationAnalysis = new TerminalConversationAnalysis({ accountClients, getFlowDeps });
+    terminalHealthDashboard?.setConversationReporter?.({
+      run: (phone, options) => conversationAnalysis.overview(phone, options),
+      get: phone => conversationAnalysis.getReport(phone),
+    });
     const callbacks = {
       onCampaigns: onOpenCampaigns,
       onCampaignInput,

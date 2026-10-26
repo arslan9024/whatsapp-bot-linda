@@ -49,12 +49,30 @@ describe('FeatureCatalog', () => {
     try {
       const first = new FeatureCatalog({ file });
       first.record('validate');
+      first.recordInput('relink master +971501234567');
       first.flush();
       const second = new FeatureCatalog({ file });
       expect(second.counts.get(21)).toBe(1);
+      expect(second.actionCount('relink master')).toBe(1);
       expect(second.totals().session).toBe(0);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test('per-action counters drop phone numbers and map aliases', () => {
+    const catalog = new FeatureCatalog({ file: null });
+    expect(catalog.actionKey('relink master +971501234567')).toBe('relink master');
+    expect(catalog.actionKey('metrics report')).toBe('analytics report');
+    expect(catalog.actionKey('google read abc Sheet1')).toBe('sheets read');
+    expect(catalog.actionKey('chats +971501234567 2')).toBe('chats');
+    expect(catalog.actionKey('restore-sessions')).toBe('restore');
+    expect(catalog.actionKey('')).toBe('');
+    catalog.recordInput('device +971501234567');
+    catalog.recordInput('device 0501234567');
+    catalog.recordInput('');
+    expect(catalog.actionCount('device')).toBe(2);
+    expect(catalog.actionCount('device +15550001111')).toBe(2);
+    expect(catalog.actionCount('stats')).toBe(0);
   });
 });

@@ -92,16 +92,21 @@ describe('TerminalLayout', () => {
     layout.close();
   });
 
-  test('pins a green FEATURES panel between OUTPUT and INPUT, compacting when short', () => {
+  test('stacks HEADER, FEATURES, INPUT, OUTPUT and the PROCESS bar in order, compacting when short', () => {
     const features = { title: 'FEATURES', lines: width => [`grid ${width}`, 'row 2', 'row 3'], compactLines: ['compact'] };
+    const header = { title: 'LINDA HEADER', lines: ['details', 'master line', 'idle'], compactLines: ['one-line header'] };
     const stream = fakeTty();
     const layout = new TerminalLayout(stream);
-    expect(layout.render(output, input, features)).toBe('repinned');
+    expect(layout.render(output, input, features, header)).toBe('repinned');
     const text = stream.output;
     expect(text).toContain(`\x1b[${PANEL_COLORS.features}m`);
-    expect(new Set([PANEL_COLORS.output, PANEL_COLORS.features, PANEL_COLORS.input]).size).toBe(3);
-    expect(text.indexOf('OUTPUT')).toBeLessThan(text.indexOf('FEATURES'));
+    expect(text).toContain(`\x1b[1;${PANEL_COLORS.header}m`);
+    expect(text).toContain(`\x1b[1;${PANEL_COLORS.process}m`);
+    expect(new Set(Object.values(PANEL_COLORS)).size).toBe(5);
+    expect(text.indexOf('LINDA HEADER')).toBeLessThan(text.indexOf('FEATURES'));
     expect(text.indexOf('FEATURES')).toBeLessThan(text.indexOf('INPUT'));
+    expect(text.indexOf('INPUT')).toBeLessThan(text.indexOf('OUTPUT'));
+    expect(text.indexOf('OUTPUT')).toBeLessThan(text.indexOf('PROCESS VIEWBOARD'));
     expect(text).toMatch(/grid \d+/);
     layout.close();
 
@@ -112,6 +117,25 @@ describe('TerminalLayout', () => {
     expect(short.output).toContain('compact');
     expect(short.output).not.toContain('row 3');
     compact.close();
+
+    const shorter = fakeTty({ rows: 22 });
+    const both = new TerminalLayout(shorter);
+    both.render(output, input, features, header);
+    expect(both.pinned).toBe(true);
+    expect(shorter.output).toContain('one-line header');
+    expect(shorter.output).not.toContain('master line');
+    both.close();
+  });
+
+  test('truncates a long OUTPUT body instead of giving up on pinning', () => {
+    const long = { title: 'OUTPUT', lines: Array.from({ length: 40 }, (_, i) => `device ${i + 1}`) };
+    const stream = fakeTty({ rows: 30 });
+    const layout = new TerminalLayout(stream);
+    expect(layout.render(long, input)).toBe('repinned');
+    expect(layout.height).toBeLessThanOrEqual(30 - 8);
+    expect(stream.output).toMatch(/… \+\d+ more lines/);
+    expect(stream.output).not.toContain('device 40');
+    layout.close();
   });
 
   test('re-pins after a terminal resize', () => {

@@ -1,10 +1,10 @@
 /**
  * TerminalLayout.js
  *
- * Pins the OUTPUT (device dashboard), optional FEATURES (numbered feature counters)
- * and INPUT (command / question) panels to the
- * top of an interactive terminal using a VT scroll region. Logs and other
- * processing output scroll only in the area below the panels, so the panels
+ * Pins a full terminal UI to the top of an interactive terminal using a VT scroll region:
+ * HEADER (Linda details), FEATURES sub-header (numbered feature counters), INPUT
+ * (command / question), OUTPUT (devices & conversation report) and a PROCESS VIEWBOARD
+ * bar. Logs and other processing output scroll only in the area below, so the panels
  * always stay above them. Non-TTY output (pipes, files, tests) is never touched.
  */
 
@@ -12,7 +12,8 @@ import { stripVTControlCharacters } from 'node:util';
 
 const CSI = '\x1b[';
 const MIN_LOG_ROWS = 8;
-export const PANEL_COLORS = { output: '36', features: '32', input: '33' }; // cyan / green / yellow
+// magenta / green / yellow / cyan / blue
+export const PANEL_COLORS = { header: '35', features: '32', input: '33', output: '36', process: '34' };
 
 export function layoutSupported(stream = process.stdout) {
   return Boolean(stream?.isTTY) && process.env.LINDA_PLAIN_TERMINAL !== '1';
@@ -63,10 +64,14 @@ export class TerminalLayout {
     return this.state === 'pinned' || this.state === 'unpinnable';
   }
 
-  buildPanel({ title, lines }, color, width, minBody = 0) {
+  buildPanel({ title, lines }, color, width, minBody = 0, maxBody = Infinity) {
     const inner = width - 4;
     const source = typeof lines === 'function' ? lines(inner) : lines;
-    const body = source.flatMap(line => wrap(line, inner));
+    let body = source.flatMap(line => wrap(line, inner));
+    if (body.length > maxBody) {
+      const hidden = body.length - maxBody + 1;
+      body = [...body.slice(0, maxBody - 1), `… +${hidden} more line${hidden === 1 ? '' : 's'} (enlarge the window to see all)`];
+    }
     while (body.length < minBody) body.push('');
     const head = `╭─ ${title} `;
     return [
@@ -76,55 +81,72 @@ export class TerminalLayout {
     ];
   }
 
+  processBar(width) {
+    const label = '── PROCESS VIEWBOARD · live logs & processing below ';
+    return colorize(label + '─'.repeat(Math.max(0, width - 1 - label.length)), PANEL_COLORS.process, { bold: true, stream: this.stream });
+  }
+
   /**
-   * Draw OUTPUT, optional FEATURES and INPUT panels. `features.compactLines` replaces
-   * the full feature grid when the window is too short for everything.
+   * Draw the full terminal UI from top to bottom: HEADER, FEATURES (sub-header), INPUT,
+   * OUTPUT and a PROCESS VIEWBOARD bar; logs scroll below it. When the window is short,
+   * features and header switch to their `compactLines`, then the OUTPUT body is truncated.
    */
-  render(output, input, features = null) {
+  render(output, input, features = null, header = null) {
     if (!this.enabled) return false;
-    this.panels = { output, input, features };
+    this.panels = { output, input, features, header };
     this.installHooks();
     const width = Math.max(40, Math.min(this.stream.columns || 100, 140) - 1);
     const rows = this.stream.rows || 24;
+    const available = rows - MIN_LOG_ROWS;
     const inputLines = this.buildPanel(input, PANEL_COLORS.input, width);
+    const processLines = [this.processBar(width)];
+    let headerLines = header ? this.buildPanel(header, PANEL_COLORS.header, width) : [];
     let outputLines = this.buildPanel(output, PANEL_COLORS.output, width);
     let featureLines = features ? this.buildPanel(features, PANEL_COLORS.features, width) : [];
-    const fits = () => outputLines.length + featureLines.length + inputLines.length <= rows - MIN_LOG_ROWS;
+    const fixed = () => headerLines.length + featureLines.length + inputLines.length + processLines.length;
+    const fits = () => fixed() + outputLines.length <= available;
     if (features?.compactLines && !fits()) {
       featureLines = this.buildPanel({ title: features.title, lines: features.compactLines }, PANEL_COLORS.features, width);
     }
+    if (header?.compactLines && !fits()) {
+      headerLines = this.buildPanel({ title: header.title, lines: header.compactLines }, PANEL_COLORS.header, width);
+    }
+    const outputBudget = available - fixed() - 2;
+    if (!fits() && outputBudget >= 3) {
+      outputLines = this.buildPanel(output, PANEL_COLORS.output, width, 0, outputBudget);
+    }
 
     if (!fits()) {
-      // Too many devices for this window: fall back to a normal top-of-viewport redraw.
+      // Window too small for the panels: fall back to a normal top-of-viewport redraw.
       this.unpin();
-      this.stream.write(`${CSI}H${CSI}2J${[...outputLines, ...featureLines, ...inputLines].join('\n')}\n`);
+      this.stream.write(`${CSI}H${CSI}2J${[...headerLines, ...featureLines, ...inputLines, ...outputLines].join('\n')}\n`);
       this.state = 'unpinnable';
       return true;
     }
 
-    const fixedRows = featureLines.length + inputLines.length;
-    if (this.state === 'pinned' && outputLines.length + fixedRows <= this.height) {
-      // Keep the header height stable so the log area never jumps.
-      const bodyRows = this.height - fixedRows - 2;
-      outputLines = this.buildPanel(output, PANEL_COLORS.output, width, bodyRows);
-      this.stream.write(`\x1b7${this.drawRows([...outputLines, ...featureLines, ...inputLines])}\x1b8`);
+    const compose = () => [...headerLines, ...featureLines, ...inputLines, ...outputLines, ...processLines];
+    if (this.state === 'pinned' && fixed() + outputLines.length <= this.height) {
+      // Keep the panel height stable so the log area never jumps.
+      const bodyRows = this.height - fixed() - 2;
+      outputLines = this.buildPanel(output, PANEL_COLORS.output, width, bodyRows, bodyRows);
+      this.stream.write(`\x1b7${this.drawRows(compose())}\x1b8`);
       return true;
     }
 
-    const header = [...outputLines, ...featureLines, ...inputLines];
-    this.height = header.length;
+    const panels = compose();
+    this.height = panels.length;
     this.stream.write(
-      `${CSI}r${CSI}H${CSI}2J${this.drawRows(header)}${CSI}${this.height + 1};${rows}r${CSI}${this.height + 1};1H`,
+      `${CSI}r${CSI}H${CSI}2J${this.drawRows(panels)}${CSI}${this.height + 1};${rows}r${CSI}${this.height + 1};1H`,
     );
     this.state = 'pinned';
     this.patchConsoleClear();
     return 'repinned';
   }
 
-  /** Redraw with new INPUT content, keeping the last OUTPUT content. */
+  /** Redraw with new INPUT content, keeping the last HEADER, FEATURES and OUTPUT content. */
   updateInput(input) {
     if (!this.panels || !this.current) return false;
-    return this.render(this.panels.output, input, this.panels.features);
+    return this.render(this.panels.output, input, this.panels.features, this.panels.header);
   }
 
   drawRows(lines) {

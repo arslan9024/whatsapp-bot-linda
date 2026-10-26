@@ -213,6 +213,39 @@ describe('Counted hierarchical terminal menus', () => {
     expect(menu.handleInput('6.5').command).toBe('features');
   });
 
+  test('appended by-phone actions keep existing codes and support optional fields', () => {
+    expect(menu.handleInput('1.17')).toEqual({ handled: true });
+    expect(menu.handleInput('+15551234567')).toEqual({ handled: true });
+    expect(menu.handleInput('1').command).toBe('disconnect +15551234567');
+    expect(menu.handleInput('1.18').command).toBe('health');
+    menu.handleInput('8.9');
+    menu.handleInput('+15551234567');
+    expect(menu.handleInput('').command).toBe('chats +15551234567');
+    menu.handleInput('8.10');
+    menu.handleInput('+15551234567');
+    menu.handleInput('3');
+    expect(menu.handleInput('').command).toBe('analyze +15551234567 3');
+    menu.handleInput('8.8');
+    expect(menu.handleInput('+15551234567').command).toBe('score +15551234567');
+  });
+
+  test('full numbered list shows every terminal action with its dotted code and counter', () => {
+    const lines = menu.fullListLines(command => (command === 'link-code' ? 4 : 0));
+    const text = lines.join('\n');
+    expect(text).toContain('[1] DEVICES AND ACCOUNTS');
+    expect(text).toContain('2.1  Link with pairing code  → link-code  ×4');
+    expect(text).toContain('8.2  Validate a number  → validate <…>  ×0');
+    expect(text).toContain('1.8.1.8.3  Analyze selected chat');
+    expect(text).toContain('7.x');
+    expect(text).not.toContain('!');
+    const catalog = menu.root.children[6];
+    const terminalLeaves = menu.root.children.filter(node => node !== catalog).flatMap(leaves).filter(item => !item.info);
+    expect(lines.filter(line => line.includes('→'))).toHaveLength(terminalLeaves.length);
+    const cells = menu.gridCells(() => 1);
+    expect(cells).toContain('2.2 link-qr ×1');
+    expect(cells.some(cell => cell.startsWith('1.8 ') || cell.startsWith('7.'))).toBe(false);
+  });
+
   test('all canonical terminal actions are present', () => {
     const commands = new Set(menu.root.children.slice(0, 6).flatMap(leaves).map(item => item.command));
     for (const command of [

@@ -383,6 +383,7 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     setIsInitializing(false);
 
     terminalHealthDashboard?.requestDashboardRefresh?.();
+    terminalHealthDashboard?.onAccountReady?.(phoneNumber);
   });
 
   // ───────────────────────── Auth Failure ────────────────────────────────

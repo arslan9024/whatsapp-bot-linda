@@ -14,17 +14,39 @@
  */
 
 import readline from 'readline';
+import fs from 'fs';
+import path from 'path';
 import accountHealthMonitor from '../accounts/AccountHealthMonitor.js';
 import TerminalNumberMenu from './TerminalNumberMenu.js';
 import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import TerminalLayout, { colorize, PANEL_COLORS } from './TerminalLayout.js';
 import FeatureCatalog from './FeatureCatalog.js';
+import { conversationReportLines, conversationSummaryLines } from './TerminalConversationAnalysis.js';
 import {
   dedupeLines, intentLines, pickClient, scoreLines, sendSingleMessage, sentimentLines, similarLines, validateLines,
 } from './TerminalFeatureCommands.js';
 
-const COMMAND_HINT = 'link-code | link-qr | recover <phone> | restore-sessions | campaigns | features | f<id> | menu | help';
+const COMMAND_HINT = 'Type a feature code (e.g. 1.13, 8.2) | features = full numbered list | menu | link-code | link-qr | recover <phone> | help';
+const APP_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).version || '?';
+  } catch {
+    return '?';
+  }
+})();
+
+/** Lay out short cells in as many columns as fit `width`. */
+const gridLines = (cells, width) => {
+  if (!cells.length) return [];
+  const cellWidth = Math.max(...cells.map(cell => cell.length)) + 2;
+  const columns = Math.max(1, Math.floor((width + 2) / cellWidth));
+  const lines = [];
+  for (let i = 0; i < cells.length; i += columns) {
+    lines.push(cells.slice(i, i + columns).map(cell => cell.padEnd(cellWidth)).join('').trimEnd());
+  }
+  return lines;
+};
 
 class TerminalHealthDashboard {
   constructor() {
@@ -49,15 +71,121 @@ class TerminalHealthDashboard {
     this.activeQuestion = null;
     this.pairingCodes = new Map();
     this.features = new FeatureCatalog();
+    this.startedAt = Date.now();
+    this.conversationReporter = null;
+    this.conversationJobs = new Map();
+    this.conversationTimers = new Map();
   }
 
-  /** FEATURES panel: numbered features with usage counters (compact summary on short windows). */
-  featurePanel() {
+  /** HEADER panel: Linda identity, runtime details and master/device status. */
+  headerPanel(masterInfo, devicesLine) {
+    const uptime = Math.floor((Date.now() - this.startedAt) / 60000);
+    const runtime = `Linda v${APP_VERSION} · Node ${process.version} · PID ${process.pid} · ` +
+      `started ${new Date(this.startedAt).toLocaleTimeString()} · uptime ${Math.floor(uptime / 60)}h ${String(uptime % 60).padStart(2, '0')}m`;
+    const job = [...this.conversationJobs.keys()];
+    const master = masterInfo
+      ? `Master: ${masterInfo.phone} · ${masterInfo.online ? 'ONLINE' : masterInfo.status} · ${masterInfo.link}`
+      : `Master: ${this.masterPhoneNumber || 'not configured (type 2.1 or 2.2 to link)'}`;
+    const activity = job.length ? `Working: analyzing conversations for ${job.join(', ')}` :
+      this.commandRunning && this.lastCommand ? `Working: ${this.lastCommand}` : 'Idle · waiting for your command';
     return {
-      title: 'FEATURES · F<id> COUNTERS (* restored)',
-      lines: width => [this.features.summaryLine(), ...this.features.gridLines(width)],
+      title: 'LINDA · WHATSAPP BOT CONTROL CENTER',
+      lines: [runtime, `${master} | ${devicesLine}`, activity],
+      compactLines: [`Linda v${APP_VERSION} · ${master} | ${devicesLine}`],
+    };
+  }
+
+  /** Conversation report lines for OUTPUT: full summary for the online master, one line per other account. */
+  conversationLines(onlinePhones = []) {
+    if (!this.conversationReporter) return [];
+    const lines = [];
+    for (const { phone, master } of onlinePhones) {
+      const report = this.conversationReporter.get(phone);
+      if (this.conversationJobs.has(phone)) {
+        lines.push(`CONVERSATIONS ${phone}: analyzing… ${this.conversationJobs.get(phone).progress || ''}`.trimEnd());
+      } else if (!report) {
+        lines.push(`CONVERSATIONS ${phone}: no report yet (type convos ${phone})`);
+      } else if (master) {
+        lines.push(`CONVERSATIONS · MASTER ${phone}`, ...conversationSummaryLines(report).map(line => `  ${line}`));
+      } else {
+        lines.push(`CONVERSATIONS ${phone}: ${report.totalChats} chats · ${report.totalMessages}${report.cappedChats ? '+' : ''} messages · ` +
+          `last: ${report.last ? report.last.name : 'none'} · full list: convos ${phone}`);
+      }
+    }
+    return lines;
+  }
+
+  /** `reporter = { run(phone, options) => report, get(phone) => report|null }` */
+  setConversationReporter(reporter) {
+    this.conversationReporter = reporter;
+  }
+
+  /** Called when an account becomes ready: analyze its conversations once WhatsApp has synced. */
+  onAccountReady(phone, delayMs = Number(process.env.LINDA_CHAT_REPORT_DELAY_MS) || 8000) {
+    if (!this.conversationReporter || process.env.LINDA_AUTO_CHAT_REPORT === '0') return;
+    clearTimeout(this.conversationTimers.get(phone));
+    const timer = setTimeout(() => {
+      this.conversationTimers.delete(phone);
+      this.runConversationReport(phone).catch(() => {});
+    }, delayMs);
+    timer.unref?.();
+    this.conversationTimers.set(phone, timer);
+  }
+
+  /** Analyze all conversations of `phone`; progress and summary go to the process log. */
+  async runConversationReport(phone, { printTable = false } = {}) {
+    if (!this.conversationReporter) throw new Error('Conversation reports are unavailable');
+    if (this.conversationJobs.has(phone)) {
+      console.log(`Conversation analysis for ${phone} is already running.`);
+      return this.conversationJobs.get(phone).promise;
+    }
+    const job = { progress: '' };
+    console.log(`📊 Analyzing all conversations for ${phone}…`);
+    job.promise = (async () => {
+      try {
+        const report = await this.conversationReporter.run(phone, {
+          onProgress: (done, total) => {
+            job.progress = `${done}/${total} chats`;
+            console.log(`📊 ${phone}: counted messages in ${done}/${total} chats`);
+            this.requestDashboardRefresh();
+          },
+        });
+        const lines = printTable ? conversationReportLines(report) : conversationSummaryLines(report);
+        console.log(`✅ Conversation report for ${report.phone}`);
+        for (const line of lines) console.log(`   ${line}`);
+        return report;
+      } catch (error) {
+        console.log(`⚠️  Conversation report for ${phone} failed: ${error.message}`);
+        throw error;
+      } finally {
+        this.conversationJobs.delete(phone);
+        this.requestDashboardRefresh();
+      }
+    })();
+    this.conversationJobs.set(phone, job);
+    this.requestDashboardRefresh();
+    return job.promise;
+  }
+
+  /** FEATURES panel: dotted feature codes with usage counters (compact summary on short windows). */
+  featurePanel() {
+    const count = command => this.features.actionCount(command);
+    return {
+      title: 'FEATURES · CODE COMMAND ×USES · type the code · features = full numbered list',
+      lines: width => [this.features.summaryLine(), ...gridLines(this.numberMenu.gridCells(count), width)],
       compactLines: [this.features.summaryLine()],
     };
+  }
+
+  /** Full numbered list of every feature (dotted codes + counters). Rebuilds the menu from home. */
+  printFeatureList() {
+    this.numberMenu.refresh(false);
+    for (const line of this.numberMenu.fullListLines(command => this.features.actionCount(command))) console.log(line);
+  }
+
+  /** Auto-print the list at startup/after commands, except in tests or when LINDA_FEATURE_LIST=0. */
+  get autoFeatureList() {
+    return process.env.NODE_ENV !== 'test' && process.env.LINDA_FEATURE_LIST !== '0';
   }
 
   /** Pinned, colored OUTPUT/INPUT panels are used only in an interactive terminal. */
@@ -364,6 +492,8 @@ class TerminalHealthDashboard {
     let saved = 0;
     let linked = 0;
     let deviceNumber = 0;
+    let masterInfo = null;
+    const onlinePhones = [];
     for (const [phone, device] of rows) {
       const metadata = sessionState?.getDeviceMetadata(phone) || {};
       const clientId = SessionManager.resolveClientId(phone, metadata, device);
@@ -394,6 +524,8 @@ class TerminalHealthDashboard {
       const master = phone === (this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber);
       const link = loggedOut ? 'NOT LINKED (logged out)' : previouslyLinked ? 'LINKED' :
         status === 'LINKING' ? 'LINKING' : 'NOT LINKED';
+      if (master) masterInfo = { phone, status, link, online: online && !loggedOut };
+      if (online && !loggedOut) onlinePhones.push({ phone, master });
       lines.push(`${++deviceNumber}. ${device.displayName || device.name || phone}${master ? ' [MASTER]' : ''} | ${phone} | Link: ${link} | Connection: ${status} | session: ${canRestore ? `saved (${clientId})` : online ? 'active; save pending' : 'relink needed'}`);
       if (previouslyLinked && !online && !loggedOut && !inProgress) {
         lines.push(`   Linked device; currently offline. ${
@@ -408,11 +540,14 @@ class TerminalHealthDashboard {
         lines.push(`   Connection error: ${String(lastError).replace(/\s+/g, ' ').slice(0, 240)}`);
       }
     }
+    const devicesLine = `Devices: ${rows.size} | Linked: ${linked} | Active (online): ${active} | Offline: ${rows.size - active} | Saved sessions: ${saved}`;
+    const conversationLines = this.conversationLines(onlinePhones);
     const screen = [
       'LINDA | DEVICE DASHBOARD',
-      `Devices: ${rows.size} | Linked: ${linked} | Active (online): ${active} | Offline: ${rows.size - active} | Saved sessions: ${saved}`,
+      devicesLine,
       'Linked = registered on the phone (last known). Active = connected now. Reactivating an offline linked device does not need relinking.',
       ...lines,
+      ...conversationLines,
       this.lastCommand ? `Last command: ${this.lastCommand}` : '',
       this.lastNotice ? `Notice: ${this.lastNotice}` : '',
       this.features.summaryLine(),
@@ -422,12 +557,13 @@ class TerminalHealthDashboard {
     if (!force && screen === this.lastDashboard && (!usePanels || this.layout.current)) return;
     this.lastDashboard = screen;
     if (usePanels) {
-      // Feature counters get their own panel; drop the summary and hint lines from OUTPUT.
-      const outputLines = screen.split('\n').slice(1, -2);
+      // Title and device totals move to the HEADER; feature counters get their own panel.
+      const outputLines = screen.split('\n').slice(2, -2);
       const result = this.layout.render(
-        { title: 'OUTPUT · LINDA DEVICE DASHBOARD', lines: outputLines },
+        { title: 'OUTPUT · DEVICES & CONVERSATIONS', lines: outputLines },
         { title: 'INPUT · YOUR ACTION', lines: this.inputPanelLines() },
         this.featurePanel(),
+        this.headerPanel(masterInfo, devicesLine),
       );
       // A full re-pin clears the log area, so put the prompt back.
       if (result === 'repinned' && this.isMonitoring && !this.commandRunning && !this.isSelectingLinkingMethod) {
@@ -744,6 +880,7 @@ class TerminalHealthDashboard {
         } else if (selection.handled) {
           if (/^menu$/i.test(input.trim())) {
             this.features.record('menu');
+            this.features.recordInput('menu');
             this.renderInputPanel();
           }
           if (this.isMonitoring) {
@@ -787,10 +924,14 @@ class TerminalHealthDashboard {
       this.commandRunning = true;
       this.lastCommand = input_original;
       this.features.record(command);
+      this.features.recordInput(input_original);
       try {
       switch (command) {
         case 'features':
-          for (const line of this.features.listLines()) console.log(line);
+        case 'list-all':
+          this.printFeatureList();
+          console.log('Legacy shortcuts still work: f<id> [args] (e.g. f21 0501234567). F-id list: features f');
+          if (parts[1]?.toLowerCase() === 'f') for (const line of this.features.listLines()) console.log(line);
           break;
 
         case 'sentiment':
@@ -997,6 +1138,17 @@ class TerminalHealthDashboard {
           if (parts.length > 3) throw new Error('Usage: chats [phone] [page]');
           await onListChats(parts[1], parts[2]);
           break;
+
+        case 'convos':
+        case 'conversations': {
+          if (!this.conversationReporter) throw new Error('Conversation reports are unavailable');
+          if (parts.length > 2) throw new Error('Usage: convos [phone]');
+          const target = parts[1] || this.accountConfigManager?.getMasterPhoneNumber?.() || this.masterPhoneNumber;
+          if (!target) throw new Error('Usage: convos <phone> (no master configured)');
+          await this.runConversationReport(target, { printTable: true });
+          this.lastNotice = `Conversation report ready for ${target}.`;
+          break;
+        }
 
         case 'analyze':
           if (!onAnalyzeChat) throw new Error('Local conversation analysis is unavailable');
@@ -1544,6 +1696,7 @@ class TerminalHealthDashboard {
           console.log(`    device <phone>            → Show detailed device information`);
           console.log('    disconnect <phone>        → Close locally; keep the saved session');
           console.log('    chats [phone] [page]      → List available chats; no message history read');
+          console.log('    convos [phone]            → Conversation report: total chats, last conversation, messages per chat');
           console.log('    analyze <phone> <n> [max] → Locally analyze selected chat (1-500 messages)');
           console.log(`    list                      → List all devices`);
           console.log(`    masters                   → Show all master accounts`);
@@ -1557,8 +1710,9 @@ class TerminalHealthDashboard {
           console.log(`    similar <a> | <b>         → Compare two names or phone numbers`);
           console.log(`    dedupe <file>             → Find duplicate contacts in CSV/XLSX/JSON`);
           console.log(`\n  SYSTEM:`);
-          console.log(`    features                  → List all features with IDs (F1-F${this.features.features.length}) and usage counters`);
-          console.log(`    f<id> [args] / #<id>      → Run a feature by number, e.g. f8 or f21 0501234567`);
+          console.log(`    features / list-all       → Full numbered list of every feature (dotted codes) with usage counters`);
+          console.log(`    <code>                    → Run a feature by its code, e.g. 2.1 (link-code), 1.13 (device), 8.2 (validate)`);
+          console.log(`    f<id> [args] / #<id>      → Legacy shortcut, e.g. f8 or f21 0501234567 (features f lists F-ids)`);
           console.log(`    help                      → Show this help message`);
           console.log(`    quit / exit               → Exit monitoring\n`);
           break;
@@ -1592,7 +1746,14 @@ class TerminalHealthDashboard {
         console.error(`Command failed: ${error.message}`);
       } finally {
         this.commandRunning = false;
-        if (!['help', 'menu', 'campaigns', 'features'].includes(command)) this.refreshDashboard();
+        if (!['help', 'menu', 'campaigns', 'features', 'list-all'].includes(command)) {
+          this.refreshDashboard();
+          // Pinned panels already show the codes; otherwise reprint the list under the output.
+          if (this.autoFeatureList && !this.usePanels && this.isMonitoring && !this.isSelectingLinkingMethod &&
+              !this.numberMenu.pending && !this.linkingChallenges.size && !this.isCampaignMenuActive?.()) {
+            this.printFeatureList();
+          }
+        }
       }
       if (this.isMonitoring && !this.isSelectingLinkingMethod) {
         this.rl.prompt();
@@ -1608,7 +1769,8 @@ class TerminalHealthDashboard {
 
     // Initial display
     this.displayHealthDashboard();
-    console.log('Type menu for numbered actions (2.1 = link-code, 2.2 = link-qr).');
+    if (this.autoFeatureList) this.printFeatureList();
+    console.log('Type any feature code from the list (e.g. 2.1 = link-code, 2.2 = link-qr, 8.2 = validate). features = show the list again.');
     this.rl.prompt();
   }
 

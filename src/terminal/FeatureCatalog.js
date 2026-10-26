@@ -49,9 +49,11 @@ export const FEATURES = Object.freeze([
   { id: 31, command: 'features', name: 'Feature list', category: 'System' },
   { id: 32, command: 'help', name: 'Help', category: 'System' },
   { id: 33, command: 'quit', name: 'Quit', category: 'System', aliases: ['exit'] },
+  { id: 34, command: 'convos', name: 'Conversation report', category: 'Messaging', usage: 'convos [+phone]', aliases: ['conversations'] },
 ]);
 
 const DEFAULT_FILE = path.join(process.cwd(), 'data', 'feature-usage.json');
+const MULTI_WORD = new Set(['link', 'relink', 'goraha', 'analytics', 'sheets']);
 
 export class FeatureCatalog {
   /**
@@ -65,6 +67,7 @@ export class FeatureCatalog {
       for (const key of [feature.command, ...(feature.aliases || [])]) this.byCommand.set(key, feature);
     }
     this.counts = new Map(FEATURES.map(feature => [feature.id, 0]));
+    this.actionCounts = new Map();
     this.sessionCounts = new Map();
     this.lastUsed = null;
     this.saveTimer = null;
@@ -80,6 +83,9 @@ export class FeatureCatalog {
       const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       for (const [id, count] of Object.entries(saved.counts || {})) {
         if (this.counts.has(Number(id)) && Number.isFinite(count)) this.counts.set(Number(id), count);
+      }
+      for (const [key, count] of Object.entries(saved.actions || {})) {
+        if (Number.isFinite(count)) this.actionCounts.set(key, count);
       }
     } catch {
       // No saved counters yet.
@@ -101,7 +107,11 @@ export class FeatureCatalog {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = `${this.file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ updatedAt: new Date().toISOString(), counts: Object.fromEntries(this.counts) }, null, 2));
+      fs.writeFileSync(tmp, JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        counts: Object.fromEntries(this.counts),
+        actions: Object.fromEntries(this.actionCounts),
+      }, null, 2));
       fs.renameSync(tmp, this.file);
     } catch {
       // Counters are informational; never break a command because of them.
@@ -122,6 +132,29 @@ export class FeatureCatalog {
     this.lastUsed = feature;
     this.save();
     return feature;
+  }
+
+  /**
+   * Counter key for a full command line: phone numbers are dropped and aliases mapped,
+   * so `relink master +971...` and menu code `1.9` share the key `relink master`.
+   */
+  actionKey(line) {
+    const tokens = String(line).trim().toLowerCase().split(/\s+/).filter(token => token && !/^\+?\d{6,}$/.test(token));
+    if (!tokens.length) return '';
+    const first = this.get(tokens[0])?.command || tokens[0];
+    return MULTI_WORD.has(first) && /^[a-z][a-z-]*$/.test(tokens[1] || '') ? `${first} ${tokens[1]}` : first;
+  }
+
+  /** Count one use of a full command line (per menu action). */
+  recordInput(line) {
+    const key = this.actionKey(line);
+    if (!key) return;
+    this.actionCounts.set(key, (this.actionCounts.get(key) || 0) + 1);
+    this.save();
+  }
+
+  actionCount(line) {
+    return this.actionCounts.get(this.actionKey(line)) || 0;
   }
 
   /**
@@ -154,7 +187,7 @@ export class FeatureCatalog {
   summaryLine() {
     const t = this.totals();
     return `Features: ${t.features} (F1-F${t.features}) | Used: ${t.used} | Total uses: ${t.total} | This session: ${t.session}` +
-      `${this.lastUsed ? ` | Last: F${this.lastUsed.id} ${this.lastUsed.command}` : ''} | Run: f<id> or features`;
+      `${this.lastUsed ? ` | Last: F${this.lastUsed.id} ${this.lastUsed.command}` : ''} | Run: code (e.g. 8.2), f<id> or features`;
   }
 
   /** Compact multi-column grid of `F<id> command ×count`, fitted to `width` characters. */

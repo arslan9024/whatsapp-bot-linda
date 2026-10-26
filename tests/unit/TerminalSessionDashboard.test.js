@@ -124,6 +124,56 @@ describe('Compact truthful terminal device dashboard', () => {
     expect(screen).toContain('Active (online): 1');
   });
 
+  test('shows the master conversation report in OUTPUT and runs it automatically after login', async () => {
+    jest.useFakeTimers();
+    const phone = devices[0].phoneNumber;
+    dashboard.accountConfigManager.getMasterPhoneNumber = () => phone;
+    const report = {
+      phone, generatedAt: 0, durationMs: 1200, perChatLimit: 200, totalChats: 2, individualChats: 1, groupChats: 1,
+      unreadChats: 0, unreadMessages: 0, countedChats: 2, skippedChats: 0, totalMessages: 7, incoming: 4, outgoing: 3,
+      cappedChats: 0, busiest: null,
+      entries: [
+        { number: 1, name: 'Ali', group: false, unread: 0, timestamp: 0, lastFromMe: true, lastPreview: 'ok', messages: 5, incoming: 3, outgoing: 2, capped: false },
+        { number: 2, name: 'Team', group: true, unread: 0, timestamp: 0, lastFromMe: null, lastPreview: '', messages: 2, incoming: 1, outgoing: 1, capped: false },
+      ],
+    };
+    report.last = report.entries[0];
+    let stored = null;
+    const reporter = { run: jest.fn(async () => (stored = report)), get: jest.fn(() => stored) };
+    dashboard.setConversationReporter(reporter);
+
+    dashboard.displayHealthDashboard();
+    expect(console.log.mock.calls.at(-1)[0]).toContain(`CONVERSATIONS ${phone}: no report yet`);
+
+    dashboard.onAccountReady(phone, 1000);
+    expect(reporter.run).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1000);
+    expect(reporter.run).toHaveBeenCalledWith(phone, expect.objectContaining({ onProgress: expect.any(Function) }));
+    await dashboard.conversationJobs.get(phone)?.promise;
+    expect(console.log.mock.calls.flat().join('\n')).toContain('Conversations: 2 (1 people, 1 groups)');
+
+    dashboard.displayHealthDashboard(true);
+    const screen = console.log.mock.calls.at(-1)[0];
+    expect(screen).toContain(`CONVERSATIONS · MASTER ${phone}`);
+    expect(screen).toContain('Last conversation: #1 Ali');
+    expect(screen).toContain('#1 Ali 5 | #2 Team 2');
+
+    process.env.LINDA_AUTO_CHAT_REPORT = '0';
+    reporter.run.mockClear();
+    dashboard.onAccountReady(phone, 10);
+    jest.advanceTimersByTime(50);
+    expect(reporter.run).not.toHaveBeenCalled();
+    delete process.env.LINDA_AUTO_CHAT_REPORT;
+  });
+
+  test('header panel carries Linda details and master status', () => {
+    const header = dashboard.headerPanel({ phone: '+1555', online: true, status: 'ACTIVE', link: 'LINKED' }, 'Devices: 1');
+    expect(header.title).toContain('LINDA');
+    expect(header.lines[0]).toMatch(/Linda v\S+ · Node v\d+/);
+    expect(header.lines[1]).toContain('Master: +1555 · ONLINE · LINKED | Devices: 1');
+    expect(header.compactLines).toHaveLength(1);
+  });
+
   test('linked history includes a device which has subsequently logged out', () => {
     devices[2].linkedAt = '2026-10-26T10:00:00Z';
     dashboard.setConnectionSources(new Map(), new Map());

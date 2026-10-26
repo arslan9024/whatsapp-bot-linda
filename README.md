@@ -370,11 +370,60 @@ The WhatsApp catalog lists usage, examples, enabled/authentication metadata, and
 whether a handler is registered. A registered handler may still be a placeholder;
 catalog entries do not execute WhatsApp-only commands from the terminal.
 
+### Full numbered feature list (dotted codes)
+
+At startup Linda prints every terminal feature with a dotted code and a usage
+counter. If the panels are not pinned, it also prints the list after each command.
+Type the code and press Enter to run it. For example, `2.1` runs link-code, `1.13`
+shows device details by phone, `8.2` validates a number and `8.10` analyzes a chat
+by phone. Linda prompts for any inputs it needs; optional ones show `[optional]`.
+Type `features` (or `list-all`, or `6.5`) to print the list again. When the
+panels are pinned, the green FEATURES panel shows `code command ×uses`.
+Counters are kept per action. Phone numbers are ignored, so `relink master +971…`
+and code `1.9` count together. They are saved in `data/feature-usage.json`.
+To stop the automatic printing, set `LINDA_FEATURE_LIST=0`. Existing codes never
+change, because new actions are only added at the end of a section.
+
+### Full terminal UI and conversation report
+
+When the terminal supports it, Linda pins a full UI to the top of the window, from
+top to bottom:
+
+1. **HEADER** (magenta): Linda version, Node version, PID, start time and uptime,
+   the master account status, device totals and what Linda is doing now.
+2. **FEATURES** (green): the sub-header with every feature code and its counter.
+3. **INPUT** (yellow): your command or the current question.
+4. **OUTPUT** (cyan): devices plus the conversation report.
+5. **PROCESS VIEWBOARD** (blue bar): logs and processing scroll below it.
+
+On short windows the features and header switch to one line each, and long OUTPUT
+is cut with a `… +N more lines` note.
+
+About 8 seconds after an account logs in, Linda reads its chat list and counts the
+messages in each chat. This is read-only: no messages are sent or marked as read.
+Progress shows in the process area. When the master is online, OUTPUT shows:
+
+- total conversations (people / groups) and unread counts
+- the last conversation: name, time, and a short preview of the last message
+- the most recent chats, each with its message count
+
+Other online accounts get a one-line summary.
+
+Type `convos [phone]` (or `8.11`) to rerun the report and print the full table:
+`#`, chat, messages, in, out, unread and last activity. The `#` numbers match
+`analyze <phone> <#>`. A count like `200+` means the chat reached the per-chat limit.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LINDA_AUTO_CHAT_REPORT` | on | `0` turns off the automatic report after login |
+| `LINDA_CHAT_REPORT_DELAY_MS` | `8000` | wait after login before analyzing |
+| `LINDA_CHAT_REPORT_LIMIT` | `200` | most messages counted per chat (max 5000) |
+| `LINDA_CHAT_REPORT_MAX_CHATS` | `500` | most chats whose messages are counted |
+
 ### Feature IDs, counters and restored tools
 
-Every terminal feature has a fixed ID (`F1`–`F33`) and a usage counter shown in the
-green FEATURES panel and in the summary line. Type `features` for the full list,
-or run any feature by ID: `f11` (list devices), `f7 +9715…` (reactivate a device),
+Every terminal feature also has a fixed legacy ID (`F1`–`F33`) and a usage counter.
+Type `features f` for the F-id list, or run any feature by ID: `f11` (list devices), `f7 +9715…` (reactivate a device),
 `f21 0501234567` (validate a number). Counters persist in
 `data/feature-usage.json` (git-ignored). Features marked `*` were restored from
 the archived project:

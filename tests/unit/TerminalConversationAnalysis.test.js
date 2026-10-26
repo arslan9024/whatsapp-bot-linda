@@ -1,4 +1,6 @@
-import { TerminalConversationAnalysis } from '../../src/terminal/TerminalConversationAnalysis.js';
+import {
+  TerminalConversationAnalysis, conversationReportLines, conversationSummaryLines,
+} from '../../src/terminal/TerminalConversationAnalysis.js';
 
 describe('Explicit local read-only conversation samples', () => {
   const phone = '+15550000001';
@@ -110,5 +112,73 @@ describe('Explicit local read-only conversation samples', () => {
     });
     await expect(analysis.analyze(phone, '1')).rejects.toThrow('connection changed');
     expect(output).not.toHaveBeenCalled();
+  });
+
+  describe('conversation overview report', () => {
+    const chat = (id, name, timestamp, messages, extra = {}) => ({
+      id: { _serialized: id, user: id.split('@')[0] }, name, timestamp,
+      fetchMessages: jest.fn().mockResolvedValue(messages), ...extra,
+    });
+    const msgs = (count, outgoing = 0) => Array.from({ length: count }, (_, i) => ({
+      id: { _serialized: `m${i}` }, fromMe: i < outgoing,
+    }));
+
+    test('counts all chats, messages per chat and finds the last conversation', async () => {
+      client.getChats.mockResolvedValue([
+        chat('old@c.us', 'Old friend', 100, msgs(3, 1)),
+        chat('new@c.us', 'Newest', 300, msgs(5, 2), { unreadCount: 2, lastMessage: { body: 'See you\x1b[2J soon', fromMe: false } }),
+        chat('team@g.us', 'Team', 200, msgs(4), { isGroup: true }),
+        chat('status@broadcast', 'Status', 400, msgs(9)),
+      ]);
+      const progress = jest.fn();
+      const report = await analysis.overview(phone, { onProgress: progress });
+      expect(report).toMatchObject({
+        phone, totalChats: 3, individualChats: 2, groupChats: 1, unreadChats: 1, unreadMessages: 2,
+        countedChats: 3, totalMessages: 12, outgoing: 3, incoming: 9, cappedChats: 0,
+      });
+      expect(report.entries.map(entry => [entry.number, entry.name, entry.messages])).toEqual([
+        [1, 'Newest', 5], [2, 'Team', 4], [3, 'Old friend', 3],
+      ]);
+      expect(report.last.name).toBe('Newest');
+      expect(report.last.lastPreview).not.toContain('\x1b');
+      expect(report.busiest.name).toBe('Newest');
+      expect(progress).toHaveBeenLastCalledWith(3, 3);
+      expect(analysis.getReport(phone.slice(1))).toBe(report);
+      expect(client.sendMessage).not.toHaveBeenCalled();
+      expect(client.sendSeen).not.toHaveBeenCalled();
+
+      const summary = conversationSummaryLines(report, { now: 400 * 1000 }).join('\n');
+      expect(summary).toContain('Conversations: 3 (2 people, 1 groups)');
+      expect(summary).toContain('Last conversation: #1 Newest');
+      expect(summary).toContain('#2 Team 4');
+      const table = conversationReportLines(report).join('\n');
+      expect(table).toContain('CONVERSATION REPORT');
+      expect(table).toMatch(/3 {2}Old friend/);
+    });
+
+    test('marks capped counts, tolerates failing chats, and binds analyze numbers to the report', async () => {
+      const broken = chat('broken@c.us', 'Broken', 50, []);
+      broken.fetchMessages.mockRejectedValue(new Error('boom'));
+      client.getChats.mockResolvedValue([chat('big@c.us', 'Big', 90, msgs(2)), broken]);
+      const report = await analysis.overview(phone, { perChatLimit: 2 });
+      expect(report.entries[0]).toMatchObject({ messages: 2, capped: true });
+      expect(report.entries[1].messages).toBeNull();
+      expect(report).toMatchObject({ countedChats: 1, skippedChats: 1, cappedChats: 1 });
+      expect(conversationSummaryLines(report)[0]).toContain('Messages counted: 2+');
+      client.getChatById.mockResolvedValue({ fetchMessages });
+      await analysis.analyze(phone, '2');
+      expect(client.getChatById).toHaveBeenCalledWith('broken@c.us');
+    });
+
+    test('a disconnect during the report aborts it and stores nothing', async () => {
+      const only = chat('a@c.us', 'A', 1, []);
+      only.fetchMessages.mockImplementation(async () => {
+        managers.get(phone).state = 'DISCONNECTED';
+        return [];
+      });
+      client.getChats.mockResolvedValue([only]);
+      await expect(analysis.overview(phone)).rejects.toThrow('connection changed');
+      expect(analysis.getReport(phone)).toBeNull();
+    });
   });
 });

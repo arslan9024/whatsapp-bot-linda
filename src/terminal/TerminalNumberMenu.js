@@ -17,7 +17,7 @@ export default class TerminalNumberMenu {
     this.root = null;
   }
 
-  refresh() {
+  refresh(show = true) {
     const accounts = this.dashboard.accountConfigManager?.getAllAccounts() || [];
     const devices = this.dashboard.deviceManager?.getAllDevices() || [];
     const commands = registry.getAllCommands();
@@ -75,6 +75,8 @@ export default class TerminalNumberMenu {
           action('Account health by phone', 'health', [phoneField]),
           action('Account metrics by phone', 'stats', [phoneField]),
           action('Recover session by phone', 'recover', [phoneField]),
+          action('Disconnect by phone (keep session)', 'disconnect', [phoneField], { confirm: true }),
+          action('Health of all accounts', 'health'),
         ] },
         { label: 'Link master directly (no saved preference)', children: [
           action('Link with pairing code', 'link-code'),
@@ -105,7 +107,7 @@ export default class TerminalNumberMenu {
           action('Text command help', 'help'),
           action('Exit terminal monitoring', 'quit', [], { confirm: true }),
           action('Campaigns (terminal only; headless sending)', 'campaigns'),
-          action('Feature list with counters (F<id>)', 'features'),
+          action('All features: numbered list with counters', 'features'),
         ] },
         { label: `WhatsApp command catalog (${commands.length}; reference only)`, children: categories.map(category => ({
           label: category,
@@ -131,16 +133,70 @@ export default class TerminalNumberMenu {
           action('Intent of text', 'intent', [field('Text')]),
           action('Compare names/phones', 'similar', [field('Two values separated by |, e.g. Ali Khan | Aly Khan')]),
           action('Find duplicate contacts in file', 'dedupe', [field('CSV/XLSX/JSON file path')]),
+          action('Health score by phone', 'score', [phoneField]),
+          action('List chats by phone', 'chats', [phoneField, field('Page number', '', /^[1-9]\d*$/)]),
+          action('Analyze chat by phone', 'analyze', [
+            phoneField,
+            field('Chat number from the chats list', undefined, /^[1-9]\d*$/),
+            field('Message sample limit (1-500)', '', /^(?:[1-9]\d?|[1-4]\d{2}|500)$/),
+          ]),
+          action('Conversation report (all chats, message counts)', 'convos', [
+            field('Phone (blank = master account)', '', /^\+?[1-9]\d{6,14}$/),
+          ]),
         ] },
       ],
     };
-    const catalogNode = this.root.children[6];
-    const terminalActions = this.root.children.filter(node => node !== catalogNode)
+    this.catalogNode = this.root.children[6];
+    const terminalActions = this.root.children.filter(node => node !== this.catalogNode)
       .reduce((total, node) => total + this.countActions(node), 0);
     this.summary += ` | Terminal actions: ${terminalActions}`;
     this.path = [];
     this.pending = null;
-    this.render();
+    if (show) this.render();
+  }
+
+  /**
+   * Every menu entry with its dotted code (type the code to run it), e.g. `1.13`, `8.2`.
+   * `count(command)` returns a usage counter shown as ×n; the WhatsApp catalog is collapsed.
+   */
+  fullListLines(count = null) {
+    if (!this.root) this.refresh(false);
+    const lines = ['LINDA · ALL FEATURES · type a code (e.g. 8.2) and press Enter', this.summary];
+    const walk = (node, prefix) => node.children.forEach((child, index) => {
+      const codePath = [...prefix, index + 1];
+      const code = codePath.join('.');
+      const pad = '  '.repeat(prefix.length);
+      if (!prefix.length) lines.push('', `[${code}] ${child.label.toUpperCase()}`);
+      if (child === this.catalogNode) {
+        lines.push(`  ${code}.x  ${child.children.length} categories (reference only) - type ${code} to browse`);
+      } else if (child.children) {
+        if (prefix.length) lines.push(`${pad}${code}  ${child.label}`);
+        walk(child, codePath);
+      } else if (child.info) {
+        lines.push(`${pad}${code}  ${child.label} (info)`);
+      } else {
+        const args = child.fields.length ? ` ${child.fields.map(f => f.defaultValue === undefined ? '<…>' : '[…]').join(' ')}` : '';
+        const uses = count ? `  ×${count(child.command)}` : '';
+        lines.push(`${pad}${code}  ${child.label}  → ${child.command}${args}${uses}`);
+      }
+    });
+    walk(this.root, []);
+    lines.push('', 'Type a full code (8.2) or a section number then item number. 0 = back | 00 = home | menu = current level | features = this list');
+    return lines;
+  }
+
+  /** Short `code command ×n` cells for the pinned FEATURES panel (no per-account or catalog entries). */
+  gridCells(count = () => 0) {
+    if (!this.root) this.refresh(false);
+    const cells = [];
+    this.root.children.forEach((section, s) => {
+      if (section === this.catalogNode) return;
+      section.children.forEach((child, i) => {
+        if (child.children || child.info) return;
+        cells.push(`${s + 1}.${i + 1} ${child.command} ×${count(child.command)}`);
+      });
+    });
+    return cells;
   }
 
   nodeAt(path) {
@@ -214,7 +270,7 @@ export default class TerminalNumberMenu {
         this.promptField();
         return { handled: true };
       }
-      if (/\r|\n/.test(value) || (next.pattern && !next.pattern.test(value))) {
+      if (/\r|\n/.test(value) || (value !== '' && next.pattern && !next.pattern.test(value))) {
         this.output(`Invalid value for ${next.label}. Enter a valid single-line value, or 0 to cancel.`);
         return { handled: true };
       }

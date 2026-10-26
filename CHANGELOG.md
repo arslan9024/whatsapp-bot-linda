@@ -13,6 +13,21 @@
 
 ---
 
+## Full terminal UI and conversation report
+
+- The terminal UI now runs top to bottom: HEADER (magenta), FEATURES (green), INPUT (yellow), OUTPUT (cyan), then a blue PROCESS VIEWBOARD bar with the scrolling logs below it.
+- On short windows the header and features compact to one line each, and long OUTPUT is truncated instead of unpinning.
+- After login, Linda analyzes every conversation read-only: total chats, the last conversation, and message counts per chat.
+- When the master is online, the report appears in OUTPUT.
+- New `convos [phone]` command, menu code `8.11` and feature `F34`.
+- Environment variables: `LINDA_AUTO_CHAT_REPORT`, `LINDA_CHAT_REPORT_DELAY_MS`, `LINDA_CHAT_REPORT_LIMIT`, `LINDA_CHAT_REPORT_MAX_CHATS`.
+
+## Full numbered feature list
+
+- Every terminal feature is listed with a dotted code (`1.1`–`8.10`, plus per-account `1.8.N.x`) and a per-action usage counter. Type the code to run it. The list prints at startup, for `features` / `list-all` / `6.5`, and after each command when the panels are not pinned. Set `LINDA_FEATURE_LIST=0` to turn the automatic printing off.
+- New actions: `1.17` disconnect by phone, `1.18` health of all accounts, `8.8` health score by phone, `8.9` list chats by phone, `8.10` analyze chat by phone. Existing codes did not change.
+- The green FEATURES panel now shows `code command ×uses`. Per-action counters are saved in `data/feature-usage.json`. `features f` still lists the legacy F-ids.
+
 ## Restored archive features and feature counters
 
 - Every terminal feature now has an ID (`F1`–`F33`) and a persisted usage counter (`data/feature-usage.json`). They are shown in a new green **FEATURES** panel pinned between OUTPUT and INPUT. Run any feature with `f<id> [args]` or `#<id>`; type `features` for the full list.
