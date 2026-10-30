@@ -49,7 +49,9 @@ function normalizeDigits(value) {
  * @returns {boolean}
  */
 export function isDeviceLinkingRequest(text) {
-  if (typeof text !== 'string') return false;
+  if (typeof text !== 'string') {
+return false;
+}
 
   // Strip emojis, symbols, and extra whitespace
   const cleaned = text
@@ -57,7 +59,9 @@ export function isDeviceLinkingRequest(text) {
     .trim()
     .toLowerCase();
 
-  if (!cleaned) return false;
+  if (!cleaned) {
+return false;
+}
 
   // Direct slash/bang commands or standalone words
   const directCommands = [
@@ -94,7 +98,9 @@ export function isDeviceLinkingRequest(text) {
  * @returns {string}
  */
 export function extractSenderPhone(fromJid) {
-  if (!fromJid || typeof fromJid !== 'string') return '';
+  if (!fromJid || typeof fromJid !== 'string') {
+return '';
+}
   const [userPart] = fromJid.split('@');
   const [cleanPhone] = userPart.split(':');
   const digits = cleanPhone.replace(/\D/g, '');
@@ -145,8 +151,12 @@ export class InboundDeviceLinkingService {
    * @returns {boolean}
    */
   shouldHandle(msg, recipientPhone) {
-    if (!msg || msg.fromMe || msg.isGroupMsg) return false;
-    if (msg.from?.includes('@g.us')) return false;
+    if (!msg || msg.fromMe || msg.isGroupMsg) {
+return false;
+}
+    if (msg.from?.includes('@g.us')) {
+return false;
+}
 
     const { acm } = this.getDependencies();
     const primaryMasterPhone = acm?.getMasterPhoneNumber?.();
@@ -167,7 +177,7 @@ export class InboundDeviceLinkingService {
    * @param {string} recipientPhone - Primary master phone number
    * @returns {Promise<boolean>}
    */
-  async handleMessage(msg, primaryClient = null, recipientPhone = '') {
+  async handleMessage(msg, primaryClient = null, _recipientPhone = '') {
     const senderPhone = extractSenderPhone(msg.from || msg.author);
     if (!senderPhone) {
       this.logBot('Inbound linking request received but unable to parse sender phone', 'warn');
@@ -301,14 +311,18 @@ export class InboundDeviceLinkingService {
 
         newClient.once('code', (code) => {
           codeResolved = true;
-          if (pairingTimer) clearTimeout(pairingTimer);
+          if (pairingTimer) {
+clearTimeout(pairingTimer);
+}
           resolve(code);
         });
 
         newClient.once('auth_failure', (err) => {
           if (!codeResolved) {
             codeResolved = true;
-            if (pairingTimer) clearTimeout(pairingTimer);
+            if (pairingTimer) {
+clearTimeout(pairingTimer);
+}
             reject(new Error(`Authentication failure: ${err?.message || err}`));
           }
         });
@@ -320,7 +334,7 @@ export class InboundDeviceLinkingService {
       }
 
       const flowDeps = typeof this.getFlowDeps === 'function' ? this.getFlowDeps() : {};
-      const connManager = this.setupClientFlow(
+      this.setupClientFlow(
         newClient,
         senderPhone,
         clientId,
@@ -402,7 +416,9 @@ export class InboundDeviceLinkingService {
     } catch {
       const oldClient = clients?.get(phoneNumber);
       if (oldClient) {
-        try { await oldClient.destroy?.(); } catch (_) { /* best effort */ }
+        try {
+ await oldClient.destroy?.(); 
+} catch (_) { /* best effort */ }
         clients?.delete(phoneNumber);
       }
     }
@@ -426,7 +442,9 @@ export class InboundDeviceLinkingService {
     } catch (err) {
       this.logBot(`Failed to deliver WhatsApp message: ${err.message}`, 'warn');
       if (originalMsg && typeof originalMsg.reply === 'function') {
-        try { await originalMsg.reply(text); } catch (_) {}
+        try {
+ await originalMsg.reply(text); 
+} catch (_) {}
       }
     }
   }
