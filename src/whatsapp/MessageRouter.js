@@ -67,6 +67,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
     commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
+    inboundDeviceLinkingService,    // NEW: Phase 32 - Inbound device linking (self-service pairing)
   } = deps;
 
   // ═══ LISTENER CLEANUP (Phase 10) ═══
@@ -174,6 +175,18 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       // ── Master account detection ────────────────────────────────
       const masterPhone = accountConfigManager?.getMasterPhoneNumber();
       const isMasterAccount = phoneNumber === masterPhone;
+
+      // ── Inbound Device Linking (Phase 32) ──────────────────────
+      const linkingService = inboundDeviceLinkingService || services.get('inboundDeviceLinkingService');
+      if (isMasterAccount && linkingService && !msg.fromMe && !msg.from?.includes('@g.us')) {
+        if (linkingService.shouldHandle(msg, phoneNumber)) {
+          const handled = await linkingService.handleMessage(msg, client, phoneNumber);
+          if (handled) {
+            logBot(`📱 Inbound device linking processed from ${maskPhone(msg.from)}`, 'success');
+            return;
+          }
+        }
+      }
 
       // ── WhatsApp Command Bridge (Phase 31) ─────────────────────
       // Intercept "linda <command>" messages from other master accounts

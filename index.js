@@ -90,6 +90,7 @@ import CampaignCommandsDefault from "./src/commands/CampaignCommands.js";
 // Disable auto-linking on startup, require user command instead
 // Includes pre-linking health check and graceful error handling
 import { ManualLinkingHandler } from "./src/linking/ManualLinkingHandler.js";
+import { InboundDeviceLinkingService } from "./src/linking/InboundDeviceLinkingService.js";
 
 // PHASE 26: GORAHA BOT INTEGRATION (February 19, 2026)
 // Contact statistics and Google service account validation
@@ -190,6 +191,7 @@ let reportGenerator = null;  // Multi-format report generation (NEW - Phase 29e)
 let metricsDashboard = null;  // Terminal-based metrics display (NEW - Phase 29e)
 let googleSheetsManager = null;  // Google Sheets CRUD operations (NEW - Phase 30)
 let commandBridge = null;  // WhatsApp Command Bridge (NEW - Phase 31)
+let inboundDeviceLinkingService = null;  // On-demand device self-linking via WhatsApp (Phase 32)
 
 // Feature handlers (ref containers for DI)
 const contactHandlerRef = { current: null };
@@ -289,6 +291,7 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
     commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
+    inboundDeviceLinkingService,    // NEW: Phase 32 - Inbound device linking
   });
   // Conversations started on the phone count toward the new-conversation budget.
   getNewConversationGuard().watch(client, phoneNumber, {
@@ -1030,6 +1033,30 @@ async function initializeBot() {
       if (!bridgeInitialized) {
         logBot("⚠️ WhatsApp Command Bridge failed to initialize; remote WhatsApp commands are unavailable.", "error");
       }
+    }
+    logBot("", "info");
+
+    // ============================================
+    // STEP 9.5: Inbound Device Linking Service (Phase 32)
+    // ============================================
+    if (!inboundDeviceLinkingService) {
+      inboundDeviceLinkingService = new InboundDeviceLinkingService({
+        accountConfigManager,
+        accountClients,
+        createClient: CreatingNewWhatsAppClient,
+        setupClientFlow,
+        getFlowDeps,
+        deviceLinkedManager,
+        sessionStateManager,
+        connectionManagers,
+        clientHealthMonitor,
+        sharedContext,
+        logBot,
+      });
+      services.register('inboundDeviceLinkingService', inboundDeviceLinkingService);
+      sharedContext.inboundDeviceLinkingService = inboundDeviceLinkingService;
+      logBot("✅ Phase 32: Inbound Device Linking Service initialized", "success");
+      logBot("   - Authorized master accounts can link devices via WhatsApp message to Linda", "info");
     }
     logBot("", "info");
 
