@@ -7,19 +7,20 @@
  *
  * Example triggers:
  *   "Hi, Linda, can you add my device please"
+ *   "Hi, Linda, can you add my device 0589969886 please"
  *   "add my device"
  *   "link my device"
- *   "please link my phone"
  *   "!link-code"
  *
  * Flow:
- * 1. Verifies the sender's phone number is authorized in bots-config.json.
- * 2. Checks if device is already active or in progress.
- * 3. Immediately acknowledges receipt to the sender via WhatsApp reply.
- * 4. Initializes a pairing session in 'code' mode for that number.
- * 5. Automatically sends the 8-character pairing code back to the sender
+ * 1. Resolves genuine phone number (handling standard JIDs and WhatsApp Privacy LIDs).
+ * 2. Verifies the sender's phone number is authorized in bots-config.json.
+ * 3. Checks if device is already active or in progress.
+ * 4. Immediately acknowledges receipt to the sender via WhatsApp reply.
+ * 5. Initializes a pairing session in 'code' mode for that number.
+ * 6. Automatically sends the 8-character pairing code back to the sender
  *    via WhatsApp text with simple 6-step linking instructions.
- * 6. Sends a celebration confirmation message once linking succeeds.
+ * 7. Sends a celebration confirmation message once linking succeeds.
  *
  * Operating Lane: Architecture & Reliability / WhatsApp Client & Protocols
  * Governing Laws: Rate-limited dispatch & 24/7 resilience
@@ -32,80 +33,28 @@ import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import { getLiveConnectionState } from '../connection/ConnectionEnhancements.js';
 import { getSessionRecovery } from '../sessions/SessionRecoveryService.js';
+import {
+  normalizeDigits,
+  isDeviceLinkingRequest,
+  extractSenderPhone,
+  extractPhonesFromText,
+  isLidJid,
+  resolveSenderPhone,
+  lidPhoneStore,
+} from './InboundLinkingHelpers.js';
+
+// Re-export helpers for backward compatibility with existing tests and modules
+export {
+  normalizeDigits,
+  isDeviceLinkingRequest,
+  extractSenderPhone,
+  extractPhonesFromText,
+  isLidJid,
+  resolveSenderPhone,
+  lidPhoneStore,
+};
 
 const logger = new Logger('InboundDeviceLinkingService');
-
-/**
- * Normalize a phone number to digits only for fail-safe comparisons.
- */
-function normalizeDigits(value) {
-  return String(value || '').replace(/\D/g, '');
-}
-
-/**
- * Check whether a message text represents a device linking/addition request.
- *
- * @param {string} text
- * @returns {boolean}
- */
-export function isDeviceLinkingRequest(text) {
-  if (typeof text !== 'string') {
-return false;
-}
-
-  // Strip emojis, symbols, and extra whitespace
-  const cleaned = text
-    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-    .trim()
-    .toLowerCase();
-
-  if (!cleaned) {
-return false;
-}
-
-  // Direct slash/bang commands or standalone words
-  const directCommands = [
-    '!link-code', '!link-device', '!add-device', '!link', '!pair', '!code',
-    '/link', '/pair', '/code', 'code', 'link', 'pair'
-  ];
-  if (directCommands.includes(cleaned)) {
-    return true;
-  }
-
-  // Exact command prefixes
-  if (/^linda\b.*?\b(?:add|link|pair|code)\b/i.test(cleaned)) {
-    return true;
-  }
-
-  // Conversational phrases matching:
-  // (add | link | pair | connect | register | share) AND (device | phone | number | account | mobile | code | me)
-  const actionMatch = /\b(add|link|pair|connect|register|share|give|send)\b/i.test(cleaned);
-  const targetMatch = /\b(device|phone|number|account|mobile|code|me)\b/i.test(cleaned);
-
-  if (actionMatch && (targetMatch || cleaned.includes('linda'))) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Extract clean E.164 phone number from a WhatsApp JID.
- * E.g. "971589969886@c.us" -> "+971589969886"
- * E.g. "971589969886:14@c.us" -> "+971589969886"
- *
- * @param {string} fromJid
- * @returns {string}
- */
-export function extractSenderPhone(fromJid) {
-  if (!fromJid || typeof fromJid !== 'string') {
-return '';
-}
-  const [userPart] = fromJid.split('@');
-  const [cleanPhone] = userPart.split(':');
-  const digits = cleanPhone.replace(/\D/g, '');
-  return digits ? `+${digits}` : '';
-}
 
 export class InboundDeviceLinkingService {
   constructor(deps = {}) {
@@ -119,6 +68,7 @@ export class InboundDeviceLinkingService {
     this.connectionManagers = deps.connectionManagers || null;
     this.clientHealthMonitor = deps.clientHealthMonitor || null;
     this.sharedContext = deps.sharedContext || null;
+    this.lidPhoneMap = deps.lidPhoneMap || lidPhoneStore;
     this.logBot = deps.logBot || ((msg, level = 'info') => {
       if (typeof logger[level] === 'function') {
         logger[level](msg);
@@ -152,11 +102,11 @@ export class InboundDeviceLinkingService {
    */
   shouldHandle(msg, recipientPhone) {
     if (!msg || msg.fromMe || msg.isGroupMsg) {
-return false;
-}
+      return false;
+    }
     if (msg.from?.includes('@g.us')) {
-return false;
-}
+      return false;
+    }
 
     const { acm } = this.getDependencies();
     const primaryMasterPhone = acm?.getMasterPhoneNumber?.();
@@ -174,17 +124,36 @@ return false;
    *
    * @param {object} msg - Incoming WhatsApp message object
    * @param {object} primaryClient - Primary master WhatsApp client instance
-   * @param {string} recipientPhone - Primary master phone number
+   * @param {string} _recipientPhone - Primary master phone number
    * @returns {Promise<boolean>}
    */
   async handleMessage(msg, primaryClient = null, _recipientPhone = '') {
-    const senderPhone = extractSenderPhone(msg.from || msg.author);
+    const { acm, clients, connManagers, ssm, dlm, chm } = this.getDependencies();
+
+    // Resolve sender phone, intelligently resolving WhatsApp Privacy IDs (LIDs)
+    const resolved = await resolveSenderPhone(msg, primaryClient, acm, this.lidPhoneMap);
+    const senderPhone = resolved.phone;
+
+    // Handle Unresolved WhatsApp Privacy ID (LID)
+    if (!senderPhone && resolved.isLid) {
+      this.logBot(`Inbound linking received from unmapped WhatsApp LID: +${resolved.lidDigits}`, 'warn');
+      await this.sendWhatsAppMessage(
+        msg.from,
+        `🔒 *WhatsApp Privacy ID Detected*\n\n` +
+        `Linda received your message via WhatsApp Privacy Addressing (ID: +${resolved.lidDigits}).\n\n` +
+        `To link your device, please reply with your registered phone number, for example:\n` +
+        `👉 *"Hi Linda, please add my device 0589969886"*`,
+        primaryClient,
+        msg
+      );
+      return true;
+    }
+
     if (!senderPhone) {
       this.logBot('Inbound linking request received but unable to parse sender phone', 'warn');
       return false;
     }
 
-    const { acm, clients, connManagers, ssm, dlm, chm } = this.getDependencies();
     if (!acm) {
       this.logBot('Inbound linking: AccountConfigManager unavailable', 'error');
       await this.sendWhatsAppMessage(senderPhone, '⚠️ Configuration manager unavailable. Please try again later.', primaryClient, msg);
@@ -312,8 +281,8 @@ return false;
         newClient.once('code', (code) => {
           codeResolved = true;
           if (pairingTimer) {
-clearTimeout(pairingTimer);
-}
+            clearTimeout(pairingTimer);
+          }
           resolve(code);
         });
 
@@ -321,8 +290,8 @@ clearTimeout(pairingTimer);
           if (!codeResolved) {
             codeResolved = true;
             if (pairingTimer) {
-clearTimeout(pairingTimer);
-}
+              clearTimeout(pairingTimer);
+            }
             reject(new Error(`Authentication failure: ${err?.message || err}`));
           }
         });
@@ -417,8 +386,10 @@ clearTimeout(pairingTimer);
       const oldClient = clients?.get(phoneNumber);
       if (oldClient) {
         try {
- await oldClient.destroy?.(); 
-} catch (_) { /* best effort */ }
+          await oldClient.destroy?.();
+        } catch (_) {
+          /* best effort */
+        }
         clients?.delete(phoneNumber);
       }
     }
@@ -428,10 +399,14 @@ clearTimeout(pairingTimer);
   /**
    * Deliver a message to the target phone via originalMsg reply or primaryClient.
    */
-  async sendWhatsAppMessage(toPhone, text, primaryClient, originalMsg) {
-    const chatId = toPhone.includes('@c.us') ? toPhone : `${normalizeDigits(toPhone)}@c.us`;
+  async sendWhatsAppMessage(targetJidOrPhone, text, primaryClient, originalMsg) {
+    const isLid = String(targetJidOrPhone || '').includes('@lid');
+    const chatId = targetJidOrPhone.includes('@')
+      ? targetJidOrPhone
+      : `${normalizeDigits(targetJidOrPhone)}@c.us`;
+
     try {
-      if (primaryClient?.sendMessage) {
+      if (primaryClient?.sendMessage && !isLid) {
         await primaryClient.sendMessage(chatId, text);
         return;
       }
@@ -439,12 +414,18 @@ clearTimeout(pairingTimer);
         await originalMsg.reply(text);
         return;
       }
+      if (primaryClient?.sendMessage) {
+        await primaryClient.sendMessage(chatId, text);
+        return;
+      }
     } catch (err) {
       this.logBot(`Failed to deliver WhatsApp message: ${err.message}`, 'warn');
       if (originalMsg && typeof originalMsg.reply === 'function') {
         try {
- await originalMsg.reply(text); 
-} catch (_) {}
+          await originalMsg.reply(text);
+        } catch (_) {
+          /* best effort */
+        }
       }
     }
   }

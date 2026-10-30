@@ -18,6 +18,9 @@ import {
   InboundDeviceLinkingService,
   isDeviceLinkingRequest,
   extractSenderPhone,
+  extractPhonesFromText,
+  isLidJid,
+  resolveSenderPhone,
 } from '../../src/linking/InboundDeviceLinkingService.js';
 
 describe('InboundDeviceLinkingService', () => {
@@ -322,6 +325,90 @@ describe('InboundDeviceLinkingService', () => {
         expect.stringContaining('timed out')
       );
       expect(service.activeRequests.has('+971589969886')).toBe(false);
+    });
+
+    it('resolves sender phone automatically from WhatsApp LID via client.getContactLidAndPhone', async () => {
+      const msg = {
+        from: '91702450733229@lid',
+        body: 'Hi, Linda, can you add my device please',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const mockClientWithLid = {
+        sendMessage: jest.fn().mockResolvedValue(true),
+        getContactLidAndPhone: jest.fn().mockResolvedValue([{ pn: '971589969886@c.us' }]),
+      };
+
+      const handlePromise = service.handleMessage(msg, mockClientWithLid, '+971505760056');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      mockCreatedClient.emit('code', 'TEST-9999');
+      const result = await handlePromise;
+
+      expect(result).toBe(true);
+      expect(mockClientWithLid.sendMessage).toHaveBeenCalledWith(
+        '971589969886@c.us',
+        expect.stringContaining('TEST-9999')
+      );
+    });
+
+    it('resolves sender phone from message body when received via unmapped WhatsApp LID', async () => {
+      const msg = {
+        from: '91702450733229@lid',
+        body: 'Hi Linda, can you add my device 0589969886 please',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const mockClientNoLidSupport = {
+        sendMessage: jest.fn().mockResolvedValue(true),
+      };
+
+      const handlePromise = service.handleMessage(msg, mockClientNoLidSupport, '+971505760056');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      mockCreatedClient.emit('code', 'BODY-5678');
+      const result = await handlePromise;
+
+      expect(result).toBe(true);
+      expect(mockClientNoLidSupport.sendMessage).toHaveBeenCalledWith(
+        '971589969886@c.us',
+        expect.stringContaining('BODY-5678')
+      );
+    });
+
+    it('prompts user with guidance when message is from unmapped LID without phone number', async () => {
+      const msg = {
+        from: '91709999999999@lid',
+        body: 'add my device',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const result = await service.handleMessage(msg, mockPrimaryClient, '+971505760056');
+      expect(result).toBe(true);
+      expect(msg.reply).toHaveBeenCalledWith(
+        expect.stringContaining('WhatsApp Privacy ID Detected')
+      );
+    });
+  });
+
+  describe('InboundLinkingHelpers', () => {
+    it('detects WhatsApp LIDs accurately', () => {
+      expect(isLidJid('91702450733229@lid')).toBe(true);
+      expect(isLidJid('91702450733229')).toBe(true);
+      expect(isLidJid('971589969886@c.us')).toBe(false);
+      expect(isLidJid('0589969886')).toBe(false);
+    });
+
+    it('extracts UAE phone numbers from arbitrary text strings', () => {
+      expect(extractPhonesFromText('Hi Linda add 0589969886 please')).toEqual(['+971589969886']);
+      expect(extractPhonesFromText('link +971589969886 now')).toEqual(['+971589969886']);
+      expect(extractPhonesFromText('device 971589969886')).toEqual(['+971589969886']);
+      expect(extractPhonesFromText('no phone in this message')).toEqual([]);
+    });
+
+    it('resolves direct phone JID without LID processing', async () => {
+      const msg = { from: '971589969886@c.us' };
+      const res = await resolveSenderPhone(msg);
+      expect(res.phone).toBe('+971589969886');
+      expect(res.isLid).toBe(false);
     });
   });
 });

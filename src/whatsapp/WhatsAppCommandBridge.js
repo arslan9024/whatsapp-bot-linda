@@ -1023,7 +1023,11 @@ Diagnostics:
     const acm = this.accountConfigManager || services.get('accountConfigManager');
     if (!acm?.getAllAccounts || !acm?.getMasterPhoneNumber) return false;
 
-    const sender = this.normalizePhone(senderJid);
+    let sender = this.normalizePhone(senderJid);
+    const lidStore = services.get('lidPhoneStore');
+    if (lidStore?.has(sender)) {
+      sender = this.normalizePhone(lidStore.get(sender));
+    }
     const master = this.normalizePhone(acm.getMasterPhoneNumber());
     if (!sender || !master) return false;
     if (sender === master) return false;
