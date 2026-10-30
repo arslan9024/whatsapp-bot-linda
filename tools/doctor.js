@@ -151,7 +151,12 @@ function checkCommandBridgeGuard() {
     fail(5, 'CommandBridge session-aware guard', 'File not found');
     return;
   }
-  const src = fs.readFileSync(filePath, 'utf8');
+  // Bridge logic is split across src/whatsapp/bridge/*.js - scan the entry file and its modules.
+  const bridgeDir = r('src/whatsapp/bridge');
+  const moduleFiles = fs.existsSync(bridgeDir)
+    ? fs.readdirSync(bridgeDir).filter(f => f.endsWith('.js')).map(f => path.join(bridgeDir, f))
+    : [];
+  const src = [filePath, ...moduleFiles].map(f => fs.readFileSync(f, 'utf8')).join('\n');
   if (src.includes('hasSessionArtifacts')) {
     pass(5, 'CommandBridge session-aware guard', 'hasSessionArtifacts() guard present ✓');
   } else {
