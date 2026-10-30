@@ -11,7 +11,7 @@ echo.
 
 REM Kill any existing Node/Chrome processes
 echo [CLEANUP] Terminating existing Node.js and Chrome processes...
-taskkill /F /IM node.exe >nul 2>&1
+REM node.exe is never killed (Production Law #1)
 taskkill /F /IM chrome.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
@@ -54,7 +54,7 @@ echo.
 REM Clear old sessions
 echo [CLEANUP] Checking for old sessions...
 if exist "sessions\" (
-    rmdir /s /q "sessions" >nul 2>&1
+    REM rmdir /s /q "sessions" disabled: Sessions Are Sacred (Production Law #6)
     echo   ✓ Old sessions cleared
 ) else (
     echo   ℹ No old sessions found

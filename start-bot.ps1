@@ -8,7 +8,7 @@ Write-Host ""
 
 # Kill any existing Node/Chrome processes
 Write-Host "🧹 Cleaning up existing processes..." -ForegroundColor Yellow
-Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force 2>$null
+# node.exe is never killed (Production Law #1)
 Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force 2>$null
 Start-Sleep -Milliseconds 1000
 
@@ -50,7 +50,7 @@ Write-Host ""
 # Clear old sessions
 Write-Host "🔄 Checking for old sessions..." -ForegroundColor Yellow
 if (Test-Path "sessions") {
-    Remove-Item "sessions" -Recurse -Force -ErrorAction SilentlyContinue
+    # Remove-Item "sessions" disabled: Sessions Are Sacred (Production Law #6)
     Write-Host "   ✅ Old sessions cleared" -ForegroundColor Green
 } else {
     Write-Host "   ℹ️  No old sessions found" -ForegroundColor Gray
