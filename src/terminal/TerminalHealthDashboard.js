@@ -590,9 +590,10 @@ class TerminalHealthDashboard {
               controller.abort();
               reject(new Error(timeoutText));
             }, 120000);
+            let settled = false;
             const controller = new AbortController();
             rl.once('close', onClose);
-            rl.question(
+            const q = rl.question(
               prompt,
               { signal: controller.signal },
               (input) => {
@@ -601,6 +602,7 @@ class TerminalHealthDashboard {
                 resolve(input.trim().toLowerCase());
               }
             );
+            if (q && typeof q.catch === 'function') q.catch(() => {});
           });
           if (Object.hasOwn(choices, answer)) {
             return choices[answer];

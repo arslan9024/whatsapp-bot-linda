@@ -272,7 +272,14 @@ export class WhatsAppCommandBridge {
         return relink(masterPhone);
       }
       const choose = this.terminalHealthDashboard?.selectMasterActivation;
-      const action = choose ? await choose.call(this.terminalHealthDashboard, masterPhone) : 'reconnect';
+      let action = 'reconnect';
+      if (choose) {
+        try {
+          action = await choose.call(this.terminalHealthDashboard, masterPhone);
+        } catch {
+          action = 'reconnect';
+        }
+      }
       if (action !== 'reconnect') return relink(masterPhone, action);
       if (!callbacks.onRestoreAccount) return relink(masterPhone);
       try {

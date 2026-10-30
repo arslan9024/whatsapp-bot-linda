@@ -36,6 +36,8 @@ const NON_CRITICAL_ERROR_PATTERNS = [
   'net::ERR_',           // network blips
   'ECONNRESET',
   'ETIMEDOUT',
+  'readline was closed',
+  'terminal closed',
 ];
 
 /**
