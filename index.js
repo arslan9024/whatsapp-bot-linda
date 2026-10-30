@@ -600,7 +600,12 @@ async function initializeBot() {
     logBot("🔗 PHASE 21: MANUAL LINKING MODE ENABLED", "info");
     logBot("═══════════════════════════════════════════════════════════\n", "info");
     
-    logBot("⚠️  Auto-linking DISABLED - accounts will NOT link automatically", "warn");
+    const autoLinkEnabled = process.env.AUTO_LINK !== 'false';
+    if (autoLinkEnabled) {
+      logBot("✅ Auto-linking ENABLED - master account will link automatically if not restored", "success");
+    } else {
+      logBot("⚠️  Auto-linking DISABLED - accounts will NOT link automatically", "warn");
+    }
     logBot("✅ Manual linking enabled - user must request to link accounts", "success");
     
     // Pre-register all devices in tracking system (without linking)
@@ -663,7 +668,34 @@ async function initializeBot() {
         logBot(`⚠️  Automatic session recovery could not load ${restoreResult.failed} account(s)`, "warn");
         logBot("   Saved profiles are retained; check the recovery errors and dashboard", "info");
       } else {
-        logBot("ℹ️  No previous sessions to restore - manual linking required", "info");
+        logBot(autoLinkEnabled ? "ℹ️  No previous sessions to restore - initiating auto-linking..." : "ℹ️  No previous sessions to restore - manual linking required", "info");
+      }
+
+      if (autoLinkEnabled && (!restoreResult || restoreResult.restored === 0)) {
+        if (!manualLinkingHandler) {
+          manualLinkingHandler = new ManualLinkingHandler({
+            logBot,
+            bootstrapManager,
+            recoveryManager,
+            sessionStateManager,
+            deviceLinkedManager,
+            accountConfigManager,
+            connectionManagers,
+            accountClients,
+            clientHealthMonitor,
+            terminalHealthDashboard,
+            createDeviceStatusFile,
+            sharedContext,
+            getFlowDeps,
+          });
+          services.register('manualLinkingHandler', manualLinkingHandler);
+          sharedContext.manualLinkingHandler = manualLinkingHandler;
+        }
+        const method = process.env.AUTO_LINK_METHOD || 'qr';
+        logBot(`🚀 Auto-linking: Automatically initiating ${method.toUpperCase()} linking for master account...`, "info");
+        manualLinkingHandler.initiateMasterAccountLinking(method).catch(err => {
+          logBot(`⚠️ Auto-linking attempt: ${err.message}`, "warn");
+        });
       }
       
       logBot("", "info");
@@ -778,7 +810,9 @@ async function initializeBot() {
     }
 
     logBot("", "info");
-    logBot("⏳ Waiting for user command to initiate linking...", "info");
+    if (!autoLinkEnabled && accountClients.size === 0) {
+      logBot("⏳ Waiting for user command to initiate linking ('link master')...", "info");
+    }
     logBot("", "info");
     
     // Initialize Manual Linking Handler
