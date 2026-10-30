@@ -5,16 +5,17 @@
  * Enables registered master WhatsApp accounts to self-link on demand
  * by sending an inbound message to Linda (the primary master bot).
  *
- * Example trigger:
+ * Example triggers:
  *   "Hi, Linda, can you add my device please"
  *   "add my device"
  *   "link my device"
+ *   "please link my phone"
  *   "!link-code"
  *
  * Flow:
  * 1. Verifies the sender's phone number is authorized in bots-config.json.
  * 2. Checks if device is already active or in progress.
- * 3. Immediately acknowledges receipt to the sender.
+ * 3. Immediately acknowledges receipt to the sender via WhatsApp reply.
  * 4. Initializes a pairing session in 'code' mode for that number.
  * 5. Automatically sends the 8-character pairing code back to the sender
  *    via WhatsApp text with simple 6-step linking instructions.
@@ -35,6 +36,13 @@ import { getSessionRecovery } from '../sessions/SessionRecoveryService.js';
 const logger = new Logger('InboundDeviceLinkingService');
 
 /**
+ * Normalize a phone number to digits only for fail-safe comparisons.
+ */
+function normalizeDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/**
  * Check whether a message text represents a device linking/addition request.
  *
  * @param {string} text
@@ -42,25 +50,39 @@ const logger = new Logger('InboundDeviceLinkingService');
  */
 export function isDeviceLinkingRequest(text) {
   if (typeof text !== 'string') return false;
-  const cleaned = text.trim().toLowerCase();
+
+  // Strip emojis, symbols, and extra whitespace
+  const cleaned = text
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .trim()
+    .toLowerCase();
+
   if (!cleaned) return false;
 
-  // Direct slash/bang commands
-  if (['!link-code', '!link-device', '!add-device', '!link', '!pair', '/link', '/pair'].includes(cleaned)) {
+  // Direct slash/bang commands or standalone words
+  const directCommands = [
+    '!link-code', '!link-device', '!add-device', '!link', '!pair', '!code',
+    '/link', '/pair', '/code', 'code', 'link', 'pair'
+  ];
+  if (directCommands.includes(cleaned)) {
     return true;
   }
 
   // Exact command prefixes
-  if (/^linda\s+(?:add|link|pair)\s+(?:my\s+)?device/i.test(cleaned)) {
+  if (/^linda\b.*?\b(?:add|link|pair|code)\b/i.test(cleaned)) {
     return true;
   }
 
   // Conversational phrases matching:
-  // (add | link | pair | connect | register) AND (device | phone | number | account | mobile)
-  const actionMatch = /\b(add|link|pair|connect|register)\b/i.test(cleaned);
-  const targetMatch = /\b(device|phone|number|account|mobile)\b/i.test(cleaned);
+  // (add | link | pair | connect | register | share) AND (device | phone | number | account | mobile | code | me)
+  const actionMatch = /\b(add|link|pair|connect|register|share|give|send)\b/i.test(cleaned);
+  const targetMatch = /\b(device|phone|number|account|mobile|code|me)\b/i.test(cleaned);
 
-  return actionMatch && targetMatch;
+  if (actionMatch && (targetMatch || cleaned.includes('linda'))) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -128,8 +150,10 @@ export class InboundDeviceLinkingService {
 
     const { acm } = this.getDependencies();
     const primaryMasterPhone = acm?.getMasterPhoneNumber?.();
-    if (recipientPhone && primaryMasterPhone && recipientPhone !== primaryMasterPhone) {
-      return false; // Only primary master processes device additions
+    if (recipientPhone && primaryMasterPhone) {
+      if (normalizeDigits(recipientPhone) !== normalizeDigits(primaryMasterPhone)) {
+        return false; // Only primary master processes device additions
+      }
     }
 
     return isDeviceLinkingRequest(msg.body);
@@ -144,7 +168,7 @@ export class InboundDeviceLinkingService {
    * @returns {Promise<boolean>}
    */
   async handleMessage(msg, primaryClient = null, recipientPhone = '') {
-    const senderPhone = extractSenderPhone(msg.from);
+    const senderPhone = extractSenderPhone(msg.from || msg.author);
     if (!senderPhone) {
       this.logBot('Inbound linking request received but unable to parse sender phone', 'warn');
       return false;
@@ -158,7 +182,10 @@ export class InboundDeviceLinkingService {
     }
 
     // 1. Authorization Check: Must be in bots-config.json
-    const accountConfig = acm.getAccountByPhone(senderPhone);
+    const senderDigits = normalizeDigits(senderPhone);
+    const accountConfig = acm.getAccountByPhone(senderPhone) ||
+      acm.getAllAccounts?.().find(acc => normalizeDigits(acc.phoneNumber) === senderDigits);
+
     if (!accountConfig) {
       this.logBot(`Inbound linking rejected: ${senderPhone} is not a configured master account`, 'warn');
       await this.sendWhatsAppMessage(
@@ -174,7 +201,7 @@ export class InboundDeviceLinkingService {
 
     // 2. Self Check: Primary master cannot link itself via inbound message
     const primaryMasterPhone = acm.getMasterPhoneNumber?.();
-    if (senderPhone === primaryMasterPhone) {
+    if (senderDigits === normalizeDigits(primaryMasterPhone)) {
       await this.sendWhatsAppMessage(
         senderPhone,
         `ℹ️ Primary master (${primaryMasterPhone}) is already online as Linda's active host.`,
@@ -185,7 +212,7 @@ export class InboundDeviceLinkingService {
     }
 
     // 3. Already Active Check
-    const existingClient = clients?.get(senderPhone);
+    const existingClient = clients?.get(senderPhone) || clients?.get(senderDigits);
     if (existingClient) {
       const liveState = await getLiveConnectionState(existingClient).catch(() => null);
       if (liveState === 'CONNECTED') {
@@ -201,12 +228,12 @@ export class InboundDeviceLinkingService {
     }
 
     // 4. Concurrency Guard
-    if (this.activeRequests.has(senderPhone)) {
+    if (this.activeRequests.has(senderPhone) || this.activeRequests.has(senderDigits)) {
       await this.sendWhatsAppMessage(
         senderPhone,
         `⏳ *Pairing in Progress*\n\n` +
         `A pairing code request is already active for your device (${senderPhone}).\n` +
-        `Please check previous messages for your code or wait 60 seconds before retrying.`,
+        `Please check previous messages for your code or wait a minute before retrying.`,
         primaryClient,
         msg
       );
@@ -215,10 +242,11 @@ export class InboundDeviceLinkingService {
 
     // 5. Begin Linking Flow
     this.activeRequests.add(senderPhone);
+    this.activeRequests.add(senderDigits);
     this.logBot(`📲 Inbound linking: Started pairing flow for ${senderPhone} (${accountConfig.displayName || accountConfig.name})`, 'info');
 
     try {
-      // Immediate acknowledgement
+      // Immediate acknowledgement to reassure the user
       await this.sendWhatsAppMessage(
         senderPhone,
         `⏳ *Initiating Device Linking*\n\n` +
@@ -327,6 +355,7 @@ export class InboundDeviceLinkingService {
       // Listen for successful authentication and readiness
       newClient.once('ready', async () => {
         this.activeRequests.delete(senderPhone);
+        this.activeRequests.delete(senderDigits);
         this.logBot(`🎉 Inbound linking: ${senderPhone} successfully linked and online!`, 'success');
 
         const successMessage =
@@ -342,6 +371,7 @@ export class InboundDeviceLinkingService {
       return true;
     } catch (error) {
       this.activeRequests.delete(senderPhone);
+      this.activeRequests.delete(senderDigits);
       this.logBot(`❌ Inbound linking failed for ${senderPhone}: ${error.message}`, 'error');
 
       await this.sendWhatsAppMessage(
@@ -380,21 +410,22 @@ export class InboundDeviceLinkingService {
   }
 
   /**
-   * Deliver a message to the target phone via primaryClient or fallback reply.
+   * Deliver a message to the target phone via originalMsg reply or primaryClient.
    */
   async sendWhatsAppMessage(toPhone, text, primaryClient, originalMsg) {
+    const chatId = toPhone.includes('@c.us') ? toPhone : `${normalizeDigits(toPhone)}@c.us`;
     try {
-      const chatId = toPhone.includes('@c.us') ? toPhone : `${toPhone.replace(/^\+/, '')}@c.us`;
       if (primaryClient?.sendMessage) {
         await primaryClient.sendMessage(chatId, text);
         return;
       }
-      if (originalMsg?.reply) {
+      if (originalMsg && typeof originalMsg.reply === 'function') {
         await originalMsg.reply(text);
+        return;
       }
     } catch (err) {
-      this.logBot(`Failed to deliver WhatsApp message to ${toPhone}: ${err.message}`, 'error');
-      if (originalMsg?.reply) {
+      this.logBot(`Failed to deliver WhatsApp message: ${err.message}`, 'warn');
+      if (originalMsg && typeof originalMsg.reply === 'function') {
         try { await originalMsg.reply(text); } catch (_) {}
       }
     }

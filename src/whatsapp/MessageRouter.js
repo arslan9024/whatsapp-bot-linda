@@ -174,7 +174,8 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
       // ── Master account detection ────────────────────────────────
       const masterPhone = accountConfigManager?.getMasterPhoneNumber();
-      const isMasterAccount = phoneNumber === masterPhone;
+      const normalize = (p) => String(p || '').replace(/\D/g, '');
+      const isMasterAccount = normalize(phoneNumber) === normalize(masterPhone);
 
       // ── Inbound Device Linking (Phase 32) ──────────────────────
       const linkingService = inboundDeviceLinkingService || services.get('inboundDeviceLinkingService');
