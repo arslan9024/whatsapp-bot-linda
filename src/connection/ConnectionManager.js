@@ -218,6 +218,9 @@ export default class ConnectionManager {
     } finally {
       clearTimeout(timer);
       this.isInitializing = false;
+      if (this.authRequired) {
+        this.initializationPending = false;
+      }
       this.cancelInitialization = null;
       client.removeListener('ready', onReady);
       client.removeListener('auth_failure', onAuthFailure);

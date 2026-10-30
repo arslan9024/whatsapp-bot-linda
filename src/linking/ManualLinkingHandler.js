@@ -152,7 +152,15 @@ export class ManualLinkingHandler {
       createClient: CreatingNewWhatsAppClient, accountClients: this.accountClients,
       accountConfigManager: this.accountConfigManager,
     });
-    await recovery.stopAccount(phoneNumber);
+    try {
+      await recovery.stopAccount(phoneNumber);
+    } catch {
+      const oldClient = this.accountClients.get(phoneNumber);
+      if (oldClient) {
+        try { await oldClient.destroy(); } catch {}
+        this.accountClients.delete(phoneNumber);
+      }
+    }
     this.connectionManagers.delete(phoneNumber);
     return true;
   }

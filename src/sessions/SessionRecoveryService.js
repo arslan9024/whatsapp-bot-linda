@@ -61,7 +61,7 @@ export class SessionRecoveryService {
         (manager.isInitializing || manager.isReconnecting)) {
       throw new Error(`Connection already in progress for ${phone}`);
     }
-    if (manager?.initializationPending) {
+    if (manager?.initializationPending && !manager?.authRequired && manager?.state !== 'AUTH_REQUIRED') {
       throw new Error(`Previous browser initialization is still running for ${phone}; refusing a duplicate browser`);
     }
     if (manager) {
