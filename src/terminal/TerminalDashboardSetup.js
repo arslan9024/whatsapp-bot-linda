@@ -152,7 +152,8 @@ export function setupTerminalInputListener(opts) {
         logBot('🔗 Initiating master account linking...', 'info');
         logBot('', 'info');
         
-        const success = await manualLinkingHandler.initiateMasterAccountLinking(linkingMethod);
+        const method = linkingMethod || process.env.AUTO_LINK_METHOD || 'code';
+        const success = await manualLinkingHandler.initiateMasterAccountLinking(method);
         
         if (!success) {
           logBot('', 'info');

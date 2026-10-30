@@ -691,8 +691,8 @@ async function initializeBot() {
           services.register('manualLinkingHandler', manualLinkingHandler);
           sharedContext.manualLinkingHandler = manualLinkingHandler;
         }
-        const method = process.env.AUTO_LINK_METHOD || 'qr';
-        logBot(`🚀 Auto-linking: Automatically initiating ${method.toUpperCase()} linking for master account...`, "info");
+        const method = process.env.AUTO_LINK_METHOD || 'code';
+        logBot(`🚀 Auto-linking: Initiating ${method === 'code' ? 'pairing code' : 'QR code'} linking for master account...`, "info");
         manualLinkingHandler.initiateMasterAccountLinking(method).catch(err => {
           logBot(`⚠️ Auto-linking attempt: ${err.message}`, "warn");
         });
