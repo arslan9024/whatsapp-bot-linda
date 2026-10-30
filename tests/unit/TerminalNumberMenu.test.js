@@ -238,6 +238,8 @@ describe('Counted hierarchical terminal menus', () => {
     expect(text).toContain('[1] DEVICES AND ACCOUNTS');
     expect(text).toContain('2.1  Link with pairing code  → link-code  ×4');
     expect(text).toContain('8.2  Validate a number  → validate <…>  ×0');
+    expect(text).toContain('9.1  Plan a project (existing chat / today / hold)  → outreach <…>  ×0');
+    expect(text).toContain('9.3  New-conversation budget (today / this month)  → outreach budget  ×0');
     expect(text).toContain('1.8.1.8.3  Analyze selected chat');
     expect(text).toContain('7.x');
     expect(text).not.toContain('!');
@@ -251,7 +253,7 @@ describe('Counted hierarchical terminal menus', () => {
 
   test('sections group every code with action and usage counters for the INPUT board', () => {
     const sections = menu.sections(command => (command === 'recover' ? 2 : 0));
-    expect(sections.map(section => section.code)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    expect(sections.map(section => section.code)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
     expect(sections[0].cells).toContain('1.16 recover ×2');
     expect(sections[0].cells).toContain('1.19 restore master ×0');
     expect(sections[0].cells.find(cell => cell.startsWith('1.8 '))).toMatch(/^1\.8 ▸Select account\/device \(\d+\)$/);

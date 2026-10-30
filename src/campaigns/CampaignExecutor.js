@@ -8,6 +8,7 @@ import { SelectingBotForCampaign } from './SelectingBotForCampaign.js';
 import { Logger } from '../core/Logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import ContactConsentService from './ContactConsentService.js';
+import { getNewConversationGuard } from '../outreach/MasterChatDirectory.js';
 
 const logger = new Logger('CampaignExecutor');
 
@@ -30,7 +31,8 @@ const logger = new Logger('CampaignExecutor');
  */
 class CampaignExecutor {
   
-  constructor() {
+  constructor({ newConversationGuard = null } = {}) {
+    this.newConversationGuard = newConversationGuard;
     this.executionId = null;
     this.campaignId = null;
     this.results = {
@@ -179,6 +181,17 @@ class CampaignExecutor {
             logger.warn(`Failed to get contact details: ${error.message}`);
           }
           
+          // Same new-conversation budget as the terminal campaigns, API queue and send command.
+          const allowance = await (this.newConversationGuard || getNewConversationGuard()).reserve({
+            account: accountPhone, client: agent, phone: contact.phone, source: 'legacy-campaign',
+          });
+          if (!allowance.allowed) {
+            this._log(`New-conversation limit: ${allowance.reason}; stopping for today.`);
+            this.results.skippedCount++;
+            this._recordFailure(contact, allowance.reason);
+            break;
+          }
+
           // Personalize message
           const message = this._personalizeMessage(
             messageTemplate.text,

@@ -6,7 +6,7 @@
  * Usage: npm run list-sessions
  */
 
-import 'dotenv/config';
+import '../src/core/loadEnv.js';
 import SessionManager from "../src/sessions/SessionManager.js";
 
 async function main() {

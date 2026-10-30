@@ -19,7 +19,7 @@ const useMemoryServer = process.env.TEST_MONGO_MEMORY === '1';
 const describeWithMongo = process.env.TEST_MONGODB_URI || useMemoryServer ? describe : describe.skip;
 let memoryServer = null;
 
-function fakes({ state = 'CONNECTED', sendResult = { id: { _serialized: 'm1' } }, allowed = true } = {}) {
+function fakes({ state = 'CONNECTED', sendResult = { id: { _serialized: 'm1' } }, allowed = true, budget = { allowed: true, isNew: false } } = {}) {
   const client = {
     getState: jest.fn().mockResolvedValue(state),
     sendMessage: jest.fn().mockImplementation(async () => {
@@ -46,6 +46,7 @@ function fakes({ state = 'CONNECTED', sendResult = { id: { _serialized: 'm1' } }
   };
   const limits = { incrementDailySent: jest.fn().mockResolvedValue({}) };
   const log = jest.fn();
+  const guard = { reserve: jest.fn().mockResolvedValue(budget) };
   const worker = new ApiQueueWorker({
     accountClients: new Map([[MASTER, client]]),
     accountConfigManager: { getMasterPhoneNumber: () => MASTER },
@@ -54,9 +55,41 @@ function fakes({ state = 'CONNECTED', sendResult = { id: { _serialized: 'm1' } }
     workingHours: ALWAYS_OPEN,
     service, rateLimiter, limits,
     isDatabaseReady: () => true,
+    newConversationGuard: guard,
   });
-  return { worker, client, service, rateLimiter, limits, log };
+  return { worker, client, service, rateLimiter, limits, log, guard };
 }
+
+describe('ApiQueueWorker new-conversation budget', () => {
+  const NOW = new Date('2030-01-10T08:00:00Z');
+
+  test('a new conversation over budget is deferred to the next slot without sending', async () => {
+    const retryAt = new Date('2030-01-10T20:00:00Z');
+    const { worker, client, guard } = fakes({
+      budget: { allowed: false, isNew: true, reason: 'daily new-conversation limit reached (2/2)', retryAt },
+    });
+    worker.now = () => NOW;
+    const error = await worker.send(client, MASTER, RECIPIENT, 'hi', { queuedAt: NOW }).catch(e => e);
+    expect(error).toMatchObject({ code: 'DEFERRED', deferUntil: retryAt });
+    expect(guard.reserve).toHaveBeenCalledWith({ account: MASTER, client, phone: '971500000002', source: 'api' });
+    expect(client.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('cancels instead of holding an API message beyond the queue age limit', async () => {
+    const { worker, client } = fakes({
+      budget: { allowed: false, isNew: true, reason: 'monthly new-conversation limit reached (30/30)', retryAt: new Date('2030-02-01T00:00:00Z') },
+    });
+    const error = await worker.send(client, MASTER, RECIPIENT, 'hi', { queuedAt: NOW }).catch(e => e);
+    expect(error.code).toBe('NEW_CONVERSATION_LIMIT');
+    expect(client.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('existing chats send normally', async () => {
+    const { worker, client } = fakes();
+    await worker.send(client, MASTER, RECIPIENT, 'hi');
+    expect(client.sendMessage).toHaveBeenCalledWith('971500000002@c.us', 'hi');
+  });
+});
 
 describe('ApiQueueWorker (unit)', () => {
   test('is off unless explicitly enabled', () => {
@@ -193,6 +226,7 @@ describeWithMongo('API queue persistence (MongoDB)', () => {
       accountConfigManager: { getMasterPhoneNumber: () => MASTER },
       config: { enabled: true, minIntervalMs: 3000, maxIntervalMs: 3000, maxAgeMs: 86400000 },
     workingHours: ALWAYS_OPEN,
+      newConversationGuard: { reserve: async () => ({ allowed: true, isNew: false }) },
     });
 
     await expect(worker.tick()).resolves.toMatchObject({ sent: 1 });

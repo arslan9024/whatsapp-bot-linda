@@ -52,6 +52,7 @@ Rules:
 | M-12 | Local API | `src/api` | — | REST routes (localhost only) |
 | M-13 | Data | `src/database` | — | Mongo models, JSON stores |
 | M-14 | Plans tooling | `tools` | — | `plans:check` |
+| M-15 | Area owner outreach | `src/outreach` | ALG-021 | `OwnerSheetExtractor`, `MasterChatDirectory`, `NewConversationBudget`, `AreaOwnerOutreachPlanner`, `OutreachCommand` |
 
 ## 3. Key design patterns
 | Pattern | Where | Why |

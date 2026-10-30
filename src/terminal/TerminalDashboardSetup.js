@@ -49,6 +49,7 @@ export function setupTerminalInputListener(opts) {
     onOpenCampaigns,
     onCampaignInput,
     isCampaignMenuActive,
+    getCampaignWorkspace,
   } = opts;
 
   try {
@@ -83,6 +84,7 @@ export function setupTerminalInputListener(opts) {
       onCampaigns: onOpenCampaigns,
       onCampaignInput,
       isCampaignMenuActive,
+      getCampaignWorkspace,
       onRestoreAccount: restoreAccount,
       onCheckMaster: async ({ recover = false } = {}) => {
         const phone = accountConfigManager?.getMasterPhoneNumber?.() || terminalHealthDashboard.masterPhoneNumber;

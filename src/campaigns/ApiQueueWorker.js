@@ -11,6 +11,8 @@
  * - Consent is re-checked at send time (CommunicationService.processQueue).
  * - A send that threw after reaching WhatsApp is DELIVERY_UNKNOWN and is never auto-retried.
  * - Messages due longer than maxAgeHours ago are cancelled instead of sent.
+ * - New conversations (no chat yet) use the shared new-conversation budget; over budget the
+ *   message is requeued for the next slot, or cancelled if that slot is beyond maxAgeHours.
  */
 
 import mongoose from 'mongoose';
@@ -18,6 +20,7 @@ import CommunicationService from '../database/services/CommunicationService.js';
 import { campaignRateLimiter } from './CampaignRateLimiter.js';
 import { campaignService } from './CampaignService.js';
 import { workingHoursConfig, isWithinWorkingHours, msUntilWorkingHours, describeWorkingHours } from './WorkingHours.js';
+import { getNewConversationGuard } from '../outreach/MasterChatDirectory.js';
 
 export const API_QUEUE_LIMIT_ID = 'api-queue';
 
@@ -49,16 +52,18 @@ export default class ApiQueueWorker {
     random = Math.random,
     workingHours = workingHoursConfig(),
     now = () => new Date(),
+    newConversationGuard = getNewConversationGuard(),
   }) {
     Object.assign(this, {
       accountClients, accountConfigManager, logBot, config, service,
       rateLimiter, limits, isDatabaseReady, random, workingHours, now,
+      newConversationGuard,
     });
     this.timer = null;
     this.running = false;
     this.inFlight = null;
     this.lastState = null;
-    this.stats = { sent: 0, failed: 0, skipped: 0, expired: 0 };
+    this.stats = { sent: 0, failed: 0, skipped: 0, expired: 0, deferred: 0 };
   }
 
   start() {
@@ -145,30 +150,52 @@ export default class ApiQueueWorker {
     }
 
     const result = await this.service.processQueue(
-      (phone, content) => this.send(client, masterPhone, phone, content),
+      (phone, content, message) => this.send(client, masterPhone, phone, content, message),
       1,
       0,
     );
     if (!result.success) throw new Error(result.error);
-    const { sent, failed, skipped, processed } = result.stats;
+    const { sent, failed, skipped, processed, deferred = 0 } = result.stats;
     this.stats.sent += sent;
     this.stats.failed += failed;
     this.stats.skipped += skipped;
+    this.stats.deferred += deferred;
     if (!processed) {
       this.report('idle', 'API queue worker ready: no due messages.', 'info');
       return { status: 'idle' };
     }
     this.lastState = 'active';
     if (sent) this.logBot(`API queue: message sent via master (${this.stats.sent} this run).`, 'success');
+    if (deferred) this.logBot('API queue: new conversation held by the new-conversation limit; requeued for later.', 'info');
     if (failed) this.logBot('API queue: send failed; marked for manual review (not retried automatically).', 'error');
     return { status: 'processed', ...result.stats };
   }
 
-  async send(client, masterPhone, recipientPhone, content) {
+  async send(client, masterPhone, recipientPhone, content, message = null) {
     const digits = String(recipientPhone || '').replace(/\D/g, '');
     if (digits.length < 8 || digits.length > 15) {
       const error = new Error(`Invalid recipient number: ${recipientPhone}`);
       error.code = 'INVALID_RECIPIENT';
+      throw error;
+    }
+    const budget = await this.newConversationGuard.reserve({
+      account: masterPhone,
+      client,
+      phone: digits,
+      source: 'api',
+    });
+    if (!budget.allowed) {
+      const deferUntil = new Date(budget.retryAt);
+      const dueAt = new Date(message?.scheduledFor || message?.queuedAt || this.now());
+      // Same rule as stale messages: never hold an API request longer than maxAge.
+      const tooLate = deferUntil.getTime() - dueAt.getTime() > this.config.maxAgeMs;
+      const error = new Error(
+        tooLate
+          ? `New-conversation limit: ${budget.reason}; cancelled because the next slot (${deferUntil.toISOString()}) is beyond the queue age limit.`
+          : `New-conversation limit: ${budget.reason}; deferred until ${deferUntil.toISOString()}.`,
+      );
+      error.code = tooLate ? 'NEW_CONVERSATION_LIMIT' : 'DEFERRED';
+      error.deferUntil = deferUntil;
       throw error;
     }
     let result;

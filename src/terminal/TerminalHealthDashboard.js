@@ -24,6 +24,9 @@ import TerminalLayout, { colorize, PANEL_COLORS } from './TerminalLayout.js';
 import FeatureCatalog from './FeatureCatalog.js';
 import TerminalPlaybooks, { PLAYBOOKS } from './TerminalPlaybooks.js';
 import { conversationReportLines, conversationSummaryLines } from './TerminalConversationAnalysis.js';
+import { getNewConversationGuard } from '../outreach/MasterChatDirectory.js';
+import OutreachCommand from '../outreach/OutreachCommand.js';
+import OutreachDailyRunner from '../outreach/OutreachDailyRunner.js';
 import {
   dedupeLines, intentLines, pickClient, scoreLines, sendSingleMessage, sentimentLines, similarLines, validateLines,
 } from './TerminalFeatureCommands.js';
@@ -950,6 +953,38 @@ class TerminalHealthDashboard {
     }
   }
 
+  /** Shared outreach command + daily runner (terminal command and the automatic daily run). */
+  getOutreach(getCampaignWorkspace, onCheckMaster) {
+    if (!this.outreachCommand) {
+      this.outreachCommand = new OutreachCommand({
+        accountClients: this.accountClients,
+        connectionManagers: this.connectionManagers,
+        accountConfigManager: this.accountConfigManager,
+        getWorkspace: getCampaignWorkspace,
+        guard: this.newConversationGuard || getNewConversationGuard(),
+        ask: question => this.queuedChoice(
+          `\n${question}`,
+          { '': 'no', n: 'no', no: 'no', y: 'yes', yes: 'yes' },
+          'Enter y/yes or n/no.',
+          'No answer; skipped.',
+          'Skipped.',
+        ).catch(error => {
+          console.log(`  ${error.message}`);
+          return 'no';
+        }),
+      });
+      this.outreachCommand.daily = new OutreachDailyRunner({
+        command: this.outreachCommand,
+        ensureMaster: onCheckMaster ? () => onCheckMaster({ recover: true }) : null,
+        notify: message => {
+          this.lastNotice = message;
+          this.requestDashboardRefresh?.();
+        },
+      });
+    }
+    return this.outreachCommand;
+  }
+
   /**
    * Start interactive monitoring with user input and auto-refresh
    */
@@ -975,6 +1010,7 @@ class TerminalHealthDashboard {
       onCampaigns,
       onCampaignInput,
       isCampaignMenuActive,
+      getCampaignWorkspace,
       onGorahaStatusRequested,  // NEW: GorahaBot status (Phase 26)
       onGorahaFilterRequested,  // NEW: GorahaBot filter (Phase 28)
       onAnalyticsReportRequested,  // NEW: Analytics reporting (Phase 29e)
@@ -986,6 +1022,13 @@ class TerminalHealthDashboard {
       onGoogleSheetsMetadata,  // NEW: Google Sheets metadata (Phase 30)
     } = callbacks;
     this.isCampaignMenuActive = isCampaignMenuActive;
+
+    // Daily outreach checks itself every few minutes; it only acts when enabled with `outreach auto`.
+    try {
+      this.getOutreach(getCampaignWorkspace, onCheckMaster).daily.start();
+    } catch (error) {
+      console.log(`⚠️  Daily outreach scheduler unavailable: ${error.message}`);
+    }
 
     // Start auto-refresh
     this.startAutoRefresh(() => {
@@ -1164,7 +1207,10 @@ class TerminalHealthDashboard {
             console.log('Send cancelled; nothing was sent.');
             break;
           }
-          const result = await sendSingleMessage(sender.client, number, message);
+          const result = await sendSingleMessage(sender.client, number, message, {
+            guard: this.newConversationGuard || getNewConversationGuard(),
+            account: sender.phone,
+          });
           this.lastNotice = `Sent to ${result.to} from ${sender.phone}`;
           console.log(`✅ Sent to ${result.to} from ${sender.phone}${result.id ? ` (id ${result.id})` : ''}`);
           break;
@@ -1312,6 +1358,14 @@ class TerminalHealthDashboard {
           if (parts.length > 3) throw new Error('Usage: chats [phone] [page]');
           await onListChats(parts[1], parts[2]);
           break;
+
+        case 'outreach': {
+          const plan = await this.getOutreach(getCampaignWorkspace, onCheckMaster).run(parts.slice(1));
+          if (plan?.totals) {
+            this.lastNotice = `Outreach ${plan.projects.join(', ')}: today ${plan.totals.today}, held ${plan.totals.waiting}, existing ${plan.totals.existing}`;
+          }
+          break;
+        }
 
         case 'convos':
         case 'conversations': {
@@ -1898,6 +1952,13 @@ class TerminalHealthDashboard {
           console.log(`    servants                  → Show all servant accounts`);
           console.log(`\n  MESSAGING & INTELLIGENCE (restored):`);
           console.log(`    send <number> <message>   → Send one message from the master (asks to confirm)`);
+          console.log('    outreach <project…>       → Sheet owners of a project: existing chat vs new; today/hold plan under the new-conversation limit');
+          console.log('    outreach projects|budget  → Projects in the owners sheet | new conversations used today/this month (by source)');
+          console.log('    outreach daily [project…] → Daily run now: plan + CSV + sheet status + draft campaign (start it from campaigns)');
+          console.log('    outreach send-today [p…]  → Daily run now: plan + CSV + sheet status + send today\'s verified picks (spaced, in hours)');
+          console.log('    outreach auto draft|send <project…> | auto off | auto → Automatic daily run (once a day, restores master first)');
+          console.log('    outreach changes [p…]     → Owners sheet changes since the previous daily snapshot');
+          console.log('    outreach link [project]   → wa.me link for SMS/email/ads; owner-started chats use no budget');
           console.log(`    validate <number>         → Normalize/validate a number; checks WhatsApp when online`);
           console.log(`    score [+phone]            → Health score 0-100 with trend and recommendations`);
           console.log(`    sentiment <text>          → Sentiment score, label and mood of a text`);

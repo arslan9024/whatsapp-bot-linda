@@ -969,6 +969,7 @@ class CommunicationService {
       let sent = 0;
       let failed = 0;
       let skipped = 0;
+      let deferred = 0;
 
       for (const candidate of candidates) {
         const msg = await CommunicationLog.findOneAndUpdate(
@@ -987,7 +988,7 @@ class CommunicationService {
             continue;
           }
 
-          await sendFn(msg.recipientPhone, msg.content);
+          await sendFn(msg.recipientPhone, msg.content, msg);
           await msg.markSent();
           sent++;
 
@@ -1006,6 +1007,23 @@ class CommunicationService {
             await new Promise(resolve => setTimeout(resolve, delayMs));
           }
         } catch (sendError) {
+          // Nothing was sent: the new-conversation budget holds the message for later.
+          if (sendError.code === 'DEFERRED') {
+            msg.status = 'queued';
+            msg.scheduledFor = sendError.deferUntil;
+            msg.errorMessage = sendError.message;
+            await msg.save();
+            deferred++;
+            continue;
+          }
+          if (sendError.code === 'NEW_CONVERSATION_LIMIT') {
+            msg.status = 'cancelled';
+            msg.errorCode = sendError.code;
+            msg.errorMessage = sendError.message;
+            await msg.save();
+            skipped++;
+            continue;
+          }
           await msg.markFailed(sendError.message, sendError.code || 'QUEUE_SEND_FAILED');
           failed++;
 
@@ -1020,8 +1038,8 @@ class CommunicationService {
 
       return {
         success: true,
-        stats: { processed: candidates.length, sent, failed, skipped },
-        message: `Queue processed: ${sent} sent, ${failed} failed, ${skipped} skipped out of ${candidates.length}`
+        stats: { processed: candidates.length, sent, failed, skipped, deferred },
+        message: `Queue processed: ${sent} sent, ${failed} failed, ${skipped} skipped, ${deferred} deferred out of ${candidates.length}`
       };
     } catch (error) {
       return { success: false, error: error.message };

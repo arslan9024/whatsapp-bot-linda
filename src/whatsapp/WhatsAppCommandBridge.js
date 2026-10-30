@@ -244,7 +244,7 @@ export class WhatsAppCommandBridge {
     const statusApplies = !metadata.clientId || metadata.clientId === clientId;
     const authBlocked = statusApplies && (this.connectionManagers?.get(masterPhone)?.authRequired ||
       ['logged_out', 'auth_failed', 'auth_required'].includes(metadata.status));
-    return metadata.status !== 'paused' && !authBlocked && SessionManager.canRestoreSession(clientId);
+    return metadata.status !== 'paused' && !authBlocked && SessionManager.hasSessionArtifacts(clientId) && SessionManager.canRestoreSession(clientId);
   }
 
   requestPrimaryMasterAuthentication(masterPhone) {

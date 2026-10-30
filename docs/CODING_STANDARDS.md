@@ -48,7 +48,7 @@ module.exports = bar;
 
 ## 3. Logger Over Console
 
-**REQUIREMENT**: Use `logger` from `code/utils/Logger.js` for all production logging.
+**REQUIREMENT**: Use `logger` from `src/core/Logger.js` for all production logging.
 
 ```js
 // ✅ CORRECT

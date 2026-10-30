@@ -138,6 +138,8 @@ coverage/
 Thumbs.db
 .DS_Store
 data/campaign-workspace/
+# Outreach plans (owner phones) and the new-conversation ledger
+data/outreach/
 
 # Feature usage counters (local)
 data/feature-usage.json

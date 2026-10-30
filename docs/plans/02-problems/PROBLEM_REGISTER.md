@@ -27,6 +27,7 @@ without saying how. The how is written in `ALG-nnn` with the same number.
 | PS-018 | Show who to answer next (priority inbox) | future code `8.12` | G-4 | Planned | C3 |
 | PS-019 | Search every chat by words in under a second | future code `8.13` | G-4 | Planned | C3 |
 | PS-020 | Route each incoming message to the right intent handler | `8.5` | G-4 | Partial | C4 |
+| PS-021 | Plan area owner outreach from the owners sheet within the new-conversation limit | `9.1`–`9.3`, `outreach` | G-5 | Implemented | C2 |
 
 ## Problem details
 
@@ -134,3 +135,10 @@ using an incrementally updated inverted index stored on disk.
 **Solved when:** each incoming message gets one intent with a confidence
 score, below a threshold it goes to "unknown" (never guessed), and new
 intents can be added without touching the router.
+
+### PS-021 — Area owner outreach within the new-conversation limit
+**Solved when:** for a chosen project, every owner in the owners sheet
+(Sheet1 plus cluster tabs, deduplicated) is classified as existing
+conversation, new today, new later (with an estimated day) or skipped (with a
+reason). No account ever starts more than the configured new conversations
+per Dubai day (default 2) or month (default 30), whichever path sends.

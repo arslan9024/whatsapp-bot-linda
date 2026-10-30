@@ -102,8 +102,20 @@ export function parseContactFile(name, data) {
   return normalizeRecipients(rows);
 }
 
+/** "Good Morning" / "Good Afternoon" / "Good Evening" for the send moment in the working-hours zone. */
+export function timeOfDayGreeting(now = new Date(), timezone = process.env.WORK_HOURS_TIMEZONE || 'Asia/Dubai') {
+  let hour;
+  try {
+    hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }).format(now));
+  } catch {
+    hour = now.getHours();
+  }
+  return hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+}
+
 export function personalize(template, contact) {
   const values = {
+    greeting: timeOfDayGreeting(),
     ...contact.values,
     name: contact.name,
     phone: contact.phone,
@@ -220,9 +232,11 @@ export default class CampaignWorkspace {
       failed: 0,
       notSent: 0,
       pending: 0,
+      deferred: 0,
       sending: 0,
       unknown: 0,
     };
+    const now = Date.now();
     for (const contact of campaign.contacts) {
       if (contact.deliveryUnknown) {
         counts.unknown++;
@@ -240,6 +254,9 @@ export default class CampaignWorkspace {
         counts.sending++;
       } else {
         counts.pending++;
+        if (contact.deferredUntil > now) {
+          counts.deferred++;
+        }
       }
     }
     return {
@@ -503,7 +520,11 @@ export default class CampaignWorkspace {
   }
 
   async wait(campaign) {
-    const delay = Math.max(0, (campaign.nextSendAt || 0) - Date.now());
+    // setTimeout overflows above ~24.8 days; long waits are re-armed by the run loop.
+    const delay = Math.min(
+      24 * 60 * 60 * 1000,
+      Math.max(0, (campaign.nextSendAt || 0) - Date.now()),
+    );
     if (!delay) {
       return;
     }
@@ -521,14 +542,31 @@ export default class CampaignWorkspace {
 
   async run(campaign) {
     while (campaign.status === 'running') {
-      const contact = campaign.contacts.find(
+      const pending = campaign.contacts.filter(
         item => item.selected && item.status === 'pending',
       );
-      if (!contact) {
+      if (!pending.length) {
         campaign.status = 'completed';
         campaign.updatedAt = new Date().toISOString();
         this.persist();
         return;
+      }
+      const contact = pending.find(
+        item => !(item.deferredUntil > Date.now()),
+      );
+      if (!contact) {
+        // Every remaining recipient waits for the new-conversation budget.
+        const resumeAt = Math.min(...pending.map(item => item.deferredUntil));
+        if (campaign.nextSendAt !== resumeAt) {
+          campaign.nextSendAt = resumeAt;
+          this.persist();
+          this.log(
+            `Campaign "${campaign.name}" waiting: ${pending.length} recipient(s) deferred by the new-conversation limit until ${new Date(resumeAt).toISOString()}.`,
+            'info',
+          );
+        }
+        await this.wait(campaign);
+        continue;
       }
       await this.wait(campaign);
       if (campaign.status !== 'running') {
@@ -553,6 +591,13 @@ export default class CampaignWorkspace {
       if (!permission.allowed) {
         if (permission.pause) {
           throw new Error(permission.reason);
+        }
+        if (permission.defer) {
+          contact.deferredUntil = new Date(permission.retryAt).getTime();
+          contact.reason = permission.reason;
+          campaign.updatedAt = new Date().toISOString();
+          this.persist();
+          continue;
         }
         contact.status = 'not_sent';
         contact.reason = permission.reason;

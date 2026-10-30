@@ -233,7 +233,24 @@ examples and enabled/handler state. Nothing in this section is executed from the
 Conversation analysis is read-only: Linda only fetches chats and messages (`fetchMessages`) from the active session
 and never sends anything while analyzing.
 
-## 5. Feature IDs (F1–F34)
+### 9 · Area owner outreach
+
+| Code | Action | Command |
+|---|---|---|
+| 9.1 | Plan a project: existing chat / new today / hold | `outreach <project…>` (names or abbreviations, e.g. `outreach VARDON`, `outreach JNP SYM`) |
+| 9.2 | Projects in the owners sheet with owner counts | `outreach projects` |
+| 9.3 | New-conversation budget of the master (today / this month) | `outreach budget` |
+
+`outreach <project…>` reads the owners sheet (`OUTREACH_SHEET_ID`: Sheet1 plus every cluster tab, owners merged when
+they share a number), checks the **master's** chat list for each owner (any number with a chat = existing
+conversation), and plans new owners under the new-conversation limit (default 2 per day, 30 per Dubai calendar
+month). Today's picks are verified on WhatsApp. It prints a summary, writes a CSV to `data/outreach/`, and then asks
+(default **no**) whether to create a draft campaign with today's picks and whether to write a `Linda Outreach` status
+column to Sheet1 (needs Editor access for the service account). Planning sends nothing and uses no budget; the draft
+campaign is started from `campaigns` as usual. Run it again each day. The master must be connected (`master ready`).
+Algorithm: [ALG-021](../plans/03-algorithms/ALG-021-area-owner-outreach.md).
+
+## 5. Feature IDs (F1–F35)
 
 Each feature has a stable ID and a usage counter stored in `data/feature-usage.json`. Run one with `f<id>` or
 `#<id>`, followed by arguments when it needs them.
@@ -274,6 +291,7 @@ Each feature has a stable ID and a usage counter stored in `data/feature-usage.j
 | F32 | `help` | Help | System |
 | F33 | `quit` / `exit` | Quit | System |
 | F34 | `convos [+phone]` | Conversation report | Messaging |
+| F35 | `outreach <project…>\|projects\|budget` | Area owner outreach planner | Messaging |
 
 ## 6. Playbooks (p1–p10)
 
@@ -316,7 +334,8 @@ campaign task:
 | 14 | Results filter: All / Failed |
 | 0 / 00 | Back to campaigns / campaigns home |
 
-Safety limits (randomized intervals, 45 messages per account per day, 10 per campaign per day by default) are
+Safety limits (randomized intervals, 45 messages per account per day, 10 per campaign per day by default, and the
+new-conversation limit of 2 per day / 30 per month) are
 described in [ARCHITECTURAL_BOUNDARIES.md §6](./ARCHITECTURAL_BOUNDARIES.md#6-messaging-safety-limits).
 
 ## 8. Keeping the screen short (deduplication)

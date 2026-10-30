@@ -10,6 +10,7 @@ import { campaignService } from './CampaignService.js';
 import { campaignRateLimiter } from './CampaignRateLimiter.js';
 import { workingHoursConfig } from './WorkingHours.js';
 import TerminalCampaignMenu from '../terminal/TerminalCampaignMenu.js';
+import { getNewConversationGuard } from '../outreach/MasterChatDirectory.js';
 
 export function createTerminalCampaigns({
   accountClients,
@@ -17,6 +18,7 @@ export function createTerminalCampaigns({
   accountConfigManager,
   googleSheetsManager,
   logBot,
+  newConversationGuard = getNewConversationGuard(),
 }) {
   const accounts = () => {
     const configured = accountConfigManager?.getAllAccounts() || [];
@@ -80,11 +82,24 @@ export function createTerminalCampaigns({
           reason: `Recipient needs ${messageCount} messages, but only ${remaining} remain in the daily limits.`,
         };
       }
-      return {
-        allowed: limit.allowed,
-        pause: !limit.allowed,
-        reason: limit.reason,
-      };
+      if (!limit.allowed) {
+        return { allowed: false, pause: true, reason: limit.reason };
+      }
+      const budget = await newConversationGuard.reserve({
+        account: campaign.accountPhone,
+        client,
+        phone: contact.phone,
+        source: `campaign:${campaign.id}`,
+      });
+      if (!budget.allowed) {
+        return {
+          allowed: false,
+          defer: true,
+          retryAt: budget.retryAt,
+          reason: `Deferred: ${budget.reason}.`,
+        };
+      }
+      return { allowed: true };
     },
     sendRecipient: async (campaign, contact, text, attachments) => {
       const client = accountClients.get(campaign.accountPhone);

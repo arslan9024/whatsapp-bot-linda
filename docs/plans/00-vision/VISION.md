@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Document | Vision (RUP artifact) |
-| Version | 1.1 — 2026-10-26 |
+| Version | 1.2 — 2026-10-27 |
 | Owner | Arslan Malik (product owner) |
 | Status | Baseline for Inception milestone LCO |
 
@@ -11,6 +11,7 @@
 |---|---|
 | 1.0 | First baseline: keypad-menu idea, goals G-1..G-8, principles, scope, constraints, levels L0–L6 |
 | 1.1 | Added the engine identity and system boundary with the company web app (§1.1, §11), the engine pillars (§12), the sending policy with operator-chosen working hours (§13), the technical baseline (§14), and an honest list of current gaps (§15). Corrected the API size (198 endpoints, 49 models) |
+| 1.2 | Added area owner outreach (§12.6, PS-021) and the new-conversation limit (30 per month, 2 per day, Dubai calendar) to the sending policy (§13) and the gaps (§15) |
 
 ## 1. One sentence
 
@@ -281,6 +282,25 @@ Details: [Architectural boundaries](../../software_docs/ARCHITECTURAL_BOUNDARIES
   direction each conversation went, and build the priority inbox
   (`ALG-009`, `ALG-018`).
 
+### 12.6 Area owner outreach (owners sheet → new conversations)
+
+- The owners sheet (Google Sheets, `OUTREACH_SHEET_ID`) lists property owners
+  per area: Sheet1 plus one tab per cluster. Projects are chosen at run time
+  by name or abbreviation (`outreach VARDON`).
+- Linda extracts the chosen projects' owners and their mobile numbers, merges
+  an owner who appears in several tabs, rejects invalid and landline numbers,
+  and skips owners flagged as do-not-contact.
+- For each owner it checks the **master's** WhatsApp chat list. If any of the
+  owner's numbers already has a chat, the owner is an existing conversation
+  and does not use the new-conversation budget. A new owner is contacted on
+  one number only.
+- The report says who can be contacted **today** (within the remaining
+  budget, verified on WhatsApp), who waits for **tomorrow**, and the
+  estimated day for everyone **later**. Output: terminal summary, CSV, an
+  optional draft campaign with today's picks, and an optional status column
+  in Sheet1. The operator runs it again each day.
+- Algorithm and traceability: [ALG-021](../03-algorithms/ALG-021-area-owner-outreach.md), PS-021, FR-034..FR-037.
+
 ## 13. Sending policy (safety)
 
 Every outgoing message must pass all of these rules.
@@ -290,6 +310,7 @@ Every outgoing message must pass all of these rules.
 | **Working hours** | Messages are sent only between `WORK_HOURS_START` and `WORK_HOURS_END` in `WORK_HOURS_TIMEZONE`. The default is **09:00–20:00 Asia/Dubai**, and the operator chooses the window, e.g. 9 to 20. Outside the window, sending waits until the next opening. Campaigns stay running and can still be paused or stopped | Terminal campaigns, API queue worker, legacy scheduler |
 | Window formats | `9`, `09:30`; the end may be `24`. A start later than the end spans midnight. `0`–`24` means all day. Invalid values fall back to the default and show a warning | All senders (one shared setting) |
 | Daily account cap | 45 messages per account per day, shared by every sender | Terminal campaigns, API queue worker, legacy scheduler |
+| **New conversations** | A message to a number that has no chat with the sending account opens a new conversation. At most **30 per month and 2 per day** per account (Dubai calendar; `NEW_CONVERSATIONS_MONTHLY_LIMIT`, `NEW_CONVERSATIONS_DAILY_LIMIT`). A slot is reserved before sending, so a failed send still counts. Over the limit, the message is deferred to the next day or month, never sent | Terminal campaigns, API queue worker, terminal `send` |
 | Per-campaign cap | 10 messages per campaign per day by default | Campaigns |
 | Random intervals | A random gap between sends: chosen per campaign (3–3600 s); 30–90 s for the API worker | Campaigns, API queue worker |
 | Circuit breaker | 5 failures in 10 minutes pause the account for 5 minutes | All senders |
@@ -322,6 +343,7 @@ is only planned.
 | Automatic master restore after restart | Implemented and unit-tested; live verification on the real master device is in progress |
 | API queue worker (API → WhatsApp delivery) | Implemented, opt-in, unit-tested; not yet live-verified. Text messages only |
 | Working hours for all senders | Implemented and unit-tested; not yet live-verified |
+| Area owner outreach and new-conversation limit | Implemented and unit-tested; dry-run on the real owners sheet (7165 owners). Not yet live-verified against the master chat list. Writing the status column needs Editor access for the service account. Chats started by hand on the phone are not in Linda's ledger; they are detected from the chat list once they contain a message. The legacy scheduler does not check the limit |
 | Legacy campaign scheduler | Older path kept for compatibility; it now uses the shared working hours, and its undefined `CampaignMessageDelayer` reference (which would have crashed it) is fixed. Not live-verified |
 | API media messages, delivery receipts and webhooks | Planned (API-G2..G4 in [Architectural boundaries](../../software_docs/ARCHITECTURAL_BOUNDARIES.md)) |
 | `POST /queue/process` | Returns 501 by design, because the bot's worker does the delivery |

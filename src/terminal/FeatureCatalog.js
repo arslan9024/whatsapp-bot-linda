@@ -50,6 +50,7 @@ export const FEATURES = Object.freeze([
   { id: 32, command: 'help', name: 'Help', category: 'System' },
   { id: 33, command: 'quit', name: 'Quit', category: 'System', aliases: ['exit'] },
   { id: 34, command: 'convos', name: 'Conversation report', category: 'Messaging', usage: 'convos [+phone]', aliases: ['conversations'] },
+  { id: 35, command: 'outreach', name: 'Area owner outreach planner', category: 'Messaging', usage: 'outreach <project…> | outreach projects | outreach budget' },
 ]);
 
 const DEFAULT_FILE = path.join(process.cwd(), 'data', 'feature-usage.json');

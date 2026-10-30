@@ -105,6 +105,10 @@ Verification: **T** = automated test, **D** = demonstration, **I** = inspection.
 | FR-031 | `8.13 search <words>` shall return the chats and messages containing all of the words, ranked, with snippets. | PS-019 | S | T, bench | Planned |
 | FR-032 | Each inbound message shall get one intent with a confidence score. If the confidence is below θ or ambiguous, the message is routed to the human. | PS-020 | M | T | Partial |
 | FR-033 | Intent handlers shall be plugins with `match` and `handle`. A failing or slow handler shall not affect the others. | PS-020 | S | T | Planned |
+| FR-034 | `outreach <project…>` shall extract the selected projects' owners from Sheet1 and all cluster tabs, merge owners sharing a number, reject invalid and landline numbers, and skip do-not-contact owners. | PS-021 | M | T `AreaOwnerOutreach` | Implemented |
+| FR-035 | An owner shall count as an existing conversation if any of their numbers has a chat on the master account or was started by Linda; only new owners consume budget. | PS-021 | M | T | Implemented |
+| FR-036 | New conversations shall be limited per account to `NEW_CONVERSATIONS_DAILY_LIMIT` per day and `NEW_CONVERSATIONS_MONTHLY_LIMIT` per calendar month (Asia/Dubai). Campaign, API and terminal sends over the limit shall be DEFERRED to the next day or month, never sent. | PS-021 | M | T | Implemented |
+| FR-037 | The plan shall list today's picks (verified with `getNumberId`), tomorrow's and later owners with an estimated day, and shall write a CSV, an optional draft campaign with today's picks and an optional status column in Sheet1. | PS-021 | S | T | Implemented |
 
 ### 3.3 Terminal operating system (E2)
 | ID | Requirement | Source | Pri | Verify | Status |

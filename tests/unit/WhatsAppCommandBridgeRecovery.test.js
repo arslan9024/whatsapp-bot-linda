@@ -6,6 +6,7 @@ import services from '../../src/core/ServiceRegistry.js';
 jest.mock('../../src/sessions/SessionManager.js', () => ({
   SessionManager: {
     canRestoreSession: jest.fn(),
+    hasSessionArtifacts: jest.fn(),
     resolveClientId: jest.fn(),
   },
 }));
@@ -33,6 +34,7 @@ describe('Primary master session recovery', () => {
     managers = new Map();
     metadata = { clientId: 'saved-master', status: 'offline' };
     SessionManager.canRestoreSession.mockReturnValue(true);
+    SessionManager.hasSessionArtifacts.mockReturnValue(true);
     SessionManager.resolveClientId.mockReturnValue('saved-master');
     restore = jest.fn().mockResolvedValue(true);
     services.register('terminalCallbacks', { onRestoreAccount: restore });

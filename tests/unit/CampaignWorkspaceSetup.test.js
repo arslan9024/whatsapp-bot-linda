@@ -87,6 +87,34 @@ describe('Headless campaign transport uses existing linked clients', () => {
       },
       googleSheetsManager: null,
       logBot: jest.fn(),
+      newConversationGuard: guard,
+    });
+  });
+
+  const guard = { reserve: jest.fn() };
+  beforeEach(() => {
+    guard.reserve.mockReset().mockResolvedValue({ allowed: true, isNew: false });
+  });
+
+  test('defers a recipient when the new-conversation budget is used', async () => {
+    const retryAt = new Date('2030-01-02T05:00:00Z');
+    guard.reserve.mockResolvedValue({
+      allowed: false,
+      isNew: true,
+      reason: 'daily new-conversation limit reached (2/2)',
+      retryAt,
+    });
+    expect(await menu.workspace.checkRecipient(campaign, contact)).toEqual({
+      allowed: false,
+      defer: true,
+      retryAt,
+      reason: 'Deferred: daily new-conversation limit reached (2/2).',
+    });
+    expect(guard.reserve).toHaveBeenCalledWith({
+      account: phone,
+      client,
+      phone: contact.phone,
+      source: 'campaign:campaign-1',
     });
   });
 

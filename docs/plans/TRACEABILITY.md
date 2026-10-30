@@ -27,6 +27,7 @@ status. `npm run plans:check` fails if a problem in the
 | PS-018 | [ALG-018](03-algorithms/ALG-018-priority-inbox.md) | [FC-018](04-flowcharts/FC-018-priority-inbox.md) | FR-030 | M-09 | — (planned) | 8.12 (planned) | C3 | Planned |
 | PS-019 | [ALG-019](03-algorithms/ALG-019-full-text-search.md) | [FC-019](04-flowcharts/FC-019-full-text-search.md) | FR-031 | M-09 | — (planned) | 8.13 (planned) | C3 | Planned |
 | PS-020 | [ALG-020](03-algorithms/ALG-020-intent-routing.md) | [FC-020](04-flowcharts/FC-020-intent-routing.md) | FR-032, FR-033 | M-09, M-02 | MessageAnalyzerWithContext | 8.5 | C4 | Partial |
+| PS-021 | [ALG-021](03-algorithms/ALG-021-area-owner-outreach.md) | [FC-021](04-flowcharts/FC-021-area-owner-outreach.md) | FR-034, FR-035, FR-036, FR-037 | M-15, M-08, M-12 | AreaOwnerOutreach, CampaignWorkspace, ApiQueueWorker | 9.1–9.3, outreach | C2 | Implemented |
 
 Test names are best-effort mappings of today's suites. When an algorithm
 gap is closed, add a dedicated `ALG-nnn`-focused test and list it here.

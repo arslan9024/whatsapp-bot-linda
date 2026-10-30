@@ -128,6 +128,7 @@ Current limits are **maximums**. Planned adaptive budgets may lower them, never 
 | Opt-out / consent | Campaigns skip opted-out or revoked contacts; the API requires recorded consent, re-checked at send time | `ContactConsentService` |
 | Uncertain delivery | If a send may have happened but was not confirmed, the result is marked "delivery unknown" (`DELIVERY_UNKNOWN`) and never auto-retried | `CampaignWorkspaceSetup.js`, `ApiQueueWorker.js` |
 | Working hours | Messages are sent only inside the operator's window: `WORK_HOURS_START`–`WORK_HOURS_END` in `WORK_HOURS_TIMEZONE` (default 09:00–20:00 Asia/Dubai). Applies to terminal campaigns, the API queue worker and the legacy scheduler. Outside the window, sending waits (campaigns stay pausable); invalid settings fall back to the default with a warning | `src/campaigns/WorkingHours.js` |
+| New conversations | A message to a number with **no existing chat** on the sending account starts a new conversation. These are capped per account at `NEW_CONVERSATIONS_DAILY_LIMIT` (2) per day and `NEW_CONVERSATIONS_MONTHLY_LIMIT` (30) per calendar month in `NEW_CONVERSATIONS_TIMEZONE` (default `WORK_HOURS_TIMEZONE`). Existing chats are found in the account's chat list (never with `getChatById`, which creates a chat). A slot is reserved in the local ledger `data/outreach/new-conversations.json` before sending. Over the limit: campaign contacts are deferred to the next day or month; API messages get `NEW_CONVERSATION_LIMIT` and are rescheduled (or cancelled if past their max age); the terminal `send` refuses. `NEW_CONVERSATIONS_ENFORCE=false` turns enforcement off | `src/outreach/NewConversationBudget.js`, `MasterChatDirectory.js` |
 
 Planned: **adaptive budgets** that lower the daily allowance and widen intervals based on account age, recent
 failures and reply rates, within the caps above.
@@ -140,6 +141,8 @@ failures and reply rates, within the caps above.
 | Device / account metadata | `session-state.json`, `config/` (atomic writes) | No (not tracked in Git) |
 | Conversation analysis results | Bot memory / terminal output | No |
 | Campaign workspace drafts and attachment copies | `data/campaign-workspace/` | No |
+| New-conversation ledger and outreach plan CSVs | `data/outreach/` (not tracked in Git) | No |
+| Owners sheet (outreach source) | Google Sheets (`OUTREACH_SHEET_ID`); read in memory, optional status column written back | Only to Google Sheets |
 | Messaging logs, campaigns, limits, consent, real-estate records | MongoDB (`MONGODB_URI`) | Only to the configured MongoDB server |
 
 ## 8. Intelligence boundary

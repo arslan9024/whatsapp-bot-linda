@@ -30,3 +30,4 @@ Rules:
 | [FC-018](FC-018-priority-inbox.md) | Priority inbox | [ALG-018](../03-algorithms/ALG-018-priority-inbox.md) |
 | [FC-019](FC-019-full-text-search.md) | Full-text search | [ALG-019](../03-algorithms/ALG-019-full-text-search.md) |
 | [FC-020](FC-020-intent-routing.md) | Intent routing | [ALG-020](../03-algorithms/ALG-020-intent-routing.md) |
+| [FC-021](FC-021-area-owner-outreach.md) | Area owner outreach | [ALG-021](../03-algorithms/ALG-021-area-owner-outreach.md) |

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// cspell:words AKIA pousr wwebjs
 /**
  * Secret scanner (Node port of archive/scripts/scan-secrets.ps1).
  *
@@ -44,9 +45,13 @@ export function mask(text) {
 export function scanText(text, file = '') {
   const findings = [];
   text.split(/\r?\n/).forEach((line, index) => {
-    if (line.length > 2000) return;
+    if (line.length > 2000) {
+      return;
+    }
     for (const [name, pattern] of SECRET_PATTERNS) {
-      if (pattern.test(line)) findings.push({ file, line: index + 1, type: name, preview: mask(line) });
+      if (pattern.test(line)) {
+        findings.push({ file, line: index + 1, type: name, preview: mask(line) });
+      }
     }
   });
   return findings;
@@ -63,9 +68,14 @@ function listFiles(root, staged) {
     const walk = dir => {
       for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
         const rel = path.join(dir, entry.name);
-        if (SKIP_DIRS.test(rel)) continue;
-        if (entry.isDirectory()) walk(rel);
-        else files.push(rel);
+        if (SKIP_DIRS.test(rel)) {
+          continue;
+        }
+        if (entry.isDirectory()) {
+          walk(rel);
+        } else {
+          files.push(rel);
+        }
       }
     };
     walk('.');
@@ -75,7 +85,9 @@ function listFiles(root, staged) {
 
 function isScannable(file) {
   const base = path.basename(file).toLowerCase();
-  if (SKIP_DIRS.test(file) || base === 'package-lock.json' || base.endsWith('.example') || base.endsWith('.sample')) return false;
+  if (SKIP_DIRS.test(file) || base === 'package-lock.json' || base.endsWith('.example') || base.endsWith('.sample')) {
+    return false;
+  }
   return base.startsWith('.env') || TEXT_EXTENSIONS.has(path.extname(base));
 }
 
@@ -85,8 +97,14 @@ export function scan(root = process.cwd(), { staged = false } = {}) {
   for (const file of listFiles(root, staged).filter(isScannable)) {
     const full = path.join(root, file);
     let stat;
-    try { stat = fs.statSync(full); } catch { continue; }
-    if (!stat.isFile() || stat.size > MAX_BYTES) continue;
+    try {
+      stat = fs.statSync(full);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.size > MAX_BYTES) {
+      continue;
+    }
     scanned++;
     findings.push(...scanText(fs.readFileSync(full, 'utf8'), file.replace(/\\/g, '/')));
   }
@@ -99,12 +117,18 @@ if (isMain) {
   const { scanned, findings } = scan(process.cwd(), { staged });
   console.log(`Secret scan: ${scanned} files${staged ? ' (staged)' : ''} | findings: ${findings.length}`);
   const byType = new Map();
-  for (const finding of findings) byType.set(finding.type, (byType.get(finding.type) || 0) + 1);
-  for (const [type, count] of byType) console.log(`  ${type}: ${count}`);
+  for (const finding of findings) {
+    byType.set(finding.type, (byType.get(finding.type) || 0) + 1);
+  }
+  for (const [type, count] of byType) {
+    console.log(`  ${type}: ${count}`);
+  }
   findings.slice(0, 50).forEach((finding, index) => {
     console.log(`  ${index + 1}. ${finding.file}:${finding.line} [${finding.type}] ${finding.preview}`);
   });
-  if (findings.length > 50) console.log(`  ...and ${findings.length - 50} more`);
+  if (findings.length > 50) {
+    console.log(`  ...and ${findings.length - 50} more`);
+  }
   if (findings.length) {
     console.log('\nMove these values to .env (ignored by git) and rotate any credential that was ever pushed.');
     process.exitCode = 1;

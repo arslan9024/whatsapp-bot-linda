@@ -147,6 +147,33 @@ export default class TerminalNumberMenu {
             field('Phone (blank = master account)', '', /^\+?[1-9]\d{6,14}$/),
           ]),
         ] },
+        { label: 'Area owner outreach (owners sheet, new-conversation plan)', children: [
+          action('Plan a project (existing chat / today / hold)', 'outreach', [
+            field('Project name(s) or abbreviation, e.g. VARDON or JNP SYM'),
+          ]),
+          action('Owners sheet projects (owner counts)', 'outreach projects'),
+          action('New-conversation budget (today / this month)', 'outreach budget'),
+          action('Daily run now: plan + sheet status + draft campaign', 'outreach daily', [
+            field('Project name(s), e.g. VARDON (empty = saved daily projects)', ''),
+          ]),
+          action('Daily run now: plan + sheet status + send today\'s picks', 'outreach send-today', [
+            field('Project name(s), e.g. VARDON (empty = saved daily projects)', ''),
+          ]),
+          action('Automatic daily run: status', 'outreach auto'),
+          action('Automatic daily run: draft mode', 'outreach auto draft', [
+            field('Project name(s), e.g. VARDON'),
+          ]),
+          action('Automatic daily run: send mode', 'outreach auto send', [
+            field('Project name(s), e.g. VARDON'),
+          ]),
+          action('Automatic daily run: off', 'outreach auto off'),
+          action('Owners sheet changes since the last snapshot', 'outreach changes', [
+            field('Project name(s) (empty = whole sheet)', ''),
+          ]),
+          action('Inbound wa.me link (owner messages first, no budget used)', 'outreach link', [
+            field('Project name (optional)', ''),
+          ]),
+        ] },
       ],
     };
     this.catalogNode = this.root.children[6];

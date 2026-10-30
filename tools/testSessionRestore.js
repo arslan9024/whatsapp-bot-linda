@@ -18,7 +18,7 @@ function testSessionRestore() {
   console.log('╚════════════════════════════════════════════════════════════╝\n');
 
   const masterNumber = process.env.BOT_MASTER_NUMBER || '971505760056';
-  const sessionsPath = path.join(__dirname, 'sessions');
+  const sessionsPath = path.join(__dirname, '..', 'sessions');
   const sessionPath = path.join(sessionsPath, `session-${masterNumber}`);
   const deviceStatusFile = path.join(sessionPath, 'device-status.json');
   const sessionHistoryFile = path.join(sessionPath, 'session-history.json');
@@ -111,7 +111,7 @@ function testSessionRestore() {
   console.log('───────────────────────────────');
 
   try {
-    const indexContent = fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8');
+    const indexContent = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
     
     // Check for required imports
     if (indexContent.includes('import SessionRestoreHandler')) {

@@ -158,13 +158,27 @@ export function pickClient(accountClients, connectionManagers, preferredPhone) {
   return null;
 }
 
-/** Send one text message after the caller has confirmed it. */
-export async function sendSingleMessage(client, number, message) {
+/**
+ * Send one text message after the caller has confirmed it.
+ * With `guard`, a recipient without an existing chat uses the new-conversation budget.
+ */
+export async function sendSingleMessage(client, number, message, { guard = null, account = null } = {}) {
   const normalized = normalizePhone(number);
   if (!normalized.isValid) throw new Error(`Invalid number: ${number}`);
   const digits = normalized.formatted.slice(1);
   const id = client.getNumberId ? await client.getNumberId(digits) : { _serialized: `${digits}@c.us` };
   if (!id) throw new Error(`${normalized.formatted} is not on WhatsApp.`);
+  if (guard) {
+    const budget = await guard.reserve({ account, client, phone: digits, source: 'terminal' });
+    if (!budget.allowed) {
+      const error = new Error(
+        `Not sent: ${budget.reason}. ${normalized.formatted} has no chat yet; next slot ${new Date(budget.retryAt).toLocaleString('en-GB')}.`,
+      );
+      error.code = 'NEW_CONVERSATION_LIMIT';
+      error.retryAt = budget.retryAt;
+      throw error;
+    }
+  }
   const sent = await client.sendMessage(id._serialized, message);
   return { to: normalized.formatted, id: sent?.id?._serialized || sent?.id?.id || null };
 }

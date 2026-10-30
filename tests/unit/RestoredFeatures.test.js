@@ -92,4 +92,20 @@ describe('single message helpers', () => {
     client.getNumberId.mockResolvedValue(null);
     await expect(sendSingleMessage(client, '0501234567', 'hi')).rejects.toThrow(/not on WhatsApp/);
   });
+
+  test('sendSingleMessage blocks a new conversation over the budget without sending', async () => {
+    const client = {
+      getNumberId: jest.fn().mockResolvedValue({ _serialized: '971501234567@c.us' }),
+      sendMessage: jest.fn(),
+    };
+    const guard = {
+      reserve: jest.fn().mockResolvedValue({
+        allowed: false, isNew: true, reason: 'daily new-conversation limit reached (2/2)', retryAt: new Date('2030-01-02T00:00:00Z'),
+      }),
+    };
+    await expect(sendSingleMessage(client, '0501234567', 'hi', { guard, account: '+971500000001' }))
+      .rejects.toMatchObject({ code: 'NEW_CONVERSATION_LIMIT' });
+    expect(guard.reserve).toHaveBeenCalledWith({ account: '+971500000001', client, phone: '971501234567', source: 'terminal' });
+    expect(client.sendMessage).not.toHaveBeenCalled();
+  });
 });

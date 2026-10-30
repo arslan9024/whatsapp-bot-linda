@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './src/core/loadEnv.js';
 import { CreatingNewWhatsAppClient } from "./src/whatsapp/CreatingNewWhatsAppClient.js";
 import { createDeviceStatusFile, updateDeviceStatus } from "./src/linking/deviceStatus.js";
 import { SessionStateManager } from "./src/sessions/SessionStateManager.js";
@@ -71,6 +71,7 @@ import { initializeDatabase } from "./src/core/DatabaseInitializer.js";
 // PHASE 13: Feature initializers & terminal setup
 import { initializeAdvancedFeatures, initializeAutoRecovery, initializePhase1Services } from "./src/core/FeatureInitializer.js";
 import { setupTerminalInputListener } from "./src/terminal/TerminalDashboardSetup.js";
+import { initLinkingAndCredentialManagers, initResilienceAndAnalyticsManagers } from "./src/core/BotBootstrap.js";
 
 // PHASE 17: Comprehensive Conversation Handling (February 16, 2026)
 import { phase17Orchestrator } from "./src/core/Phase17Orchestrator.js";
@@ -122,6 +123,7 @@ import MetricsDashboard from "./src/analytics/MetricsDashboard.js";
 import GoogleSheetsManager from "./src/integrations/google/GoogleSheetsManager.js";  // NEW: Phase 30 - Google Sheets CRUD
 import { createTerminalCampaigns } from "./src/campaigns/CampaignWorkspaceSetup.js";
 import ApiQueueWorker from "./src/campaigns/ApiQueueWorker.js";
+import { getNewConversationGuard } from "./src/outreach/MasterChatDirectory.js";
 
 // PHASE 31: WHATSAPP COMMAND BRIDGE (February 21, 2026)
 // Allows master accounts to send "linda <command>" messages to primary master
@@ -285,6 +287,14 @@ function setupMessageListeners(client, phoneNumber, connManager) {
     reportGenerator,                // NEW: Phase 29e - Report generation
     metricsDashboard,               // NEW: Phase 29e - Metrics display
     commandBridge,                  // NEW: Phase 31 - WhatsApp Command Bridge
+  });
+  // Conversations started on the phone count toward the new-conversation budget.
+  getNewConversationGuard().watch(client, phoneNumber, {
+    onRecorded: ({ phone, usage }) => logBot(
+      `New conversation started on the phone of ${phoneNumber} (…${String(phone).slice(-4)}); ` +
+      `budget today ${usage.usedToday}/${usage.dailyLimit}, month ${usage.usedMonth}/${usage.monthlyLimit}`,
+      'info',
+    ),
   });
 }
 
@@ -911,12 +921,16 @@ async function initializeBot() {
     // ============================================
     setupTerminalInputListener({
       onOpenCampaigns: async () => {
-        if (!terminalCampaigns) {
-          terminalCampaigns = createTerminalCampaigns({
-            accountClients, connectionManagers, accountConfigManager, googleSheetsManager, logBot,
-          });
-        }
+        terminalCampaigns ||= createTerminalCampaigns({
+          accountClients, connectionManagers, accountConfigManager, googleSheetsManager, logBot,
+        });
         terminalCampaigns.open();
+      },
+      getCampaignWorkspace: () => {
+        terminalCampaigns ||= createTerminalCampaigns({
+          accountClients, connectionManagers, accountConfigManager, googleSheetsManager, logBot,
+        });
+        return terminalCampaigns.workspace;
       },
       onCampaignInput: input => terminalCampaigns?.handleInput(input) ?? false,
       isCampaignMenuActive: () => terminalCampaigns?.active === true,

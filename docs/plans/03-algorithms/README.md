@@ -29,6 +29,7 @@ and verification. New files start from the
 | [ALG-018](ALG-018-priority-inbox.md) | Priority inbox | Scoring with exponential decay, top-k min-heap | O(C log k) |
 | [ALG-019](ALG-019-full-text-search.md) | Full-text search | Incremental inverted index, posting-list intersection, BM25 | O(Σ postings) |
 | [ALG-020](ALG-020-intent-routing.md) | Intent routing | Plugin classifiers, argmax with a confidence threshold | O(H·L) |
+| [ALG-021](ALG-021-area-owner-outreach.md) | Area owner outreach | Union-find owner merge, chat-directory lookup, day/month budget ledger | O(R·k + C + N log N) |
 
 ## How every algorithm is written
 
