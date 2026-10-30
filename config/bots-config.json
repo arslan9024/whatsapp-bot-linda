@@ -37,6 +37,291 @@
       "status": "pending",
       "createdAt": "2026-02-18",
       "lastSync": null
+    },
+    "master_971589969886": {
+      "id": "master_971589969886",
+      "phoneNumber": "+971589969886",
+      "displayName": "Master 971589969886",
+      "description": "Master Account - +971589969886",
+      "role": "primary",
+      "sessionPath": "sessions/session-971589969886",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971503869886": {
+      "id": "master_971503869886",
+      "phoneNumber": "+971503869886",
+      "displayName": "Master 971503869886",
+      "description": "Master Account - +971503869886",
+      "role": "primary",
+      "sessionPath": "sessions/session-971503869886",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971509079196": {
+      "id": "master_971509079196",
+      "phoneNumber": "+971509079196",
+      "displayName": "Master 971509079196",
+      "description": "Master Account - +971509079196",
+      "role": "primary",
+      "sessionPath": "sessions/session-971509079196",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971509570067": {
+      "id": "master_971509570067",
+      "phoneNumber": "+971509570067",
+      "displayName": "Master 971509570067",
+      "description": "Master Account - +971509570067",
+      "role": "primary",
+      "sessionPath": "sessions/session-971509570067",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971582178440": {
+      "id": "master_971582178440",
+      "phoneNumber": "+971582178440",
+      "displayName": "Master 971582178440",
+      "description": "Master Account - +971582178440",
+      "role": "primary",
+      "sessionPath": "sessions/session-971582178440",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971569288983": {
+      "id": "master_971569288983",
+      "phoneNumber": "+971569288983",
+      "displayName": "Master 971569288983",
+      "description": "Master Account - +971569288983",
+      "role": "primary",
+      "sessionPath": "sessions/session-971569288983",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971502039886": {
+      "id": "master_971502039886",
+      "phoneNumber": "+971502039886",
+      "displayName": "Master 971502039886",
+      "description": "Master Account - +971502039886",
+      "role": "primary",
+      "sessionPath": "sessions/session-971502039886",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971585259886": {
+      "id": "master_971585259886",
+      "phoneNumber": "+971585259886",
+      "displayName": "Master 971585259886",
+      "description": "Master Account - +971585259886",
+      "role": "primary",
+      "sessionPath": "sessions/session-971585259886",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971563616136": {
+      "id": "master_971563616136",
+      "phoneNumber": "+971563616136",
+      "displayName": "Master 971563616136",
+      "description": "Master Account - +971563616136",
+      "role": "primary",
+      "sessionPath": "sessions/session-971563616136",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971567160096": {
+      "id": "master_971567160096",
+      "phoneNumber": "+971567160096",
+      "displayName": "Master 971567160096",
+      "description": "Master Account - +971567160096",
+      "role": "primary",
+      "sessionPath": "sessions/session-971567160096",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971589750428": {
+      "id": "master_971589750428",
+      "phoneNumber": "+971589750428",
+      "displayName": "Master 971589750428",
+      "description": "Master Account - +971589750428",
+      "role": "primary",
+      "sessionPath": "sessions/session-971589750428",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971505036476": {
+      "id": "master_971505036476",
+      "phoneNumber": "+971505036476",
+      "displayName": "Master 971505036476",
+      "description": "Master Account - +971505036476",
+      "role": "primary",
+      "sessionPath": "sessions/session-971505036476",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971559156636": {
+      "id": "master_971559156636",
+      "phoneNumber": "+971559156636",
+      "displayName": "Master 971559156636",
+      "description": "Master Account - +971559156636",
+      "role": "primary",
+      "sessionPath": "sessions/session-971559156636",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971551900559": {
+      "id": "master_971551900559",
+      "phoneNumber": "+971551900559",
+      "displayName": "Master 971551900559",
+      "description": "Master Account - +971551900559",
+      "role": "primary",
+      "sessionPath": "sessions/session-971551900559",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
+    },
+    "master_971551105099": {
+      "id": "master_971551105099",
+      "phoneNumber": "+971551105099",
+      "displayName": "Master 971551105099",
+      "description": "Master Account - +971551105099",
+      "role": "primary",
+      "sessionPath": "sessions/session-971551105099",
+      "enabled": true,
+      "features": {
+        "messaging": true,
+        "contacts": true,
+        "campaigns": true,
+        "analytics": true,
+        "scheduling": true
+      },
+      "status": "pending",
+      "createdAt": "2026-10-30",
+      "lastSync": null
     }
   },
   "default": "arslan-malik",
@@ -44,12 +329,12 @@
   "version": "2.0",
   "format": "Dynamic WhatsApp Bot Accounts Registry",
   "metadata": {
-    "totalBots": 1,
+    "totalBots": 17,
     "activeBots": 0,
-    "pendingBots": 1,
-    "lastModified": "2026-02-11T00:00:00Z",
+    "pendingBots": 17,
+    "lastModified": "2026-10-30T16:50:00Z",
     "managedBy": "DynamicAccountManager",
-    "notes": "Master account only. Secondary accounts added dynamically via WhatsApp commands: /add-account <phone> <name>"
+    "notes": "Configured multi-master bot accounts."
   },
   "capabilities": {
     "multi-account": true,

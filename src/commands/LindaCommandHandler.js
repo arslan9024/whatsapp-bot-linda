@@ -320,9 +320,16 @@ export class LindaCommandHandler {
 
   async handleDirectLink({ msg, cmdInfo }) {
     const sender = msg.from?.endsWith('@g.us') ? msg.author : msg.from;
-    const masterPhone = services.get('accountConfigManager')?.getMasterPhoneNumber()?.replace(/^\+/, '');
-    let authorized = msg.fromMe === true || Boolean(masterPhone &&
-      [`${masterPhone}@c.us`, `${masterPhone}@s.whatsapp.net`].includes(sender));
+    const acm = services.get('accountConfigManager');
+    const masterPhones = (acm?.getAllMasterAccounts?.() || [])
+      .map(acc => acc.phoneNumber?.replace(/^\+/, ''))
+      .filter(Boolean);
+    if (!masterPhones.length) {
+      const single = acm?.getMasterPhoneNumber()?.replace(/^\+/, '');
+      if (single) masterPhones.push(single);
+    }
+    const masterJids = masterPhones.flatMap(p => [`${p}@c.us`, `${p}@s.whatsapp.net`]);
+    let authorized = msg.fromMe === true || masterJids.includes(sender);
 
     if (!authorized && msg.from?.endsWith('@g.us')) {
       const chat = await msg.getChat();
