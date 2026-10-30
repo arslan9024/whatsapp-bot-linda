@@ -129,6 +129,7 @@ import { getNewConversationGuard } from "./src/outreach/MasterChatDirectory.js";
 // Allows master accounts to send "linda <command>" messages to primary master
 // for remote command execution with console output capture
 import { WhatsAppCommandBridge } from "./src/whatsapp/WhatsAppCommandBridge.js";
+import DailyMasterGreetingService from "./src/services/DailyMasterGreetingService.js";
 
 // Global bot instances and managers (24/7 Production)
 let Lion0 = null; // Master account (backwards compatibility)
@@ -168,6 +169,7 @@ let gorahaServicesBridge = null;  // GorahaBot contact stats + account validatio
 // PHASE 27: Auto-Session Restore Manager (February 19, 2026)
 // Automatically restores WhatsApp sessions on server restart
 let autoSessionRestoreManager = null;  // Auto-restore manager (NEW - Phase 27)
+let dailyMasterGreetingService = null;  // Daily Dubai Master Greetings Scheduler
 
 // PHASE 29c: Auto-Relinking & Connection Monitoring (February 19, 2026)
 // Auto-relink all accounts and monitor real-time connection status
@@ -926,6 +928,21 @@ async function initializeBot() {
     }
 
     // ============================================
+    // ============================================
+    // STEP 6.5D: Initialize Daily Master Greetings (Dubai Time)
+    // ============================================
+    if (!dailyMasterGreetingService) {
+      dailyMasterGreetingService = new DailyMasterGreetingService({
+        accountConfigManager,
+        accountClients,
+        sharedContext,
+        logBot,
+      });
+      dailyMasterGreetingService.start();
+      services.register("dailyMasterGreetingService", dailyMasterGreetingService);
+      logBot("✅ Daily Master Greeting Service initialized (Dubai Time: 09:00 AM GST)", "success");
+    }
+
     // STEP 6.6: Initialize Phase 1 Services (Phase 13 — extracted)
     // ============================================
     initializePhase1Services(logBot);

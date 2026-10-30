@@ -54,6 +54,8 @@ export class LindaCommandHandler {
     this.registerHandler('link-method', this.handleLinkMethod.bind(this));
     this.registerHandler('link-code', this.handleDirectLink.bind(this));
     this.registerHandler('link-qr', this.handleDirectLink.bind(this));
+    this.registerHandler('greetings', this.handleDailyGreetings.bind(this));
+    this.registerHandler('greet-masters', this.handleDailyGreetings.bind(this));
     
     // Learning Commands
     this.registerHandler('learn', this.handleLearn.bind(this));
@@ -434,6 +436,21 @@ export class LindaCommandHandler {
   // ═══════════════════════════════════════════════════════════════════════════
   // BUILT-IN COMMAND HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  async handleDailyGreetings({ msg }) {
+    const greetingService = services.get('dailyMasterGreetingService');
+    if (!greetingService) {
+      await msg.reply('⚠️ Daily Master Greeting Service is not available.');
+      return;
+    }
+    await msg.reply('🌅 Initiating daily Dubai greetings to all master accounts...');
+    const result = await greetingService.sendGreetingsNow({ source: 'command' });
+    if (result.success) {
+      await msg.reply(`✅ Daily greetings completed: ${result.sentCount}/${result.total} master accounts received greetings.`);
+    } else {
+      await msg.reply(`⚠️ Could not send daily greetings: ${result.reason || 'Unknown error'}`);
+    }
+  }
 
   async handlePing({ msg }) {
     await msg.reply('🏓 pong!');

@@ -90,6 +90,8 @@ export function createGracefulShutdown(deps) {
       if (sessionCleanupManager) sessionCleanupManager.stop();
       if (browserProcessMonitor) browserProcessMonitor.stop();
       if (lockFileDetector) lockFileDetector.stop();
+      const greetingService = services.get("dailyMasterGreetingService");
+      if (greetingService?.stop) greetingService.stop();
 
       // 0A. Stop health monitoring
       if (accountHealthMonitor) {

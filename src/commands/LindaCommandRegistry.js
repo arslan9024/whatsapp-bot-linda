@@ -138,7 +138,21 @@ export class LindaCommandRegistry {
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // CATEGORY 2: GOOGLE CONTACTS MANAGEMENT (via GorahaBot)
+    this.registerCommand({
+      name: "greetings",
+      category: "whatsapp",
+      description: "Send daily Dubai morning greetings to all master accounts",
+      usage: "!greetings",
+      examples: [
+        "!greetings",
+        "!greet-masters"
+      ],
+      requiresAuth: true,
+      handler: "DailyGreetingsHandler",
+      helpText: "Triggers daily Dubai greetings from the primary master to all configured master accounts."
+    });
+
+        // CATEGORY 2: GOOGLE CONTACTS MANAGEMENT (via GorahaBot)
     // ════════════════════════════════════════════════════════════════════════
     
     this.registerCommand({
