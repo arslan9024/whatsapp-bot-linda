@@ -114,3 +114,4 @@ describe('DailyMasterGreetingService', () => {
     expect(service.getStatus().isRunning).toBe(false);
   });
 });
+

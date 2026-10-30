@@ -32,7 +32,17 @@ export default class AutoSessionRestoreManager {
       }),
       setupClientFlow, createClient, accountClients,
     });
-    for (const [phoneNumber, account] of Object.entries(accounts)) {
+    const masterPhone = getFlowDeps().sharedContext?.accountConfigManager?.getMasterPhoneNumber?.() ||
+      sessionStateManager.state?.masterPhoneNumber;
+    const entries = Object.entries(accounts);
+    if (masterPhone) {
+      entries.sort(([phoneA], [phoneB]) => {
+        if (phoneA === masterPhone) return -1;
+        if (phoneB === masterPhone) return 1;
+        return 0;
+      });
+    }
+    for (const [phoneNumber, account] of entries) {
       if (configured.find(config => config.phoneNumber === phoneNumber)?.enabled === false) continue;
       try {
         await recovery.recover(phoneNumber, { source: 'startup' });
