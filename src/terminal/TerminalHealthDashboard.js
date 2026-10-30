@@ -723,7 +723,7 @@ class TerminalHealthDashboard {
       );
       // A full re-pin clears the log area, so put the prompt back.
       if (result === 'repinned' && this.isMonitoring && !this.commandRunning && !this.isSelectingLinkingMethod) {
-        this.rl?.prompt(true);
+        this.safePrompt(true);
       }
       return;
     }
@@ -990,6 +990,16 @@ class TerminalHealthDashboard {
   /**
    * Start interactive monitoring with user input and auto-refresh
    */
+  safePrompt(preserve = false) {
+    try {
+      if (this.isMonitoring && this.rl && !this.rl.closed) {
+        this.rl.prompt(preserve);
+      }
+    } catch (_) {
+      // Safely ignore if readline interface was closed
+    }
+  }
+
   async startInteractiveMonitoring(callbacks = {}) {
     this.initializeInput();
     this.isMonitoring = true;
@@ -1059,7 +1069,7 @@ class TerminalHealthDashboard {
         } finally {
           this.commandRunning = false;
           if (!this.isCampaignMenuActive()) this.refreshDashboard(true);
-          this.rl.prompt();
+          this.safePrompt();
         }
         return;
       }
@@ -1067,7 +1077,7 @@ class TerminalHealthDashboard {
         const play = this.playbooks.resolve(input);
         if (play?.lines) {
           for (const line of play.lines) console.log(line);
-          if (this.isMonitoring) this.rl.prompt();
+          this.safePrompt();
           return;
         }
         if (play) {
@@ -1079,7 +1089,7 @@ class TerminalHealthDashboard {
       const shortcut = this.features.resolve(input);
       if (shortcut?.error) {
         console.log(shortcut.error);
-        if (this.isMonitoring) this.rl.prompt();
+        this.safePrompt();
         return;
       }
       if (shortcut) input = shortcut.command;
@@ -1093,9 +1103,7 @@ class TerminalHealthDashboard {
             this.features.recordInput('menu');
             this.renderInputPanel();
           }
-          if (this.isMonitoring) {
-            this.rl.prompt();
-          }
+          this.safePrompt();
           return;
         }
       } catch (error) {
@@ -2014,7 +2022,7 @@ class TerminalHealthDashboard {
         }
       }
       if (this.isMonitoring && !this.isSelectingLinkingMethod) {
-        this.rl.prompt();
+        this.safePrompt();
       }
     });
 
@@ -2039,7 +2047,7 @@ class TerminalHealthDashboard {
     }
     if (this.autoFeatureList) this.printFeatureList();
     console.log(COMMAND_HINT);
-    this.rl.prompt();
+    this.safePrompt();
   }
 
   /**

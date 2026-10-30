@@ -286,6 +286,10 @@ export class WhatsAppCommandBridge {
         await callbacks.onRestoreAccount(masterPhone);
       } catch (error) {
         this.logBot(`Reconnect failed: ${error.message}`, 'warn');
+        if (/already in progress/i.test(error.message)) {
+          this.logBot('Primary master connection is already in progress; waiting for it to complete.', 'info');
+          return undefined;
+        }
       }
       if (await this.isPrimaryMasterConnected(masterPhone)) {
         botActive = true;

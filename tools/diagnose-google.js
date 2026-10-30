@@ -10,7 +10,7 @@
  *   npm run doctor:google -- --offline   # structure only, no network call
  */
 
-import 'dotenv/config';
+import '../src/core/loadEnv.js';
 import GoogleServiceAccountManager from '../src/integrations/google/GoogleServiceAccountManager.js';
 
 const offline = process.argv.includes('--offline');

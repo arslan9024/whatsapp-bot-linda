@@ -21,8 +21,11 @@ export async function initializeDatabase(logBot) {
 
   try {
     const AKOYA_SHEET_ID = process.env.AKOYA_ORGANIZED_SHEET_ID;
+    const isSheetConfigured = AKOYA_SHEET_ID &&
+      !AKOYA_SHEET_ID.startsWith('your_') &&
+      AKOYA_SHEET_ID.trim().length > 10;
 
-    if (AKOYA_SHEET_ID) {
+    if (isSheetConfigured) {
       try {
         const { quickValidateSheet } = await import('../integrations/google/sheetValidation.js');
         const sheetValid = await quickValidateSheet(AKOYA_SHEET_ID);
