@@ -198,14 +198,25 @@ export function setupTerminalInputListener(opts) {
           
           logBot(`  No existing session found - choose pairing code or QR code`, 'info');
 
-          logBot(`  [2/5] Adding to configuration...`, 'info');
-          const addResult = await accountConfigManager.addMasterAccount(phoneNumber, displayName);
-          if (!addResult.success) {
-            logBot(`  ❌ Failed to add account: ${addResult.error}`, 'error');
-            logBot('', 'info');
-            return;
+          const existingAccount = accountConfigManager.getAccountByPhone(phoneNumber);
+          if (existingAccount) {
+            displayName = (displayName && displayName !== phoneNumber) ? displayName : (existingAccount.displayName || phoneNumber);
+            logBot(`  [2/5] Account already in configuration: ${existingAccount.displayName || displayName}`, 'info');
+          } else {
+            logBot(`  [2/5] Adding to configuration...`, 'info');
+            const addResult = await accountConfigManager.addMasterAccount(phoneNumber, displayName);
+            if (!addResult.success) {
+              if (addResult.error?.includes('already in use')) {
+                logBot(`  ℹ️ Account already in configuration: ${displayName}`, 'info');
+              } else {
+                logBot(`  ❌ Failed to add account: ${addResult.error}`, 'error');
+                logBot('', 'info');
+                return;
+              }
+            } else {
+              logBot(`  ✅ Account added to config`, 'info');
+            }
           }
-          logBot(`  ✅ Account added to config`, 'info');
 
           logBot(`  [3/5] Register in device manager...`, 'info');
           if (deviceLinkedManager) {
@@ -218,12 +229,13 @@ export function setupTerminalInputListener(opts) {
           logBot(`  ✅ Registered in device tracker`, 'info');
 
           logBot(`  [4/5] Creating WhatsApp client...`, 'info');
+          await stopAccountClient(phoneNumber);
           const newClient = await createClient(savedClientId(phoneNumber));
           accountClients.set(phoneNumber, newClient);
           logBot(`  ✅ Client created`, 'info');
 
           logBot(`  [5/5] Choose a device linking method...`, 'info');
-          const flow = setupClientFlow(newClient, phoneNumber, 'master', { isRestore: false }, getFlowDeps());
+          const flow = setupClientFlow(newClient, phoneNumber, savedClientId(phoneNumber), { isRestore: false, displayName }, getFlowDeps());
 
           if (deviceLinkedManager) {
             deviceLinkedManager.startLinkingAttempt(phoneNumber);
