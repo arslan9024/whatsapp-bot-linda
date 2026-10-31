@@ -103,8 +103,13 @@ export async function sendHumanizedMessage(client, chatId, text, options = {}) {
       }
     }
 
-    // 4. Realistic typing duration (min 1500ms, max 3500ms based on length)
-    const duration = Math.min(3500, Math.max(1500, text.length * 35 + Math.floor(Math.random() * 500)));
+    // 4. Level-3 Realistic typing duration (40-65 WPM variable human typing with natural pauses)
+    const words = text.split(/\s+/).filter(Boolean).length || 1;
+    const targetWpm = 45 + Math.floor(Math.random() * 20); // 45-65 WPM realistic human typing
+    const baseDurationMs = Math.round((words / targetWpm) * 60 * 1000);
+    const punctuationCount = (text.match(/[,.?!]/g) || []).length;
+    const punctuationPauseMs = punctuationCount * (250 + Math.floor(Math.random() * 200));
+    const duration = Math.min(5000, Math.max(1500, baseDurationMs + punctuationPauseMs + Math.floor(Math.random() * 300)));
     await sleep(duration);
 
     // 5. Clear typing presence & dispatch message
