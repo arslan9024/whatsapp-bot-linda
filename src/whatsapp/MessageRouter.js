@@ -66,8 +66,10 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
 
   client.on('message_reaction', async (reaction) => {
     try {
+      if (!reaction) return;
       await reactionHandlerInstance.handleReaction(reaction);
-      logBot(`✅ Reaction tracked: ${reaction.reaction} on message ${reaction.msg.id.id}`, 'success');
+      const msgId = reaction.msg?.id?.id || reaction.msgId?._serialized || reaction.id?._serialized || 'unknown';
+      logBot(`✅ Reaction tracked: ${reaction.reaction} on message ${msgId}`, 'success');
     } catch (error) {
       logBot(`❌ Error handling reaction: ${error.message}`, 'error');
     }

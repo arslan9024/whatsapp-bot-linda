@@ -20,6 +20,7 @@ import { auditCrossAccountHistory } from './DeepChatHistoryAuditor.js';
 import { dispatchSupervisorReminder } from './SupervisorFollowUpDispatcher.js';
 import { getOrganicGreeting, sendHumanizedMessage } from './HumanizedMessageSender.js';
 import { supervisorFollowUpTracker } from './SupervisorFollowUpTracker.js';
+import { outreachSafetyController } from './OutreachSafetyController.js';
 
 const logger = new Logger('DamacHills2CampaignManager');
 
@@ -133,6 +134,12 @@ export class DamacHills2CampaignManager {
    * @returns {Promise<object>} Outcome result
    */
   async processLead(lead, options = {}) {
+    if (outreachSafetyController.isPaused()) {
+      const state = outreachSafetyController.getState();
+      logger.warn(`🛑 Cold outreach is currently PAUSED (${state.reason || 'Safety switch'}). Skipping lead.`);
+      return { success: false, action: 'outreach_paused', reason: state.reason };
+    }
+
     if (!lead || !lead.phone) {
       return { success: false, reason: 'invalid_lead_phone' };
     }

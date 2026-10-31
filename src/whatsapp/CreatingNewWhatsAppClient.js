@@ -165,6 +165,16 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
       }
     });
 
+    // Apply Level 2 Device Fingerprint & Battery State Emulation on readiness
+    RegisteredAgentWAClient.on('ready', async () => {
+      try {
+        if (RegisteredAgentWAClient.pupPage) {
+          const { DeviceFingerprintEmulator } = await import('../anti-ban/DeviceFingerprintEmulator.js');
+          await DeviceFingerprintEmulator.apply(RegisteredAgentWAClient.pupPage);
+        }
+      } catch (_) {}
+    });
+
     return RegisteredAgentWAClient;
   } catch (error) {
     const errorMsg = error.message || String(error);

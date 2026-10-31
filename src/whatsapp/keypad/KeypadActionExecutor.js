@@ -19,6 +19,9 @@ import {
   runPendingFollowups,
   runSearchOwner,
   runDamacQuotaView,
+  runToggleOutreachPause,
+  runEveningScorecard,
+  runDamacLocations,
 } from './KeypadCampaignActions.js';
 
 const logger = new Logger('KeypadActionExecutor');
@@ -72,6 +75,10 @@ export class KeypadActionExecutor {
           return await this._runRelinkMaster(context);
         case 'accounts_restore_all':
           return await this._runRestoreAll();
+        case 'accounts_backup_sessions':
+          return await this._runBackupSessions();
+        case 'accounts_recycle_memory':
+          return await this._runRecycleMemory();
         case 'campaign_damac_status':
           return await runDamacCampaignStatus(this.getClients(), this.getAcm());
         case 'campaign_dry_run':
@@ -84,6 +91,12 @@ export class KeypadActionExecutor {
           return runPendingFollowups();
         case 'campaign_search_owner':
           return runSearchOwner(context.query);
+        case 'campaign_toggle_pause':
+          return runToggleOutreachPause();
+        case 'campaign_evening_scorecard':
+          return runEveningScorecard(this.getClients(), this.getAcm());
+        case 'campaign_locations':
+          return runDamacLocations();
         case 'analytics_realtime':
           return await this._runAnalyticsReport('realtime');
         case 'analytics_report':
@@ -279,6 +292,36 @@ export class KeypadActionExecutor {
       return `📖 *GOOGLE SHEETS RECENT ROWS*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${out || 'Rows loaded.'}`;
     }
     return `📖 Sheet1 read complete.`;
+  }
+
+  async _runBackupSessions() {
+    const { sessionBackupManager } = await import('../../sessions/SessionBackupManager.js');
+    const res = await sessionBackupManager.createBackup();
+    if (!res.success) {
+      return `❌ *Session Backup Failed:*\n${res.reason || res.error}`;
+    }
+    return (
+      `🔒 *ENCRYPTED SESSION BACKUP CREATED*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 Archive: ${res.fileName}\n` +
+      `📁 Files Secured: ${res.fileCount}\n` +
+      `💾 Size: ${Math.round(res.sizeBytes / 1024)} KB\n` +
+      `🛡️ Cipher: AES-256-GCM\n` +
+      `Retention: Keeping latest 7 backups safely.`
+    );
+  }
+
+  async _runRecycleMemory() {
+    const { chromeMemoryRecycler } = await import('../../connection/ChromeMemoryRecycler.js');
+    const results = await chromeMemoryRecycler.recycleAllClients();
+    let text = `♻️ *HEADLESS CHROME MEMORY PURGE*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (results.length === 0) {
+      return text + `Zero active Chrome pages needed memory recycling.`;
+    }
+    results.forEach((r, idx) => {
+      text += `${idx + 1}. *Line ${maskPhone(r.phone)}*:\n   Heap: ${r.heapBeforeMb || 0}MB ➔ ${r.heapAfterMb || 0}MB (Freed ${r.freedMb || 0}MB)\n`;
+    });
+    return text.trim();
   }
 
   _runBridgeStats() {

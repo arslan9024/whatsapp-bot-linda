@@ -48,6 +48,8 @@ export const MENUS = {
       { key: '2', code: '2.2', label: '👑 Add New Master Account (Instructions)', action: 'accounts_add_guide' },
       { key: '3', code: '2.3', label: '🔄 Relink Master Account (Trigger Code)', action: 'accounts_relink_master' },
       { key: '4', code: '2.4', label: '💾 Restore All Saved Sessions', action: 'accounts_restore_all' },
+      { key: '5', code: '2.5', label: '🔒 Create Encrypted Session Backup', action: 'accounts_backup_sessions' },
+      { key: '6', code: '2.6', label: '♻️ Headless Chrome Memory Purge (> 250MB)', action: 'accounts_recycle_memory' },
     ],
   },
 
@@ -63,6 +65,9 @@ export const MENUS = {
       { key: '4', code: '3.4', label: '📁 View Quota Ledger & Active Lines', action: 'campaign_quota_view' },
       { key: '5', code: '3.5', label: '📋 Pending Agent Follow-ups (SLA Status)', action: 'campaign_pending_followups' },
       { key: '6', code: '3.6', label: '🔍 Search Damac Hills 2 Clusters & Info', action: 'campaign_search_owner' },
+      { key: '7', code: '3.7', label: '🛑 Safe Outreach Pause / Resume Switch', action: 'campaign_toggle_pause' },
+      { key: '8', code: '3.8', label: '📊 Agent Daily Activity Scorecard (Evening Report)', action: 'campaign_evening_scorecard' },
+      { key: '9', code: '3.9', label: '📍 Damac Hills 2 GPS Location Pins & Amenities', action: 'campaign_locations' },
     ],
   },
 

@@ -32,7 +32,8 @@ export class ReactionHandler {
       this.logger.log(`\n📊 [REACTION EVENT]`);
       this.logger.log(`Emoji: ${reaction.reaction}`);
       this.logger.log(`From: ${reaction.from}`);
-      this.logger.log(`Message: ${reaction.msg.id.id || reaction.msg.id}`);
+      const msgId = reaction.msg?.id?.id || reaction.msg?.id || reaction.msgId?._serialized || reaction.msgId?.id || reaction.id?._serialized || 'unknown';
+      this.logger.log(`Message: ${msgId}`);
 
       // Track in database
       const tracked = await this.reactionTracker.trackReaction(reaction);

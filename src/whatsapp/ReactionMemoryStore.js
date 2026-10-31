@@ -41,7 +41,7 @@ class ReactionMemoryStore {
    */
   trackReaction(reaction) {
     try {
-      const messageId = reaction.msg.id.id || reaction.msg.id;
+      const messageId = reaction.msg?.id?.id || reaction.msg?.id || reaction.msgId?._serialized || reaction.msgId?.id || reaction.id?._serialized || 'unknown';
       const emoji = reaction.reaction;
       const from = reaction.from;
       const timestamp = new Date();

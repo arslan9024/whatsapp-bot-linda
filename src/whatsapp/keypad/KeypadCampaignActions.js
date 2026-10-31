@@ -11,6 +11,7 @@ import { maskPhone, phoneKey } from '../../outreach/OwnerPhoneNormalizer.js';
 import { DamacHills2CampaignManager } from '../../outreach/DamacHills2CampaignManager.js';
 import { formatSupervisorAssignmentMessage } from '../../outreach/SupervisorFollowUpDispatcher.js';
 import { supervisorFollowUpTracker } from '../../outreach/SupervisorFollowUpTracker.js';
+import { outreachSafetyController } from '../../outreach/OutreachSafetyController.js';
 
 export async function runDamacCampaignStatus(clients, acm) {
   const manager = new DamacHills2CampaignManager();
@@ -140,3 +141,77 @@ export function runDamacQuotaView() {
     `Entries: ${JSON.stringify(todayQuota, null, 2)}`
   );
 }
+
+export function runToggleOutreachPause() {
+  if (outreachSafetyController.isPaused()) {
+    outreachSafetyController.resume();
+    return (
+      `🟢 *COLD OUTREACH RESUMED*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `Outreach operations are now active.\n` +
+      `Each account is permitted 1 fresh lead greeting per calendar day.`
+    );
+  } else {
+    outreachSafetyController.pause('Emergency one-tap pause from Keypad dashboard');
+    return (
+      `🛑 *COLD OUTREACH PAUSED (SAFE HOLD)*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `All automated greetings and follow-ups are safely halted.\n` +
+      `Reply 3.7 or select Pause/Resume anytime to resume.`
+    );
+  }
+}
+
+export function runEveningScorecard(clients, acm) {
+  const manager = new DamacHills2CampaignManager();
+  const todayQuota = manager.loadQuota();
+  const pending = supervisorFollowUpTracker.getPendingAssignments();
+  const overdueCount = pending.filter((p) => p.isOverdue).length;
+
+  let text = (
+    `📊 *AGENT DAILY ACTIVITY SCORECARD*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📅 Report Date: ${manager.getTodayKey()}\n` +
+    `🛡️ Policy: 1 New Lead / Line / Day\n\n` +
+    `📱 *Line Performance:*\n`
+  );
+
+  let totalSent = 0;
+  for (const phone of clients.keys()) {
+    const key = phoneKey(phone);
+    const sent = Number(todayQuota[key] || 0);
+    totalSent += sent;
+    const acc = acm?.getAccountByPhone?.(phone);
+    const name = acc?.displayName || acc?.name || 'Line';
+    text += `• *${name}* (${maskPhone(phone)}): ${sent > 0 ? '✅ 1 greeting sent' : '⏳ Quota unspent'}\n`;
+  }
+
+  text += (
+    `\n📈 *Operations Summary:*\n` +
+    `• Total Fresh Leads Reached: *${totalSent}*\n` +
+    `• Active Follow-up Assignments: *${pending.length}*\n` +
+    `• Overdue SLA (>24h): *${overdueCount > 0 ? `⚠️ ${overdueCount} OVERDUE` : '✅ 0 (On track)'}*`
+  );
+  return text;
+}
+
+export function runDamacLocations() {
+  return (
+    `📍 *DAMAC HILLS 2 AMENITIES & GPS PINS*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🌊 *Water Town (Malibu Beach, Wave Pool):*\n` +
+    `   Coordinates: 24.9665° N, 55.4342° E\n` +
+    `   Google Maps: https://maps.google.com/?q=24.9665,55.4342\n\n` +
+    `🛍️ *Down Town & Community Center (Carrefour):*\n` +
+    `   Coordinates: 24.9682° N, 55.4391° E\n` +
+    `   Google Maps: https://maps.google.com/?q=24.9682,55.4391\n\n` +
+    `⚽ *Sports Town (Football, Tennis, Cricket):*\n` +
+    `   Coordinates: 24.9612° N, 55.4310° E\n` +
+    `   Google Maps: https://maps.google.com/?q=24.9612,55.4310\n\n` +
+    `🐎 *Equestrian Town & Petting Farm:*\n` +
+    `   Coordinates: 24.9589° N, 55.4365° E\n` +
+    `   Google Maps: https://maps.google.com/?q=24.9589,55.4365\n\n` +
+    `💡 Share any link with prospective buyers or tenants directly!`
+  );
+}
+

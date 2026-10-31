@@ -31,12 +31,12 @@ class ReactionTracker {
   async trackReaction(reaction) {
     try {
       const reactionData = {
-        messageId: reaction.msg.id.id || reaction.msg.id,
+        messageId: reaction.msg?.id?.id || reaction.msg?.id || reaction.msgId?._serialized || reaction.msgId?.id || reaction.id?._serialized || 'unknown',
         emoji: reaction.reaction,
         userId: reaction.from,
-        chatId: reaction.msg.from,
+        chatId: reaction.msg?.from || reaction.chatId || reaction.id?.remote || 'unknown',
         timestamp: new Date(),
-        senderName: reaction.msg.author || 'unknown',
+        senderName: reaction.msg?.author || reaction.senderId || 'unknown',
         status: 'tracked',
       };
 
