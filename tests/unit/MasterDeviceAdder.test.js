@@ -117,3 +117,4 @@ describe('MasterDeviceAdder (Closed Circle Expansion by Message)', () => {
     expect(mockAcm.addMasterAccount).not.toHaveBeenCalled();
   });
 });
+
