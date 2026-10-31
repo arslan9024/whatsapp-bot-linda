@@ -328,9 +328,12 @@ class ReactionMemoryStore {
    * @private
    */
   startCleanupTimer() {
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       this._cleanupStaleData();
-    }, 24 * 60 * 60 * 1000); // Every 24 hours
+    }, 24 * 60 * 60 * 1000);
+    if (this.cleanupTimer && typeof this.cleanupTimer.unref === 'function') {
+      this.cleanupTimer.unref();
+    }
   }
 
   /**

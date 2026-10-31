@@ -112,3 +112,4 @@ export class VoiceTranscriptionService {
 
 export const voiceTranscriptionService = new VoiceTranscriptionService();
 export default voiceTranscriptionService;
+
