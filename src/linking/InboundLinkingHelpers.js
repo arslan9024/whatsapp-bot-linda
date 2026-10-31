@@ -244,3 +244,85 @@ export async function resolveSenderPhone(msg, primaryClient = null, accountConfi
   return { phone: null, isLid: true, lidDigits: rawDigits };
 }
 
+/**
+ * Comprehensive, fail-safe check to determine if an account is currently online/connected.
+ * Authoritatively verifies ConnectionManager, WhatsApp client state, client info, and DeviceLinkedManager.
+ *
+ * @param {string} phoneNumber
+ * @param {Object} deps
+ * @param {Map} [deps.clients]
+ * @param {Map} [deps.connManagers]
+ * @param {Object} [deps.dlm]
+ * @param {Object} [deps.ssm]
+ * @returns {Promise<boolean>}
+ */
+export async function isAccountConnected(phoneNumber, deps = {}) {
+  const { clients, connManagers, dlm, ssm } = deps;
+  const digits = normalizeDigits(phoneNumber);
+  if (!digits) return false;
+
+  // 1. Check ConnectionManager (Authoritative live socket status)
+  if (connManagers) {
+    for (const [key, mgr] of connManagers.entries()) {
+      if (normalizeDigits(key) === digits) {
+        if (mgr?.state === 'CONNECTED' || mgr?.isConnected === true) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 2. Check WhatsApp Client instance
+  if (clients) {
+    for (const [key, client] of clients.entries()) {
+      if (normalizeDigits(key) === digits && client) {
+        // Direct WhatsApp Web identity presence (instant, synchronous)
+        if (client.info?.wid || client.info?.pushname) {
+          return true;
+        }
+        // Fallback to live state check
+        if (typeof client.getState === 'function') {
+          try {
+            const state = await Promise.race([
+              Promise.resolve().then(() => client.getState()),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+            ]);
+            if (state === 'CONNECTED') {
+              return true;
+            }
+          } catch (_) {
+            // Ignore error/timeout
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Check DeviceLinkedManager
+  if (dlm) {
+    if (typeof dlm.isDeviceOnline === 'function') {
+      if (dlm.isDeviceOnline(phoneNumber) || dlm.isDeviceOnline(digits) || dlm.isDeviceOnline(`+${digits}`)) {
+        return true;
+      }
+    }
+    const device = dlm.getDevice?.(phoneNumber) || dlm.getDevice?.(digits) || dlm.getDevice?.(`+${digits}`);
+    if (device && (device.status === 'linked' || device.status === 'active') && (device.isOnline === true || device.state === 'CONNECTED')) {
+      return true;
+    }
+  }
+
+  // 4. SessionStateManager active status (with matching active client)
+  if (ssm && clients) {
+    const metadata = ssm.getDeviceMetadata?.(phoneNumber) || ssm.getDeviceMetadata?.(`+${digits}`) || {};
+    if (metadata.status === 'linked' && metadata.isActive === true) {
+      for (const [key, client] of clients.entries()) {
+        if (normalizeDigits(key) === digits && client) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+

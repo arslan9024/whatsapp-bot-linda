@@ -118,6 +118,7 @@ describe('InboundDeviceLinkingService', () => {
     let mockDlm;
     let mockChm;
     let mockSsm;
+    let mockConnManagers;
 
     beforeEach(() => {
       mockAcm = {
@@ -161,6 +162,8 @@ describe('InboundDeviceLinkingService', () => {
         getDeviceMetadata: jest.fn().mockReturnValue({}),
       };
 
+      mockConnManagers = new Map();
+
       service = new InboundDeviceLinkingService({
         accountConfigManager: mockAcm,
         accountClients: mockAccountClients,
@@ -171,7 +174,7 @@ describe('InboundDeviceLinkingService', () => {
         getFlowDeps: () => ({}),
         deviceLinkedManager: mockDlm,
         sessionStateManager: mockSsm,
-        connectionManagers: new Map(),
+        connectionManagers: mockConnManagers,
         clientHealthMonitor: mockChm,
         codeTimeoutMs: 2000,
       });
@@ -233,6 +236,72 @@ describe('InboundDeviceLinkingService', () => {
       expect(service.createClient).not.toHaveBeenCalled();
     });
 
+    it('informs user if device is already active via ConnectionManager state CONNECTED', async () => {
+      mockAccountClients.clear();
+      mockConnManagers.set('+971589969886', { state: 'CONNECTED', isConnected: true });
+
+      const msg = {
+        from: '971589969886@c.us',
+        body: 'Hi, Linda, can you add my device please',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const result = await service.handleMessage(msg, mockPrimaryClient, '+971505760056');
+
+      expect(result).toBe(true);
+      expect(mockPrimaryClient.sendMessage).toHaveBeenCalledWith(
+        '971589969886@c.us',
+        expect.stringContaining('already online, linked, and active')
+      );
+      expect(service.createClient).not.toHaveBeenCalled();
+      mockConnManagers.clear();
+    });
+
+    it('informs user if device is already active via client.info.wid', async () => {
+      mockAccountClients.clear();
+      mockAccountClients.set('+971589969886', {
+        info: { wid: { user: '971589969886' } },
+        getState: jest.fn().mockRejectedValue(new Error('Evaluation failed')),
+      });
+
+      const msg = {
+        from: '971589969886@c.us',
+        body: 'Hi, Linda, can you add my device please',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const result = await service.handleMessage(msg, mockPrimaryClient, '+971505760056');
+
+      expect(result).toBe(true);
+      expect(mockPrimaryClient.sendMessage).toHaveBeenCalledWith(
+        '971589969886@c.us',
+        expect.stringContaining('already online, linked, and active')
+      );
+      expect(service.createClient).not.toHaveBeenCalled();
+      mockAccountClients.clear();
+    });
+
+    it('informs user if device is already active via DeviceLinkedManager', async () => {
+      mockAccountClients.clear();
+      mockDlm.isDeviceOnline = jest.fn().mockReturnValue(true);
+
+      const msg = {
+        from: '971589969886@c.us',
+        body: 'Hi, Linda, can you add my device please',
+        reply: jest.fn().mockResolvedValue(true),
+      };
+
+      const result = await service.handleMessage(msg, mockPrimaryClient, '+971505760056');
+
+      expect(result).toBe(true);
+      expect(mockPrimaryClient.sendMessage).toHaveBeenCalledWith(
+        '971589969886@c.us',
+        expect.stringContaining('already online, linked, and active')
+      );
+      expect(service.createClient).not.toHaveBeenCalled();
+      mockDlm.isDeviceOnline = jest.fn().mockReturnValue(false);
+    });
+
     it('blocks concurrent pairing attempts for the same phone', async () => {
       service.activeRequests.add('+971589969886');
 
@@ -250,6 +319,14 @@ describe('InboundDeviceLinkingService', () => {
         expect.stringContaining('Pairing in Progress')
       );
       expect(service.createClient).not.toHaveBeenCalled();
+      service.activeRequests.clear('+971589969886');
+    });
+
+    it('auto-expires stale active pairing requests after TTL', async () => {
+      // Simulate an old pairing request from 10 minutes ago
+      service.activeRequests.set('+971589969886', Date.now() - 600000);
+      expect(service.activeRequests.isActive('+971589969886')).toBe(false);
+      expect(service.activeRequests.has('+971589969886')).toBe(false);
     });
 
     it('generates pairing code, dispatches to WhatsApp sender, and confirms when ready', async () => {

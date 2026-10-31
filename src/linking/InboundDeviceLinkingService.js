@@ -30,6 +30,7 @@ import {
   extractPhonesFromText,
   isLidJid,
   resolveSenderPhone,
+  isAccountConnected,
   lidPhoneStore,
 } from './InboundLinkingHelpers.js';
 import {
@@ -56,6 +57,8 @@ export {
   lidPhoneStore,
 };
 
+import { ActiveRequestTracker } from './ActiveRequestTracker.js';
+
 const logger = new Logger('InboundDeviceLinkingService');
 
 export class InboundDeviceLinkingService {
@@ -79,9 +82,9 @@ export class InboundDeviceLinkingService {
       }
     });
 
-    // Track phones currently undergoing linking to prevent duplicate browser spawns
-    this.activeRequests = new Set();
     this.codeTimeoutMs = deps.codeTimeoutMs ?? 90000;
+    // Concurrency guard with automatic TTL expiration
+    this.activeRequests = new ActiveRequestTracker(this.codeTimeoutMs);
   }
 
   getDependencies() {
@@ -172,25 +175,24 @@ export class InboundDeviceLinkingService {
       return true;
     }
 
-    // 3. Already Active Check
-    const existingClient = clients?.get(senderPhone) || clients?.get(senderDigits);
-    if (existingClient) {
-      const liveState = await getLiveConnectionState(existingClient).catch(() => null);
-      if (liveState === 'CONNECTED') {
-        await this.sendWhatsAppMessage(senderPhone, formatAlreadyConnectedMessage(senderPhone), primaryClient, msg);
-        return true;
-      }
+    // 3. Robust Already Active / Connected Check
+    const isAlreadyConnected = await isAccountConnected(senderPhone, { clients, connManagers, dlm, ssm });
+    if (isAlreadyConnected) {
+      this.activeRequests.clear(senderPhone);
+      this.logBot(`📲 Inbound linking: ${senderPhone} is already online and active. Sent confirmation.`, 'info');
+      await this.sendWhatsAppMessage(senderPhone, formatAlreadyConnectedMessage(senderPhone), primaryClient, msg);
+      return true;
     }
 
-    // 4. Concurrency Guard
-    if (this.activeRequests.has(senderPhone) || this.activeRequests.has(senderDigits)) {
+    // 4. Concurrency Guard (With automatic TTL expiration)
+    if (this.activeRequests.isActive(senderPhone)) {
+      this.logBot(`📲 Inbound linking: Active pairing code request already in progress for ${senderPhone}`, 'info');
       await this.sendWhatsAppMessage(senderPhone, formatPairingInProgressMessage(senderPhone), primaryClient, msg);
       return true;
     }
 
     // 5. Begin Linking Flow
-    this.activeRequests.add(senderPhone);
-    this.activeRequests.add(senderDigits);
+    this.activeRequests.start(senderPhone);
     this.logBot(`📲 Inbound linking: Started pairing flow for ${senderPhone} (${accountConfig.displayName || accountConfig.name})`, 'info');
 
     try {
@@ -242,17 +244,19 @@ export class InboundDeviceLinkingService {
       await this.sendWhatsAppMessage(senderPhone, formatPairingCodeInstructions(senderPhone, code), primaryClient, msg);
 
       // Listen for successful authentication and readiness
+      newClient.once('authenticated', () => {
+        this.activeRequests.clear(senderPhone);
+      });
+
       newClient.once('ready', async () => {
-        this.activeRequests.delete(senderPhone);
-        this.activeRequests.delete(senderDigits);
+        this.activeRequests.clear(senderPhone);
         this.logBot(`🎉 Inbound linking: ${senderPhone} successfully linked and online!`, 'success');
         await this.sendWhatsAppMessage(senderPhone, formatDeviceLinkedSuccess(senderPhone), primaryClient, msg);
       });
 
       return true;
     } catch (error) {
-      this.activeRequests.delete(senderPhone);
-      this.activeRequests.delete(senderDigits);
+      this.activeRequests.clear(senderPhone);
       this.logBot(`❌ Inbound linking failed for ${senderPhone}: ${error.message}`, 'error');
       await this.sendWhatsAppMessage(senderPhone, formatLinkingErrorMessage(error.message), primaryClient, msg);
       return true;
