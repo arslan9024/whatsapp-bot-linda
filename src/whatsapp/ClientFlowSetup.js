@@ -17,6 +17,7 @@
 
 import ConnectionManager from '../connection/ConnectionManager.js';
 import { SessionManager } from '../sessions/SessionManager.js';
+import closedCircleGuard from '../core/ClosedCircleGuard.js';
 
 /**
  * @typedef {Object} FlowDeps
@@ -76,6 +77,9 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     analyticsManager,      // NEW: Phase 29e - Metrics collection
     uptimeTracker,         // NEW: Phase 29e - SLA tracking
   } = deps;
+
+  // ── Closed Circle Guard: Prevent outbound sends to non-masters (dev phase) ──
+  closedCircleGuard.protectClient(client, phoneNumber);
 
   let mode = isRestore ? 'restore' : 'qr';
   logBot(`Setting up ${mode} flow for ${phoneNumber}...`, 'info');

@@ -15,6 +15,7 @@
 import { ReactionHandler } from './handlers/ReactionHandler.js';
 import { GroupEventHandler } from './handlers/GroupEventHandler.js';
 import services from '../core/ServiceRegistry.js';
+import closedCircleGuard from '../core/ClosedCircleGuard.js';
 import ContactConsentService from '../campaigns/ContactConsentService.js';
 import {
   handleAdminCommand,
@@ -123,6 +124,15 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     }
 
     logBot(`📨 [${timestamp}] (${maskPhone(phoneNumber)}) ${from}: [message content redacted]`, 'info');
+
+    // ── Closed Circle Guard: Wrap msg.reply to guarantee zero replies to non-masters ──
+    closedCircleGuard.protectMessage(msg);
+
+    // ── Closed Circle Guard: Strict dev phase drop for non-master contacts ──
+    if (!msg.fromMe && !closedCircleGuard.isMasterRecipient(msg.from)) {
+      logBot(`🛡️ [ClosedCircleGuard] Dropped inbound message from non-master ${maskPhone(msg.from)} (closed circle dev phase active)`, 'info');
+      return;
+    }
 
     try {
       if (!msg.fromMe && !msg.from?.includes('@g.us') && /^(stop|unsubscribe|opt[\s-]?out)$/i.test(messageText.trim())) {
