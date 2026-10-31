@@ -11,6 +11,7 @@ const callbacks = () => services.get('terminalCallbacks');
 export const COMMAND_HANDLERS = {
   help: (b, msg) => msg.reply(b.getHelpText()),
   menu: (b, msg) => b.handleMenu(msg),
+  dashboard: (b, msg) => b.handleMenu(msg),
   1: (b, msg) => b.handleGroupCommands(msg, '1'),
   2: (b, msg) => b.handleGroupCommands(msg, '2'),
   3: (b, msg) => b.handleGroupCommands(msg, '3'),

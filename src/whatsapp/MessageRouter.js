@@ -191,6 +191,19 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
         }
       }
 
+      // ── Interactive Keypad Dashboard (Phase 33) ───────────────
+      const keypad = services.get('keypadDashboardService');
+      const isMasterSender = closedCircleGuard.isMasterRecipient(msg.from);
+      if (isMasterAccount && keypad && isMasterSender && !msg.fromMe && !msg.from?.includes('@g.us')) {
+        if (keypad.shouldHandle(msg, isMasterSender)) {
+          const handled = await keypad.handleMessage(msg, client);
+          if (handled) {
+            logBot(`📱 Keypad dashboard processed from ${maskPhone(msg.from)}`, 'success');
+            return;
+          }
+        }
+      }
+
       // ── WhatsApp Command Bridge (Phase 31) ─────────────────────
       if (isMasterAccount && commandBridge && !msg.fromMe && !msg.from?.includes('@g.us')) {
         if (commandBridge.shouldHandle(msg, phoneNumber)) {
