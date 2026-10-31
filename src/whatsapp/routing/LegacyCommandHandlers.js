@@ -204,3 +204,4 @@ export async function handleGorahaVerification(msg, client, gorahaRef, logBot) {
     await msg.reply(`❌ Verification failed: ${error.message}`);
   }
 }
+

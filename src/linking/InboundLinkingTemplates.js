@@ -149,3 +149,4 @@ export function awaitPairingCode(newClient, timeoutMs = 90000) {
     });
   });
 }
+
