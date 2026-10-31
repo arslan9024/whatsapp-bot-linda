@@ -370,10 +370,14 @@ export function setupClientFlow(client, phoneNumber, botId, opts, deps) {
     // Lazy-init contact handler (restore mode only had this, but it's harmless for both)
     if (ContactLookupHandler && contactHandlerRef && !contactHandlerRef.current) {
       try {
-        contactHandlerRef.current = new ContactLookupHandler();
-        await contactHandlerRef.current.initialize();
+        const handlerInstance = typeof ContactLookupHandler === 'function'
+          ? new ContactLookupHandler()
+          : ContactLookupHandler;
+        contactHandlerRef.current = handlerInstance;
+        if (!handlerInstance.initialized && typeof handlerInstance.initialize === 'function') {
+          await handlerInstance.initialize();
+        }
         logBot('✅ Contact lookup handler ready', 'success');
-        // contactHandler is available via contactHandlerRef.current (no global needed)
       } catch (error) {
         logBot(`⚠️  Contact handler error: ${error.message}`, 'warn');
       }

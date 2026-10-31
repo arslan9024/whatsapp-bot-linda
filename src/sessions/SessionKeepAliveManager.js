@@ -79,24 +79,36 @@ export default class SessionKeepAliveManager {
         return false;
       }
 
-      // Method 1: Send silent typing indicator
+      // Safe, non-intrusive heartbeat: verify browser context and live connection
       try {
-        const chatId = phoneNumber + "@c.us";
-        await client.sendSeen(chatId);
-        
+        if (typeof client.getState === 'function') {
+          const state = await Promise.race([
+            client.getState(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Heartbeat state check timed out')), 5000)),
+          ]);
+          if (state && state !== 'CONNECTED') {
+            throw new Error(`WhatsApp state is ${state}`);
+          }
+        } else if (client.pupPage && typeof client.pupPage.evaluate === 'function') {
+          await client.pupPage.evaluate(() => 1);
+        }
+
         // Increment heartbeat counter
         const count = (this.heartbeatCounts.get(phoneNumber) || 0) + 1;
         this.heartbeatCounts.set(phoneNumber, count);
-        
-        this.logFunction(`💓 Heartbeat sent to ${phoneNumber} (count: ${count})`, "success");
+        this.updateLastActivity(phoneNumber);
+
+        this.logFunction(`💓 Heartbeat verified for ${phoneNumber} (count: ${count})`, "success");
         return true;
       } catch (err) {
-        this.logFunction(`⚠️  Heartbeat error (${phoneNumber}): ${err.message}`, "warn");
-        
-        // NEW: Detect frame detachment errors and trigger recovery
-        if (err.message && err.message.includes('detached')) {
+        const errorMsg = err?.message || String(err) || 'Unknown heartbeat error';
+        this.logFunction(`⚠️  Heartbeat error (${phoneNumber}): ${errorMsg}`, "warn");
+
+        // NEW: Detect frame detachment or browser crash and trigger recovery
+        const lowerMsg = errorMsg.toLowerCase();
+        if (lowerMsg.includes('detached') || lowerMsg.includes('target closed') || lowerMsg.includes('session closed')) {
           this.logFunction(`🚨 Frame detachment detected during heartbeat on ${phoneNumber}`, "error");
-          
+
           // Notify health monitor to trigger recovery
           if (this.clientHealthMonitor) {
             try {
@@ -109,7 +121,7 @@ export default class SessionKeepAliveManager {
             this.logFunction(`⚠️  ClientHealthMonitor not available for ${phoneNumber} frame recovery`, "warn");
           }
         }
-        
+
         return false;
       }
     } catch (error) {

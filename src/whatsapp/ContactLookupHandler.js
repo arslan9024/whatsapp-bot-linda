@@ -441,4 +441,5 @@ class ContactLookupHandler {
   }
 }
 
+export { ContactLookupHandler };
 export default new ContactLookupHandler();
