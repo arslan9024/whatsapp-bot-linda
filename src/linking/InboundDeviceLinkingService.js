@@ -58,6 +58,7 @@ export {
 };
 
 import { ActiveRequestTracker } from './ActiveRequestTracker.js';
+import { handleMasterAddDeviceRequest } from './MasterDeviceAdder.js';
 
 const logger = new Logger('InboundDeviceLinkingService');
 
@@ -157,25 +158,39 @@ export class InboundDeviceLinkingService {
       return true;
     }
 
-    // 1. Authorization Check: Must be in bots-config.json
+    // 1. Master adding another device check
     const senderDigits = normalizeDigits(senderPhone);
     const accountConfig = acm.getAccountByPhone(senderPhone) ||
       acm.getAllAccounts?.().find(acc => normalizeDigits(acc.phoneNumber) === senderDigits);
 
+    const handledByMasterAdd = await handleMasterAddDeviceRequest({
+      msg,
+      senderPhone,
+      accountConfig,
+      acm,
+      primaryClient,
+      sendWhatsAppMessage: this.sendWhatsAppMessage.bind(this),
+      logBot: this.logBot.bind(this),
+    });
+    if (handledByMasterAdd) {
+      return true;
+    }
+
+    // 2. Authorization Check: Must be in bots-config.json
     if (!accountConfig) {
       this.logBot(`Inbound linking rejected: ${senderPhone} is not a configured master account`, 'warn');
       await this.sendWhatsAppMessage(senderPhone, formatUnauthorizedMessage(senderPhone), primaryClient, msg);
       return true;
     }
 
-    // 2. Self Check: Primary master cannot link itself via inbound message
+    // 3. Self Check: Primary master cannot link itself via inbound message
     const primaryMasterPhone = acm.getMasterPhoneNumber?.();
     if (senderDigits === normalizeDigits(primaryMasterPhone)) {
       await this.sendWhatsAppMessage(senderPhone, formatPrimaryMasterSelfMessage(primaryMasterPhone), primaryClient, msg);
       return true;
     }
 
-    // 3. Robust Already Active / Connected Check
+    // 4. Robust Already Active / Connected Check
     const isAlreadyConnected = await isAccountConnected(senderPhone, { clients, connManagers, dlm, ssm });
     if (isAlreadyConnected) {
       this.activeRequests.clear(senderPhone);
@@ -184,14 +199,14 @@ export class InboundDeviceLinkingService {
       return true;
     }
 
-    // 4. Concurrency Guard (With automatic TTL expiration)
+    // 5. Concurrency Guard (With automatic TTL expiration)
     if (this.activeRequests.isActive(senderPhone)) {
       this.logBot(`📲 Inbound linking: Active pairing code request already in progress for ${senderPhone}`, 'info');
       await this.sendWhatsAppMessage(senderPhone, formatPairingInProgressMessage(senderPhone), primaryClient, msg);
       return true;
     }
 
-    // 5. Begin Linking Flow
+    // 6. Begin Linking Flow
     this.activeRequests.start(senderPhone);
     this.logBot(`📲 Inbound linking: Started pairing flow for ${senderPhone} (${accountConfig.displayName || accountConfig.name})`, 'info');
 

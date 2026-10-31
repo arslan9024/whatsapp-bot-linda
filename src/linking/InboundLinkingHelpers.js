@@ -116,6 +116,7 @@ export function isDeviceLinkingRequest(text) {
     'add device', 'link device', 'pair device', 'add my device',
     'link my device', 'pair my device', 'connect my device',
     'please add my device', 'can you add my device',
+    'add master', 'link master',
   ];
   if (directCommands.includes(cleaned)) {
     return true;
@@ -127,11 +128,16 @@ export function isDeviceLinkingRequest(text) {
   }
 
   // Conversational phrases matching:
-  // (add | link | pair | connect | register | share) AND (device | phone | number | account | mobile | code | me)
+  // (add | link | pair | connect | register | share) AND (device | phone | number | account | mobile | code | me | master)
   const actionMatch = /\b(add|link|pair|connect|register|share|give|send)\b/i.test(cleaned);
-  const targetMatch = /\b(device|phone|number|account|mobile|code|me)\b/i.test(cleaned);
+  const targetMatch = /\b(device|phone|number|account|mobile|code|me|master)\b/i.test(cleaned);
 
   if (actionMatch && (targetMatch || cleaned.includes('linda'))) {
+    return true;
+  }
+
+  // Also match command starting with add/link/pair and containing a phone number
+  if (/^(?:add|link|pair)\b/i.test(cleaned) && extractPhonesFromText(text).length > 0) {
     return true;
   }
 

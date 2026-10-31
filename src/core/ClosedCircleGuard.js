@@ -42,6 +42,14 @@ export class ClosedCircleGuard {
   }
 
   /**
+   * Invalidate cached master numbers to force an immediate reload.
+   */
+  invalidateCache() {
+    this.cachedMasters.clear();
+    this.lastCacheTime = 0;
+  }
+
+  /**
    * Dynamically fetch all authorized master account numbers as normalized digit strings.
    *
    * @returns {Set<string>} Set of digits (e.g. '971505760056', '971559156636', etc.)
@@ -174,7 +182,15 @@ export class ClosedCircleGuard {
     const guard = this;
 
     client.sendMessage = async function (chatId, content, options) {
-      if (!guard.isMasterRecipient(chatId)) {
+      const isLinkingPrompt = Boolean(
+        options?.allowClosedCirclePrompt ||
+        (typeof content === 'string' && (
+          content.includes('Unauthorized Device Request') ||
+          content.includes('WhatsApp Privacy ID Detected')
+        ))
+      );
+
+      if (!isLinkingPrompt && !guard.isMasterRecipient(chatId)) {
         logger.warn(
           `🛑 [ClosedCircleGuard] Blocked outbound message to non-master: ${maskPhone(chatId)} ` +
           `(from ${maskPhone(clientPhone || client.info?.wid?.user || 'bot')}) — Closed circle dev phase active`
@@ -209,14 +225,29 @@ export class ClosedCircleGuard {
     const guard = this;
 
     msg.reply = async function (content, chatId, options) {
-      const target = chatId || msg.from;
-      if (!guard.isMasterRecipient(target)) {
+      let opts = options;
+      let target = chatId;
+      if (typeof chatId === 'object' && chatId !== null && !options) {
+        opts = chatId;
+        target = msg.from;
+      }
+      target = target || msg.from;
+
+      const isLinkingPrompt = Boolean(
+        opts?.allowClosedCirclePrompt ||
+        (typeof content === 'string' && (
+          content.includes('Unauthorized Device Request') ||
+          content.includes('WhatsApp Privacy ID Detected')
+        ))
+      );
+
+      if (!isLinkingPrompt && !guard.isMasterRecipient(target)) {
         logger.warn(
           `🛑 [ClosedCircleGuard] Blocked msg.reply to non-master: ${maskPhone(target)} ` +
           `— Closed circle dev phase active`
         );
         const err = new Error(
-          `ClosedCircleGuard: Blocked outbound message to non-master ${maskPhone(chatId)} (dev phase active)`
+          `ClosedCircleGuard: Blocked outbound message to non-master ${maskPhone(target)} (dev phase active)`
         );
         err.code = 'BLOCKED_BY_CLOSED_CIRCLE_GUARD';
         err.blocked = true;

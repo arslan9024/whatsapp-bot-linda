@@ -38,22 +38,52 @@ export const accountCommands = {
   },
 
   async handleLink(msg, args = [], callbacks = null) {
-    if (!callbacks) {
-      await msg.reply('❌ Link command not available (callbacks missing).');
+    if (!args.length) {
+      await msg.reply('Usage: linda add master <+phone> [name] | linda add device <+phone> [name]');
       return;
     }
-    const [target, phone, ...nameParts] = args;
-    if (target === 'master' && phone) {
-      await callbacks.onAddNewMaster?.(phone, nameParts.join(' '));
+
+    let [target, phone, ...nameParts] = args;
+    let name = nameParts.join(' ').trim();
+
+    // Support: linda add +971505110636 [name] or linda link +971505110636 [name]
+    if (String(target).startsWith('+') || /^\d{10,15}$/.test(target)) {
+      phone = target;
+      target = 'master';
+      name = [args[1], ...args.slice(2)].filter(Boolean).join(' ').trim();
+    }
+
+    if ((target === 'master' || target === 'device') && phone) {
+      if (callbacks?.onAddNewMaster) {
+        await callbacks.onAddNewMaster(phone, name);
+      } else {
+        const acm = services.get('accountConfigManager');
+        if (acm) {
+          const res = await acm.addMasterAccount(phone, name);
+          if (res.success) {
+            services.get('closedCircleGuard')?.invalidateCache?.();
+            await msg.reply(`✅ Added ${phone}${name ? ` (${name})` : ''} to closed circle master list.`);
+            return;
+          } else if (res.error?.includes('already in use')) {
+            await msg.reply(`ℹ️ ${phone} is already in closed circle master list.`);
+            return;
+          } else {
+            await msg.reply(`❌ Failed to add: ${res.error}`);
+            return;
+          }
+        }
+      }
       await msg.reply(`✅ Add master requested for ${phone}.`);
       return;
     }
+
     if (target === 'master') {
-      await callbacks.onLinkMaster?.();
+      await callbacks?.onLinkMaster?.();
       await msg.reply('✅ Link master requested.');
       return;
     }
-    await msg.reply('Usage: linda link master [<+phone> <name>]');
+
+    await msg.reply('Usage: linda add master <+phone> [name] | linda add device <+phone> [name]');
   },
 
   async handleRestore(msg, callbacks = null) {

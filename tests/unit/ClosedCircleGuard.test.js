@@ -80,6 +80,19 @@ describe('ClosedCircleGuard (Strict Dev Phase Safety Shield)', () => {
 
       expect(originalSend).not.toHaveBeenCalled();
     });
+
+    it('allows sending prompt to non-master when allowClosedCirclePrompt is set', async () => {
+      const originalSend = jest.fn().mockResolvedValue({ id: 'sent-prompt' });
+      const mockClient = {
+        sendMessage: originalSend,
+      };
+
+      guard.protectClient(mockClient, '+971505760056');
+
+      const result = await mockClient.sendMessage('971509999999@c.us', 'Please add device', { allowClosedCirclePrompt: true });
+      expect(result).toEqual({ id: 'sent-prompt' });
+      expect(originalSend).toHaveBeenCalledWith('971509999999@c.us', 'Please add device', { allowClosedCirclePrompt: true });
+    });
   });
 
   describe('protectMessage', () => {
@@ -97,6 +110,20 @@ describe('ClosedCircleGuard (Strict Dev Phase Safety Shield)', () => {
       expect(originalReply).toHaveBeenCalledWith('Hello master reply', undefined, undefined);
     });
 
+    it('allows replying to non-master when allowClosedCirclePrompt is set', async () => {
+      const originalReply = jest.fn().mockResolvedValue({ id: 'reply-prompt' });
+      const mockMsg = {
+        from: '971509999999@c.us',
+        reply: originalReply,
+      };
+
+      guard.protectMessage(mockMsg);
+
+      const result = await mockMsg.reply('Please add device', undefined, { allowClosedCirclePrompt: true });
+      expect(result).toEqual({ id: 'reply-prompt' });
+      expect(originalReply).toHaveBeenCalledWith('Please add device', undefined, { allowClosedCirclePrompt: true });
+    });
+
     it('blocks replying to non-master contacts', async () => {
       const originalReply = jest.fn().mockResolvedValue({ id: 'reply-1' });
       const mockMsg = {
@@ -111,3 +138,4 @@ describe('ClosedCircleGuard (Strict Dev Phase Safety Shield)', () => {
     });
   });
 });
+

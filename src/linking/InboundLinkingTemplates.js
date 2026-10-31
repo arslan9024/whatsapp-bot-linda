@@ -18,7 +18,10 @@ export function formatPrivacyIdDetectedPrompt(lidDigits) {
     `🔒 *WhatsApp Privacy ID Detected*\n\n` +
     `Linda received your message via WhatsApp Privacy Addressing (ID: +${lidDigits}).\n\n` +
     `To link your device, please reply with your registered phone number, for example:\n` +
-    `👉 *"Hi Linda, please add my device 0589969886"*`
+    `👉 *"Hi Linda, please add my device 0589969886"*\n\n` +
+    `💡 *If this phone is not registered in the closed circle yet:*\n` +
+    `From any authorized master phone, send Linda:\n` +
+    `👉 \`add master <phone> [Name]\``
   );
 }
 
@@ -27,9 +30,30 @@ export function formatPrivacyIdDetectedPrompt(lidDigits) {
  */
 export function formatUnauthorizedMessage(senderPhone) {
   return (
-    `🔒 *Unauthorized Device Request*\n\n` +
-    `Your phone number (${senderPhone}) is not registered in Linda's authorized configuration.\n` +
-    `Please contact the system administrator to add your number before linking.`
+    `🔒 *Unauthorized Device Request — Closed Circle*\n\n` +
+    `Your phone number (${senderPhone}) is not registered in Linda's closed circle master list.\n\n` +
+    `💡 *To add this device to the closed circle by message:*\n` +
+    `From any authorized master phone, send Linda:\n` +
+    `👉 \`add master ${senderPhone} [Name]\`\n` +
+    `or\n` +
+    `👉 \`add device ${senderPhone} [Name]\`\n\n` +
+    `Once added, reply *"Hi Linda, add my device"* from this phone to link!`
+  );
+}
+
+/**
+ * Format confirmation message when an authorized master adds a device.
+ */
+export function formatDeviceAddedConfirmation(targetPhone, displayName) {
+  const nameSuffix = displayName ? ` (${displayName})` : '';
+  return (
+    `✅ *Device Added to Closed Circle Master List!*\n\n` +
+    `Phone: *${targetPhone}*${nameSuffix}\n` +
+    `Role: Master Account (Authorized Closed Circle)\n\n` +
+    `📲 *Next step to connect:*\n` +
+    `From *${targetPhone}*, send Linda:\n` +
+    `👉 *"Hi Linda, add my device"*\n\n` +
+    `Linda will immediately generate and send your 8-character pairing code!`
   );
 }
 

@@ -128,8 +128,21 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     // ── Closed Circle Guard: Wrap msg.reply to guarantee zero replies to non-masters ──
     closedCircleGuard.protectMessage(msg);
 
-    // ── Closed Circle Guard: Strict dev phase drop for non-master contacts ──
-    if (!msg.fromMe && !closedCircleGuard.isMasterRecipient(msg.from)) {
+    // ── Inbound Device Linking Check (Allowed even if non-master so device can receive linking guidance) ──
+    const linkingService = inboundDeviceLinkingService || services.get('inboundDeviceLinkingService');
+    const masterPhone = accountConfigManager?.getMasterPhoneNumber();
+    const normalize = (p) => String(p || '').replace(/\D/g, '');
+    const isMasterAccount = normalize(phoneNumber) === normalize(masterPhone);
+    const isLinkingRequest = Boolean(
+      isMasterAccount &&
+      linkingService &&
+      !msg.fromMe &&
+      !msg.from?.includes('@g.us') &&
+      linkingService.shouldHandle(msg, phoneNumber)
+    );
+
+    // ── Closed Circle Guard: Strict dev phase drop for non-master contacts (unless device linking intent) ──
+    if (!msg.fromMe && !closedCircleGuard.isMasterRecipient(msg.from) && !isLinkingRequest) {
       logBot(`🛡️ [ClosedCircleGuard] Dropped inbound message from non-master ${maskPhone(msg.from)} (closed circle dev phase active)`, 'info');
       return;
     }

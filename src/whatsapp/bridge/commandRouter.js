@@ -26,6 +26,7 @@ export const COMMAND_HANDLERS = {
   analytics: (b, msg, args) => b.handleAnalytics(msg, args, callbacks()),
   sheets: (b, msg, args) => b.handleSheets(msg, args, callbacks()),
   link: (b, msg, args) => b.handleLink(msg, args, callbacks()),
+  add: (b, msg, args) => b.handleLink(msg, args, callbacks()),
   list: (b, msg) => b.handleList(msg),
   device: (b, msg, args) => b.handleDevice(msg, args),
   'bridge-stats': (b, msg) => b.handleBridgeStats(msg),
