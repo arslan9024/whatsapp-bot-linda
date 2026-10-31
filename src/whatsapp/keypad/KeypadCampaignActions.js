@@ -12,6 +12,8 @@ import { DamacHills2CampaignManager } from '../../outreach/DamacHills2CampaignMa
 import { formatSupervisorAssignmentMessage } from '../../outreach/SupervisorFollowUpDispatcher.js';
 import { supervisorFollowUpTracker } from '../../outreach/SupervisorFollowUpTracker.js';
 import { outreachSafetyController } from '../../outreach/OutreachSafetyController.js';
+import { formatValuationReport } from '../../outreach/DamacHills2Intelligence.js';
+import { SupervisorReassignmentManager } from '../../outreach/SupervisorReassignmentManager.js';
 
 export async function runDamacCampaignStatus(clients, acm) {
   const manager = new DamacHills2CampaignManager();
@@ -212,6 +214,46 @@ export function runDamacLocations() {
     `   Coordinates: 24.9589° N, 55.4365° E\n` +
     `   Google Maps: https://maps.google.com/?q=24.9589,55.4365\n\n` +
     `💡 Share any link with prospective buyers or tenants directly!`
+  );
+}
+
+export function runValuationReport(beds = 3) {
+  return formatValuationReport(beds);
+}
+
+export function runBrochureDetails() {
+  return SupervisorReassignmentManager.getBrochureDetails();
+}
+
+export async function runTeamBroadcast(message, options = {}) {
+  const text = message || 'Reminder: Please ensure all assigned Damac Hills 2 owner follow-ups are completed within 24h.';
+  const res = await SupervisorReassignmentManager.broadcastToSubAgents(text, options);
+  if (!res.success) {
+    return `⚠️ *Broadcast Result:* No sub-agent lines were reached (${res.reason || 'offline'}).`;
+  }
+  return (
+    `📢 *TEAM ANNOUNCEMENT DISPATCHED*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `✅ Successfully delivered to *${res.deliveredCount}/${res.totalTargets}* sub-agent line(s).\n` +
+    `Message: "${text}"`
+  );
+}
+
+export async function runReassignLead(clientPhone, newAgentPhone, newAgentName) {
+  const res = await SupervisorReassignmentManager.reassignLead({
+    clientPhone,
+    newAgentPhone,
+    newAgentName,
+  });
+  if (!res.success) {
+    return `❌ *Reassignment Failed:*\n${res.error}`;
+  }
+  return (
+    `🔄 *LEAD REASSIGNMENT COMPLETE*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 Client: *${maskPhone(res.clientPhone)}*\n` +
+    `📱 New Assigned Agent: *${res.newAgentName}* (${maskPhone(res.newAgentPhone)})\n` +
+    `⏱️ SLA Timer: Reset to fresh 24 hours.`
   );
 }
 

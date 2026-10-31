@@ -22,6 +22,9 @@ import {
   runToggleOutreachPause,
   runEveningScorecard,
   runDamacLocations,
+  runValuationReport,
+  runBrochureDetails,
+  runTeamBroadcast,
 } from './KeypadCampaignActions.js';
 
 const logger = new Logger('KeypadActionExecutor');
@@ -79,6 +82,8 @@ export class KeypadActionExecutor {
           return await this._runBackupSessions();
         case 'accounts_recycle_memory':
           return await this._runRecycleMemory();
+        case 'accounts_broadcast_team':
+          return await runTeamBroadcast(context.query, { accountClients: this.getClients(), accountConfigManager: this.getAcm() });
         case 'campaign_damac_status':
           return await runDamacCampaignStatus(this.getClients(), this.getAcm());
         case 'campaign_dry_run':
@@ -97,6 +102,10 @@ export class KeypadActionExecutor {
           return runEveningScorecard(this.getClients(), this.getAcm());
         case 'campaign_locations':
           return runDamacLocations();
+        case 'campaign_valuation':
+          return runValuationReport(context.query || 3);
+        case 'campaign_brochure':
+          return runBrochureDetails();
         case 'analytics_realtime':
           return await this._runAnalyticsReport('realtime');
         case 'analytics_report':

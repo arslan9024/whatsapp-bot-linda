@@ -144,3 +144,4 @@ export class ChromeMemoryRecycler {
 
 export const chromeMemoryRecycler = new ChromeMemoryRecycler();
 export default chromeMemoryRecycler;
+

@@ -50,6 +50,7 @@ export const MENUS = {
       { key: '4', code: '2.4', label: '💾 Restore All Saved Sessions', action: 'accounts_restore_all' },
       { key: '5', code: '2.5', label: '🔒 Create Encrypted Session Backup', action: 'accounts_backup_sessions' },
       { key: '6', code: '2.6', label: '♻️ Headless Chrome Memory Purge (> 250MB)', action: 'accounts_recycle_memory' },
+      { key: '7', code: '2.7', label: '📢 Broadcast Team Announcement to Agents', action: 'accounts_broadcast_team' },
     ],
   },
 
@@ -68,6 +69,8 @@ export const MENUS = {
       { key: '7', code: '3.7', label: '🛑 Safe Outreach Pause / Resume Switch', action: 'campaign_toggle_pause' },
       { key: '8', code: '3.8', label: '📊 Agent Daily Activity Scorecard (Evening Report)', action: 'campaign_evening_scorecard' },
       { key: '9', code: '3.9', label: '📍 Damac Hills 2 GPS Location Pins & Amenities', action: 'campaign_locations' },
+      { key: '10', code: '3.10', label: '📊 Instant Property Valuation Estimates', action: 'campaign_valuation' },
+      { key: '11', code: '3.11', label: '📄 Damac Hills 2 Digital Brochure & Links', action: 'campaign_brochure' },
     ],
   },
 

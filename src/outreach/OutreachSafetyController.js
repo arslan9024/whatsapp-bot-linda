@@ -68,3 +68,4 @@ export class OutreachSafetyController {
 
 export const outreachSafetyController = new OutreachSafetyController();
 export default outreachSafetyController;
+

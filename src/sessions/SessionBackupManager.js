@@ -199,3 +199,4 @@ export class SessionBackupManager {
 
 export const sessionBackupManager = new SessionBackupManager();
 export default sessionBackupManager;
+
