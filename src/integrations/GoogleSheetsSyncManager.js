@@ -122,3 +122,4 @@ export class GoogleSheetsSyncManager {
 
 export const googleSheetsSyncManager = new GoogleSheetsSyncManager();
 export default googleSheetsSyncManager;
+

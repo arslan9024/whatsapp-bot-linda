@@ -70,3 +70,4 @@ describe('SessionAutoHealer (Pillar 6 - Corruption Auto-Recovery)', () => {
     expect(healer.isRecoverableCorruption('Random syntax error')).toBe(false);
   });
 });
+

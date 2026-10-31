@@ -144,3 +144,4 @@ export class PropertyBrochureDispatcher {
 
 export const propertyBrochureDispatcher = new PropertyBrochureDispatcher();
 export default propertyBrochureDispatcher;
+

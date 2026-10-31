@@ -51,3 +51,4 @@ describe('RealEstateLeadScorer (Lead Tiering & Conversion Engine)', () => {
     expect(result.isPriority).toBe(false);
   });
 });
+

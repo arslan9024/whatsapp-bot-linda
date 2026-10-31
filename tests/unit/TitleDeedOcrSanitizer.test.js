@@ -39,3 +39,4 @@ describe('TitleDeedOcrSanitizer (Pillar 1 - Property Document Privacy & Extracti
     expect(result.propertyFacts.unitNumber).toBeNull();
   });
 });
+

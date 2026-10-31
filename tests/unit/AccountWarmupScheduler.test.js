@@ -71,3 +71,4 @@ describe('AccountWarmupScheduler (Pillar 2 - Graduated Outreach)', () => {
     expect(status.allowed).toBe(25);
   });
 });
+

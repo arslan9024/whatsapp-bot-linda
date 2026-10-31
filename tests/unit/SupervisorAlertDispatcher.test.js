@@ -65,3 +65,4 @@ describe('SupervisorAlertDispatcher (Telegram & Webhook Alerting)', () => {
     expect(res.error).toBe('Network error');
   });
 });
+

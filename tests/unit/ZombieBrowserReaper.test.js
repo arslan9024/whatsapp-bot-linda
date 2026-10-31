@@ -60,3 +60,4 @@ describe('ZombieBrowserReaper (Pillar 6 - Safe Orphaned Browser Cleanup)', () =>
     expect(mockExec).toHaveBeenCalledTimes(1); // Only tasklist, no kill
   });
 });
+
