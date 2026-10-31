@@ -10,10 +10,16 @@
 
 import services from '../../core/ServiceRegistry.js';
 import { Logger } from '../../core/Logger.js';
-import { maskPhone, phoneKey } from '../../outreach/OwnerPhoneNormalizer.js';
+import { maskPhone } from '../../outreach/OwnerPhoneNormalizer.js';
 import { captureConsoleOutput } from '../bridge/bridgeUtils.js';
-import { DamacHills2CampaignManager } from '../../outreach/DamacHills2CampaignManager.js';
-import { formatSupervisorAssignmentMessage } from '../../outreach/SupervisorFollowUpDispatcher.js';
+import {
+  runDamacCampaignStatus,
+  runDamacDryRun,
+  runTestSupervisorDispatch,
+  runPendingFollowups,
+  runSearchOwner,
+  runDamacQuotaView,
+} from './KeypadCampaignActions.js';
 
 const logger = new Logger('KeypadActionExecutor');
 
@@ -67,13 +73,17 @@ export class KeypadActionExecutor {
         case 'accounts_restore_all':
           return await this._runRestoreAll();
         case 'campaign_damac_status':
-          return await this._runDamacCampaignStatus();
+          return await runDamacCampaignStatus(this.getClients(), this.getAcm());
         case 'campaign_dry_run':
-          return await this._runDamacDryRun();
+          return await runDamacDryRun(this.getClients(), this.getAcm());
         case 'campaign_test_supervisor':
-          return this._runTestSupervisorDispatch();
+          return runTestSupervisorDispatch();
         case 'campaign_quota_view':
-          return await this._runDamacQuotaView();
+          return runDamacQuotaView();
+        case 'campaign_pending_followups':
+          return runPendingFollowups();
+        case 'campaign_search_owner':
+          return runSearchOwner(context.query);
         case 'analytics_realtime':
           return await this._runAnalyticsReport('realtime');
         case 'analytics_report':
@@ -221,97 +231,6 @@ export class KeypadActionExecutor {
     return `❌ Restore command not available.`;
   }
 
-  // ─── Campaigns & Damac Hills 2 Handlers ─────────────────────────
-  async _runDamacCampaignStatus() {
-    const manager = new DamacHills2CampaignManager();
-    const todayQuota = manager.loadQuota();
-    const clients = this.getClients();
-    const acm = this.getAcm();
-
-    let text = (
-      `📢 *DAMAC HILLS 2 CAMPAIGN STATUS*\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📅 Date: ${manager.getTodayKey()}\n` +
-      `🛡️ Safe Policy: 1 Fresh Lead / Account / Day\n\n` +
-      `📱 *Daily Account Quotas:*\n`
-    );
-
-    let availableCount = 0;
-    for (const phone of clients.keys()) {
-      const key = phoneKey(phone);
-      const used = Number(todayQuota[key] || 0);
-      const remaining = Math.max(0, 1 - used);
-      if (remaining > 0) availableCount++;
-
-      const acc = acm?.getAccountByPhone?.(phone);
-      const name = acc?.displayName || acc?.name || 'Line';
-      const status = used >= 1 ? '🔒 1/1 (Done)' : '✅ 0/1 (Available)';
-
-      text += `• *${name}* (${maskPhone(phone)}): ${status}\n`;
-    }
-
-    text += (
-      `\n🎯 Total Capacity Remaining Today: *${availableCount} fresh lead(s)*\n` +
-      `👑 Supervisor Alerting: Active`
-    );
-    return text;
-  }
-
-  async _runDamacDryRun() {
-    const clients = this.getClients();
-    const acm = this.getAcm();
-    const manager = new DamacHills2CampaignManager({ accountClients: clients, accountConfigManager: acm });
-
-    const sampleLead = {
-      name: 'Hassan Al Shamsi',
-      phone: '+971505110636',
-      community: 'Damac Hills 2',
-      unit: 'Amazon Cluster Villa 12',
-    };
-
-    const result = await manager.processLead(sampleLead, { dryRun: true });
-
-    return (
-      `🧪 *OUTREACH DRY RUN SIMULATION*\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 Sample Lead: ${sampleLead.name} (${maskPhone(sampleLead.phone)})\n` +
-      `🏡 Community: ${sampleLead.community} - ${sampleLead.unit}\n\n` +
-      `📊 *Simulation Result:*\n` +
-      `• Action: ${result.action}\n` +
-      `• Assigned Agent: ${result.agentName || 'Available Line'}\n` +
-      `• Status: Verified successfully under Closed Circle guard!`
-    );
-  }
-
-  _runTestSupervisorDispatch() {
-    const sampleAlert = formatSupervisorAssignmentMessage({
-      ownerName: 'Rashid Al Nuaimi',
-      clientPhone: '+971501234567',
-      community: 'Damac Hills 2',
-      unit: 'Camellia Villa 42',
-      lastInteractionAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
-      agentName: 'Junior Agent 1',
-    });
-
-    return (
-      `👑 *TEST SUPERVISOR ALERT MESSAGE*\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `When prior history is detected, the supervisor sends this to the sub-agent:\n\n` +
-      `${sampleAlert}`
-    );
-  }
-
-  async _runDamacQuotaView() {
-    const manager = new DamacHills2CampaignManager();
-    const todayQuota = manager.loadQuota();
-    return (
-      `📁 *DAILY OUTREACH QUOTA LEDGER*\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📅 Active Ledger Date: ${manager.getTodayKey()}\n` +
-      `Entries: ${JSON.stringify(todayQuota, null, 2)}`
-    );
-  }
-
   // ─── Analytics & Goraha & Sheets Handlers ────────────────────────
   async _runAnalyticsReport(type) {
     const cb = this.getCallbacks().onAnalyticsReportRequested;
@@ -373,3 +292,4 @@ export class KeypadActionExecutor {
 }
 
 export default KeypadActionExecutor;
+

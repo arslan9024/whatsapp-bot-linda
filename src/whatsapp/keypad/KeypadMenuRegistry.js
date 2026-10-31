@@ -61,6 +61,8 @@ export const MENUS = {
       { key: '2', code: '3.2', label: '🧪 Run Closed-Circle Dry Run Simulation', action: 'campaign_dry_run' },
       { key: '3', code: '3.3', label: '👑 Test Supervisor Reminder Dispatch', action: 'campaign_test_supervisor' },
       { key: '4', code: '3.4', label: '📁 View Quota Ledger & Active Lines', action: 'campaign_quota_view' },
+      { key: '5', code: '3.5', label: '📋 Pending Agent Follow-ups (SLA Status)', action: 'campaign_pending_followups' },
+      { key: '6', code: '3.6', label: '🔍 Search Damac Hills 2 Clusters & Info', action: 'campaign_search_owner' },
     ],
   },
 
@@ -165,3 +167,4 @@ export function findOptionByCode(code) {
 }
 
 export default MENUS;
+

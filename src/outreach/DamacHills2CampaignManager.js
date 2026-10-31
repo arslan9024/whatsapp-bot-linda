@@ -18,21 +18,19 @@ import services from '../core/ServiceRegistry.js';
 import { maskPhone, phoneKey } from './OwnerPhoneNormalizer.js';
 import { auditCrossAccountHistory } from './DeepChatHistoryAuditor.js';
 import { dispatchSupervisorReminder } from './SupervisorFollowUpDispatcher.js';
+import { getOrganicGreeting, sendHumanizedMessage } from './HumanizedMessageSender.js';
+import { supervisorFollowUpTracker } from './SupervisorFollowUpTracker.js';
 
 const logger = new Logger('DamacHills2CampaignManager');
 
 /**
- * Format fresh greeting for a brand-new contact.
+ * Format fresh greeting for a brand-new contact (uses organic variations).
  *
  * @param {string} [ownerName]
  * @returns {string}
  */
 export function formatFreshGreeting(ownerName = '') {
-  const cleanName = String(ownerName || '').trim();
-  const nameSalutation = cleanName && cleanName.toLowerCase() !== 'property owner' ? ` ${cleanName}` : '';
-  const hour = new Date().getHours();
-  const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  return `${timeGreeting}${nameSalutation}! Hope you're having a wonderful day.`;
+  return getOrganicGreeting(ownerName);
 }
 
 export class DamacHills2CampaignManager {
@@ -40,7 +38,23 @@ export class DamacHills2CampaignManager {
     this.quotaFile = deps.quotaFile || path.resolve('data', 'outreach', 'daily-quota.json');
     this.accountConfigManager = deps.accountConfigManager || null;
     this.accountClients = deps.accountClients || null;
+    this.sheetSource = deps.sheetSource || null;
     this.dailyLimitPerAccount = 1; // Strict 1 new conversation per day per account
+  }
+
+  /**
+   * Sync outreach status back to Google Sheets if configured.
+   */
+  async _syncSheetStatus(lead, statusText, options = {}) {
+    const sheetSource = options.sheetSource || this.sheetSource;
+    if (!sheetSource || !lead.rowIndex || !options.mainValues) return;
+    try {
+      const statusMap = new Map([[lead.rowIndex, statusText]]);
+      await sheetSource.writeStatus(options.mainValues, statusMap, options.spreadsheetId);
+      logger.info(`📝 Synced row ${lead.rowIndex} status to Google Sheets: "${statusText}"`);
+    } catch (err) {
+      logger.warn(`Failed to sync status to Google Sheets: ${err.message}`);
+    }
   }
 
   getTodayKey() {
@@ -158,6 +172,24 @@ export class DamacHills2CampaignManager {
         historyDetails: history.details,
       });
 
+      // Record in 24-hour SLA monitor
+      supervisorFollowUpTracker.recordAssignment({
+        ownerName: lead.name,
+        clientPhone: clientDigits,
+        assignedAgentPhone: history.accountPhone,
+        agentName: history.accountName,
+        community: lead.community || 'Damac Hills 2',
+        unit: lead.unit || '',
+      });
+
+      if (options.syncSheet) {
+        await this._syncSheetStatus(
+          lead,
+          `Follow-up -> ${history.accountName || history.accountPhone} (${this.getTodayKey()})`,
+          options
+        );
+      }
+
       return {
         success: true,
         action: 'supervisor_reminder_dispatched',
@@ -199,9 +231,13 @@ export class DamacHills2CampaignManager {
     }
 
     try {
-      const sendRes = await client.sendMessage(targetJid, greetingText);
+      const sendRes = await sendHumanizedMessage(client, targetJid, greetingText, { instant: options.instant });
       this.recordUsage(accountPhone);
       logger.info(`✅ Fresh greeting sent from ${maskPhone(accountPhone)} to ${maskPhone(clientDigits)} (Quota 1/1 complete)`);
+
+      if (options.syncSheet) {
+        await this._syncSheetStatus(lead, `Sent ${this.getTodayKey()} via ${accountPhone}`, options);
+      }
 
       return {
         success: true,
