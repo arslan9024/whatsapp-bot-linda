@@ -80,3 +80,4 @@ export const authenticationMethods = {
     return relink(masterPhone);
   },
 };
+

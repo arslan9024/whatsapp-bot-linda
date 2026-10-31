@@ -37,3 +37,4 @@ export const outputMethods = {
     this.stats.commandsByName[command] = (this.stats.commandsByName[command] || 0) + 1;
   },
 };
+

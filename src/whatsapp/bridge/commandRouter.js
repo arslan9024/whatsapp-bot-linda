@@ -43,3 +43,4 @@ export function parseCommand(body, prefix) {
   const parts = afterPrefix.split(/\s+/);
   return { command: (parts[0] || '').toLowerCase(), args: parts.slice(1) };
 }
+

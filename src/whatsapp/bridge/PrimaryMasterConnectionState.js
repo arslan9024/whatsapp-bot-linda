@@ -42,3 +42,4 @@ export const connectionStateMethods = {
     return Boolean(isPrimaryMasterLinked(this.accountConfigManager, this.deviceLinkedManager));
   },
 };
+

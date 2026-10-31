@@ -243,3 +243,4 @@ export async function resolveSenderPhone(msg, primaryClient = null, accountConfi
   // Unresolved LID
   return { phone: null, isLid: true, lidDigits: rawDigits };
 }
+

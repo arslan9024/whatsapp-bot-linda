@@ -22,3 +22,4 @@ export const menuCommands = {
     return HELP_TEXT;
   },
 };
+
