@@ -24,6 +24,7 @@ All agent-assisted engineering in this repository operates under strict division
 - Every file must have a single, cohesive responsibility.
 - Large files (> 350 lines) must be modularized into cohesive submodules.
 - Shared logic must be extracted into `src/core/` or `src/shared/`.
+- **UI components and pages must also respect the 350‑line limit and contain only rendering or data‑fetching logic; they must not embed business logic.**
 
 ### 2.2 Continuous Deduplication & Optimization Law (PERMANENT)
 - Zero duplicate route definitions, parallel competing servers, or shadowed utilities.
@@ -58,4 +59,19 @@ Before completing any task or pull request:
 - [ ] No hardcoded secrets or tokens.
 - [ ] Diff size is within acceptable limits (< 500 lines).
 - [ ] Documentation updated to reflect changes.
+
+---
+
+## 5. Architectural Categories
+All files must be placed in one of these six categories and must obey the Single Purpose File Law:
+
+| Category | Typical contents | Example Locations |
+| :--- | :--- | :--- |
+| **1️⃣ Core / Shared** | Low‑level utilities, logger, service registry, config loaders | `src/core/`, `config/` |
+| **2️⃣ Domain / Feature** | Business‑logic modules (anti‑ban, intelligence, outreach, sessions, accounts) | `src/anti-ban/`, `src/intelligence/`, `src/outreach/`, `src/sessions/`, `src/accounts/` |
+| **3️⃣ API / Server** | Express/Koa server entry points, route definitions, middleware | `src/api/`, `src/middleware/` |
+| **4️⃣ Tests** | Unit / integration test suites, fixtures | `tests/unit/`, `tests/integration/` |
+| **5️⃣ Dev‑ops / Tools** | Scripts for housekeeping, CI, doctor checks, CLI helpers | `tools/`, `scripts/` |
+| **6️⃣ UI / Front‑end** | React/Next.js pages, components, UI‑only utilities, styling, socket bridge | `ui/pages/`, `ui/components/`, `ui/lib/` |
+
 
