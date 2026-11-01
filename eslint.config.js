@@ -1,6 +1,6 @@
 export default [
   {
-    ignores: ['node_modules/**', 'logs/**', 'sessions/**', 'Outputs/**', 'Backup/**', 'archive/**', 'coverage/**'],
+    ignores: ['node_modules/**', 'logs/**', 'sessions/**', 'Outputs/**', 'Backup/**', 'archive/**', 'coverage/**', 'ui/**'],
   },
   {
     files: ['**/*.js'],

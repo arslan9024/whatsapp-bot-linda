@@ -144,3 +144,8 @@ data/outreach/
 # Feature usage counters (local)
 data/feature-usage.json
 data/device-status/
+
+# Next.js UI Build & Dependencies
+.next/
+ui/.next/
+ui/node_modules/

@@ -5,7 +5,6 @@
  * Complies with Production Law #1: NEVER kill node.exe.
  */
 import { spawn } from "node:child_process";
-import path from "node:path";
 
 const ALLOWED_SCRIPTS = {
   doctor: ["tools/doctor.js"],
@@ -60,3 +59,4 @@ export default function handler(req, res) {
     });
   });
 }
+

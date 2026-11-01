@@ -32,3 +32,4 @@ export default function MetricCard({ title, value, helperText = "", colorScheme 
     </Box>
   );
 }
+

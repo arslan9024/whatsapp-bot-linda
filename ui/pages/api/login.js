@@ -3,8 +3,6 @@
  * UI Authentication API
  * Single responsibility: Authenticate UI users and issue session tokens.
  */
-import { timingSafeEqual } from "node:crypto";
-
 export default function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -32,3 +30,4 @@ export default function handler(req, res) {
     expiresIn: "24h",
   });
 }
+
