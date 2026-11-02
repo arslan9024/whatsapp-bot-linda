@@ -22,10 +22,10 @@
         "run:24-7": "npm run verify:24-7 && npm run dev:24-7",
         "dev:watch": "nodemon --watch index.js --watch src/whatsapp --watch src/sessions --watch src/connection --watch src/linking --watch src/terminal --exec node --no-warnings index.js",
         "clean-sessions": "node tools/cleanSessions.js",
-        "ui": "npm --prefix ui run dev",
+        "ui": "cross-env PORT=4000 npm --prefix ui run dev",
         "ui:install": "npm --prefix ui install",
         "ui:build": "npm --prefix ui run build",
-        "ui:start": "npm --prefix ui run start",
+        "ui:start": "cross-env PORT=4000 npm --prefix ui run start",
         "fresh-start": "node tools/freshStart.js",
         "list-sessions": "node tools/listSessions.js",
         "send-hello": "node tools/sendHelloMessage.js",
@@ -60,7 +60,8 @@
         "security:scan": "node tools/scan-secrets.js",
         "plans:check": "node tools/plans-check.js",
         "doctor:google": "node tools/diagnose-google.js",
-        "contacts:authorize": "node tools/authorize-contacts.js"
+        "contacts:authorize": "node tools/authorize-contacts.js",
+        "dev:ui": "concurrently --names \"BOT,UI\" --prefix-colors \"cyan,magenta\" \"npm run dev\" \"npm run ui\""
     },
     "nodemonConfig": {
         "ignore": [
@@ -106,6 +107,8 @@
         "@babel/core": "^7.29.0",
         "@babel/preset-env": "^7.29.0",
         "babel-jest": "^29.7.0",
+        "concurrently": "^10.0.6",
+        "cross-env": "^10.1.0",
         "eslint": "^8.54.0",
         "eslint-config-prettier": "^9.0.0",
         "jest": "^29.7.0",
