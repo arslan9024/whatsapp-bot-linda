@@ -19,3 +19,4 @@ export class ReferralIncentivePrompter {
 }
 
 export default new ReferralIncentivePrompter();
+

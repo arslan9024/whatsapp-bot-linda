@@ -86,3 +86,4 @@ export class UaeCentralBankFxSync {
 }
 
 export default new UaeCentralBankFxSync();
+

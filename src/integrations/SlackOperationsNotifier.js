@@ -36,3 +36,4 @@ export class SlackOperationsNotifier {
 }
 
 export default new SlackOperationsNotifier();
+

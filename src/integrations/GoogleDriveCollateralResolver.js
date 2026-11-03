@@ -25,3 +25,4 @@ export class GoogleDriveCollateralResolver {
 }
 
 export default new GoogleDriveCollateralResolver();
+

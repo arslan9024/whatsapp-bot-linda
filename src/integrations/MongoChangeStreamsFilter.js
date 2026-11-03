@@ -26,3 +26,4 @@ export class MongoChangeStreamsFilter {
 }
 
 export default new MongoChangeStreamsFilter();
+

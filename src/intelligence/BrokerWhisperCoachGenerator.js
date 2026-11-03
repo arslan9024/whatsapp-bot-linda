@@ -50,3 +50,4 @@ export class BrokerWhisperCoachGenerator {
 }
 
 export default new BrokerWhisperCoachGenerator();
+

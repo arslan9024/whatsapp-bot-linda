@@ -27,3 +27,4 @@ export class CampaignConversionAnalytics {
 }
 
 export default new CampaignConversionAnalytics();
+

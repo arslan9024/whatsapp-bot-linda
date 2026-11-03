@@ -36,3 +36,4 @@ export class HubSpotCrmFormatter {
 }
 
 export default new HubSpotCrmFormatter();
+

@@ -34,3 +34,4 @@ export class SalesforcePropertyCloudMapper {
 }
 
 export default new SalesforcePropertyCloudMapper();
+

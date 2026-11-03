@@ -68,3 +68,4 @@ export class StripeDepositLinkGenerator {
 }
 
 export default new StripeDepositLinkGenerator();
+

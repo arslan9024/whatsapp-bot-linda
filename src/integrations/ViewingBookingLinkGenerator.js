@@ -26,3 +26,4 @@ export class ViewingBookingLinkGenerator {
 }
 
 export default new ViewingBookingLinkGenerator();
+

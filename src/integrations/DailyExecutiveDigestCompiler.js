@@ -40,3 +40,4 @@ export class DailyExecutiveDigestCompiler {
 }
 
 export default new DailyExecutiveDigestCompiler();
+

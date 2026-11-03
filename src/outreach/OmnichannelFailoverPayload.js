@@ -32,3 +32,4 @@ export class OmnichannelFailoverPayload {
 }
 
 export default new OmnichannelFailoverPayload();
+

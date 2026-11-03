@@ -52,3 +52,4 @@ export class VipDealTeamChannelFormatter {
 }
 
 export default new VipDealTeamChannelFormatter();
+

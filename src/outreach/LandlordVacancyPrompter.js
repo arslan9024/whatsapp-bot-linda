@@ -13,3 +13,4 @@ export class LandlordVacancyPrompter {
 }
 
 export default new LandlordVacancyPrompter();
+
