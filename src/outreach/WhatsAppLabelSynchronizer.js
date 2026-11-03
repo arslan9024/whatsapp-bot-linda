@@ -48,3 +48,4 @@ export class WhatsAppLabelSynchronizer {
 }
 
 export default new WhatsAppLabelSynchronizer();
+

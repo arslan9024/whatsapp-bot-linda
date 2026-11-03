@@ -52,3 +52,4 @@ export class GroupMessageQuarantine {
 }
 
 export default new GroupMessageQuarantine();
+

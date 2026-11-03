@@ -50,3 +50,4 @@ export class BroadcastListManager {
 }
 
 export default new BroadcastListManager();
+

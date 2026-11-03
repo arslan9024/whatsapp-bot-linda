@@ -45,3 +45,4 @@ export class MultiDeviceSyncVerifier {
 }
 
 export default new MultiDeviceSyncVerifier();
+
