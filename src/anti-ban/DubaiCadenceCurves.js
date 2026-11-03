@@ -40,3 +40,4 @@ export class DubaiCadenceCurves {
 }
 
 export default new DubaiCadenceCurves();
+

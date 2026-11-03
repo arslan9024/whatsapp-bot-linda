@@ -46,3 +46,4 @@ export class SpamKeywordSanitizer {
 }
 
 export default new SpamKeywordSanitizer();
+

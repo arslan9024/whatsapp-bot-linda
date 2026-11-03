@@ -26,3 +26,4 @@ export class ChromiumIdleGhostEmulation {
 }
 
 export default new ChromiumIdleGhostEmulation();
+

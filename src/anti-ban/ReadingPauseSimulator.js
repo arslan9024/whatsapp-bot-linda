@@ -23,3 +23,4 @@ export class ReadingPauseSimulator {
 }
 
 export default new ReadingPauseSimulator();
+

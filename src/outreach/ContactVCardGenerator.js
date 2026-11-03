@@ -36,3 +36,4 @@ export class ContactVCardGenerator {
 }
 
 export default new ContactVCardGenerator();
+

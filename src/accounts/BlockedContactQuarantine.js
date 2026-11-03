@@ -34,3 +34,4 @@ export class BlockedContactQuarantine {
 }
 
 export default new BlockedContactQuarantine();
+

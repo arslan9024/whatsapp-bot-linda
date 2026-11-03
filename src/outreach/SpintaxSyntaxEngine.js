@@ -34,3 +34,4 @@ export class SpintaxSyntaxEngine {
 }
 
 export default new SpintaxSyntaxEngine();
+

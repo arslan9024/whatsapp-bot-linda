@@ -34,3 +34,4 @@ export class MobileTouchViewportSimulator {
 }
 
 export default new MobileTouchViewportSimulator();
+
