@@ -27,3 +27,4 @@ export class VipLeadEscalationNotifier {
 }
 
 export default new VipLeadEscalationNotifier();
+

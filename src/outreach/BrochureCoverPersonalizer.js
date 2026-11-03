@@ -19,3 +19,4 @@ export class BrochureCoverPersonalizer {
 }
 
 export default new BrochureCoverPersonalizer();
+

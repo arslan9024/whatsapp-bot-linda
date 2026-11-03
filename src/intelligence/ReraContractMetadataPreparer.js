@@ -38,3 +38,4 @@ export class ReraContractMetadataPreparer {
 }
 
 export default new ReraContractMetadataPreparer();
+

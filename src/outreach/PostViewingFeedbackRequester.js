@@ -22,3 +22,4 @@ export class PostViewingFeedbackRequester {
 }
 
 export default new PostViewingFeedbackRequester();
+

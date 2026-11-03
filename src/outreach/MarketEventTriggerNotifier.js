@@ -22,3 +22,4 @@ export class MarketEventTriggerNotifier {
 }
 
 export default new MarketEventTriggerNotifier();
+
