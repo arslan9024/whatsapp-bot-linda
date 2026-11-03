@@ -42,3 +42,4 @@ export class DubaiPropertyFeeItemizer {
 }
 
 export default new DubaiPropertyFeeItemizer();
+

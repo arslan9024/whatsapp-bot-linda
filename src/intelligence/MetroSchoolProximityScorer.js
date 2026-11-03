@@ -40,3 +40,4 @@ export class MetroSchoolProximityScorer {
 }
 
 export default new MetroSchoolProximityScorer();
+

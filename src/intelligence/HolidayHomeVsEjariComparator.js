@@ -47,3 +47,4 @@ export class HolidayHomeVsEjariComparator {
 }
 
 export default new HolidayHomeVsEjariComparator();
+

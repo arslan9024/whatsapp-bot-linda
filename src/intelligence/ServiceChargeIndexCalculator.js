@@ -38,3 +38,4 @@ export class ServiceChargeIndexCalculator {
 }
 
 export default new ServiceChargeIndexCalculator();
+

@@ -39,3 +39,4 @@ export class RentalRoiCalculator {
 }
 
 export default new RentalRoiCalculator();
+

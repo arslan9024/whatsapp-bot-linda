@@ -34,3 +34,4 @@ export class CommunityAmenitiesIndex {
 }
 
 export default new CommunityAmenitiesIndex();
+

@@ -48,3 +48,4 @@ export class DldTransactionIndexParser {
 }
 
 export default new DldTransactionIndexParser();
+

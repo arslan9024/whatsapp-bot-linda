@@ -32,3 +32,4 @@ export class LandlordEjariRenewalAlert {
 }
 
 export default new LandlordEjariRenewalAlert();
+

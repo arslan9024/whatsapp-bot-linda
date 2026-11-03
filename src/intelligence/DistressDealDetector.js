@@ -38,3 +38,4 @@ export class DistressDealDetector {
 }
 
 export default new DistressDealDetector();
+

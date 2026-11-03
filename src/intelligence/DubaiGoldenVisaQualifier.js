@@ -29,3 +29,4 @@ export class DubaiGoldenVisaQualifier {
 }
 
 export default new DubaiGoldenVisaQualifier();
+

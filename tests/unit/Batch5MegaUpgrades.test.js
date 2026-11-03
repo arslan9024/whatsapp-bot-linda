@@ -144,3 +144,4 @@ describe('Mega Batch 5 Upgrades 51–65 (UAE & Dubai Real Estate Domain Intellig
     expect(index.getAmenitiesForCommunity('DAMAC_HILLS')).toContain('GOLF_COURSE');
   });
 });
+
