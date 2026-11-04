@@ -39,3 +39,4 @@ export class MatterportTourFrameExtractor {
 }
 
 export default new MatterportTourFrameExtractor();
+

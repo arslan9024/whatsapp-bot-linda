@@ -44,3 +44,4 @@ export class MediaBrandingWatermarker {
 }
 
 export default new MediaBrandingWatermarker();
+

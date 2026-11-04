@@ -51,3 +51,4 @@ export class VoiceNoteAdaptiveTruncator {
 }
 
 export default new VoiceNoteAdaptiveTruncator();
+

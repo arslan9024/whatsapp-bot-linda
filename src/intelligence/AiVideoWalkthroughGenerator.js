@@ -50,3 +50,4 @@ export class AiVideoWalkthroughGenerator {
 }
 
 export default new AiVideoWalkthroughGenerator();
+

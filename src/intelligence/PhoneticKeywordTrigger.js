@@ -40,3 +40,4 @@ export class PhoneticKeywordTrigger {
 }
 
 export default new PhoneticKeywordTrigger();
+

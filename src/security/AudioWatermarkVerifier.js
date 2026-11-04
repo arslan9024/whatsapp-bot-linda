@@ -42,3 +42,4 @@ export class AudioWatermarkVerifier {
 }
 
 export default new AudioWatermarkVerifier();
+

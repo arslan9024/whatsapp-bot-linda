@@ -51,3 +51,4 @@ export class PhotoLightingScorer {
 }
 
 export default new PhotoLightingScorer();
+

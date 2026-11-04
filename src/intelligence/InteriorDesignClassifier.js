@@ -40,3 +40,4 @@ export class InteriorDesignClassifier {
 }
 
 export default new InteriorDesignClassifier();
+
