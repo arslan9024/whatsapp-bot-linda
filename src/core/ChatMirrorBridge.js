@@ -54,3 +54,4 @@ export class ChatMirrorBridge {
 }
 
 export default new ChatMirrorBridge();
+

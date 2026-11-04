@@ -64,3 +64,4 @@ export class TamperEvidentSessionLocker {
 }
 
 export default new TamperEvidentSessionLocker();
+

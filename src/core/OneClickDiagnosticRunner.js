@@ -58,3 +58,4 @@ export class OneClickDiagnosticRunner {
 }
 
 export default new OneClickDiagnosticRunner();
+

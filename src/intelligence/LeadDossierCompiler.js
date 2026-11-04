@@ -48,3 +48,4 @@ export class LeadDossierCompiler {
 }
 
 export default new LeadDossierCompiler();
+

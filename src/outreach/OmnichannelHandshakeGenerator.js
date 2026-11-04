@@ -36,3 +36,4 @@ export class OmnichannelHandshakeGenerator {
 }
 
 export default new OmnichannelHandshakeGenerator();
+

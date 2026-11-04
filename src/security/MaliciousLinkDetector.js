@@ -92,3 +92,4 @@ export class MaliciousLinkDetector {
 }
 
 export default new MaliciousLinkDetector();
+

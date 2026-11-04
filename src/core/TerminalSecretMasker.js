@@ -35,3 +35,4 @@ export class TerminalSecretMasker {
 }
 
 export default new TerminalSecretMasker();
+

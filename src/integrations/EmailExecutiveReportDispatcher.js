@@ -61,3 +61,4 @@ export class EmailExecutiveReportDispatcher {
 }
 
 export default new EmailExecutiveReportDispatcher();
+

@@ -67,3 +67,4 @@ export class EmergencyDataLockdownSwitch {
 }
 
 export default new EmergencyDataLockdownSwitch();
+

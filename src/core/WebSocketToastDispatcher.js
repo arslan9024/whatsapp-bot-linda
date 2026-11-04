@@ -74,3 +74,4 @@ export class WebSocketToastDispatcher {
 }
 
 export default new WebSocketToastDispatcher();
+

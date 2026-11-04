@@ -52,3 +52,4 @@ export class LindaMasterSystemRegistry {
 }
 
 export default new LindaMasterSystemRegistry();
+

@@ -41,3 +41,4 @@ export class TelegramSupervisorDispatcher {
 }
 
 export default new TelegramSupervisorDispatcher();
+

@@ -33,3 +33,4 @@ export class DormantOwnerInventoryRefresher {
 }
 
 export default new DormantOwnerInventoryRefresher();
+

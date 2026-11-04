@@ -79,3 +79,4 @@ export class LeadKanbanPipeline {
 }
 
 export default new LeadKanbanPipeline();
+

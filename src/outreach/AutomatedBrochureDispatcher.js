@@ -43,3 +43,4 @@ export class AutomatedBrochureDispatcher {
 }
 
 export default new AutomatedBrochureDispatcher();
+

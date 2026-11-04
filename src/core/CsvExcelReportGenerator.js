@@ -36,3 +36,4 @@ export class CsvExcelReportGenerator {
 }
 
 export default new CsvExcelReportGenerator();
+

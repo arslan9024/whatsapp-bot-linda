@@ -31,3 +31,4 @@ export class GoogleContactsTwoWaySync {
 }
 
 export default new GoogleContactsTwoWaySync();
+

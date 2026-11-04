@@ -36,3 +36,4 @@ export class BroadcastVariableInterpolator {
 }
 
 export default new BroadcastVariableInterpolator();
+

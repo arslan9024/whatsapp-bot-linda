@@ -42,3 +42,4 @@ export class AudioVoiceNoteStreamingPlayer {
 }
 
 export default new AudioVoiceNoteStreamingPlayer();
+

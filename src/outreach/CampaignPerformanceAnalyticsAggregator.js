@@ -42,3 +42,4 @@ export class CampaignPerformanceAnalyticsAggregator {
 }
 
 export default new CampaignPerformanceAnalyticsAggregator();
+

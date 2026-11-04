@@ -64,3 +64,4 @@ export class HourlyActivityHeatmap {
 }
 
 export default new HourlyActivityHeatmap();
+

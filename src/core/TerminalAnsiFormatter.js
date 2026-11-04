@@ -56,3 +56,4 @@ export class TerminalAnsiFormatter {
 }
 
 export default new TerminalAnsiFormatter();
+

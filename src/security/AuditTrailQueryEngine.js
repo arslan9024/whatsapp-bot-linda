@@ -57,3 +57,4 @@ export class AuditTrailQueryEngine {
 }
 
 export default new AuditTrailQueryEngine();
+
