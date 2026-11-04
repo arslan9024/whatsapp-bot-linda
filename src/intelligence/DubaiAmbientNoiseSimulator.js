@@ -46,3 +46,4 @@ export class DubaiAmbientNoiseSimulator {
 }
 
 export default new DubaiAmbientNoiseSimulator();
+

@@ -45,3 +45,4 @@ export class SpeechToIntentFastMatcher {
 }
 
 export default new SpeechToIntentFastMatcher();
+

@@ -51,3 +51,4 @@ export class AudioEmotionHesitationAnalyzer {
 }
 
 export default new AudioEmotionHesitationAnalyzer();
+

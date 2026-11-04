@@ -50,3 +50,4 @@ export class AudioQualityBooster {
 }
 
 export default new AudioQualityBooster();
+
