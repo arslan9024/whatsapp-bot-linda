@@ -43,3 +43,4 @@ export class ScratchGarbageCollector {
 }
 
 export default new ScratchGarbageCollector();
+

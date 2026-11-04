@@ -43,3 +43,4 @@ export class DefectSnaggingClassifier {
 }
 
 export default new DefectSnaggingClassifier();
+

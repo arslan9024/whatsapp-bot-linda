@@ -209,3 +209,4 @@ describe('Mega Batch 10 (Upgrades 126–140) Test Suite', () => {
     expect(guard.isAllowed('8.8.8.8')).toBe(false);
   });
 });
+

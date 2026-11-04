@@ -44,3 +44,4 @@ export class MobileViewportLayoutAdapter {
 }
 
 export default new MobileViewportLayoutAdapter();
+

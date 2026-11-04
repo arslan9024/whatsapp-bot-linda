@@ -47,3 +47,4 @@ export class MasterPlanRenderComparator {
 }
 
 export default new MasterPlanRenderComparator();
+

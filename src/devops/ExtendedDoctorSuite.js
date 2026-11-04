@@ -53,3 +53,4 @@ export class ExtendedDoctorSuite {
 }
 
 export default new ExtendedDoctorSuite();
+

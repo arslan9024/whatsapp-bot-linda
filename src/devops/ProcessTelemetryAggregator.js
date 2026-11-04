@@ -45,3 +45,4 @@ export class ProcessTelemetryAggregator {
 }
 
 export default new ProcessTelemetryAggregator();
+

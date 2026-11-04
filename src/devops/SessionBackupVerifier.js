@@ -49,3 +49,4 @@ export class SessionBackupVerifier {
 }
 
 export default new SessionBackupVerifier();
+

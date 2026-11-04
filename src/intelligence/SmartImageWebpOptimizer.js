@@ -57,3 +57,4 @@ export class SmartImageWebpOptimizer {
 }
 
 export default new SmartImageWebpOptimizer();
+

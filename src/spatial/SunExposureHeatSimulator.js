@@ -47,3 +47,4 @@ export class SunExposureHeatSimulator {
 }
 
 export default new SunExposureHeatSimulator();
+

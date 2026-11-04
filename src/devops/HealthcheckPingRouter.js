@@ -46,3 +46,4 @@ export class HealthcheckPingRouter {
 }
 
 export default new HealthcheckPingRouter();
+

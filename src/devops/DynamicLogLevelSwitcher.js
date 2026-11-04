@@ -44,3 +44,4 @@ export class DynamicLogLevelSwitcher {
 }
 
 export default new DynamicLogLevelSwitcher();
+

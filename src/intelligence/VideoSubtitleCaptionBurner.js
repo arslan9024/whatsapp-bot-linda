@@ -40,3 +40,4 @@ export class VideoSubtitleCaptionBurner {
 }
 
 export default new VideoSubtitleCaptionBurner();
+

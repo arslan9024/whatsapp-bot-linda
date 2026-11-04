@@ -40,3 +40,4 @@ export class AirportFlightNoiseProfiler {
 }
 
 export default new AirportFlightNoiseProfiler();
+

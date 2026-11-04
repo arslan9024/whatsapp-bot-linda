@@ -50,3 +50,4 @@ export class DatabaseIndexOptimizer {
 }
 
 export default new DatabaseIndexOptimizer();
+

@@ -44,3 +44,4 @@ export class CarouselCardSynthesizer {
 }
 
 export default new CarouselCardSynthesizer();
+

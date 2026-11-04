@@ -31,3 +31,4 @@ export class FacialPrivacyMasker {
 }
 
 export default new FacialPrivacyMasker();
+

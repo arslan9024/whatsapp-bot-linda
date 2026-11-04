@@ -47,3 +47,4 @@ export class VirtualStagingPreviewGenerator {
 }
 
 export default new VirtualStagingPreviewGenerator();
+

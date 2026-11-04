@@ -73,3 +73,4 @@ export default new MultiAccountSwitcherManager([
   { id: 'linda_primary', name: 'Linda (Primary Concierge)', phone: '+971501112233' },
   { id: 'power_agent', name: 'PowerAgent (Campaigns)', phone: '+971559998877' }
 ]);
+

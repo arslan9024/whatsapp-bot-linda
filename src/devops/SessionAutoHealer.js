@@ -50,3 +50,4 @@ export class SessionAutoHealer {
 }
 
 export default new SessionAutoHealer();
+

@@ -38,3 +38,4 @@ export class DynamicQrPayloadGenerator {
 }
 
 export default new DynamicQrPayloadGenerator();
+

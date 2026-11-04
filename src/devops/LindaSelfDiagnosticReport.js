@@ -42,3 +42,4 @@ export class LindaSelfDiagnosticReport {
 }
 
 export default new LindaSelfDiagnosticReport();
+

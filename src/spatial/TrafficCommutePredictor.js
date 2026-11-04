@@ -39,3 +39,4 @@ export class TrafficCommutePredictor {
 }
 
 export default new TrafficCommutePredictor();
+

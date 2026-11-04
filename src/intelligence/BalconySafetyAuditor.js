@@ -59,3 +59,4 @@ export class BalconySafetyAuditor {
 }
 
 export default new BalconySafetyAuditor();
+

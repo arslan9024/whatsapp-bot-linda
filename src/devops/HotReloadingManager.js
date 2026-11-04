@@ -72,3 +72,4 @@ export class HotReloadingManager {
 }
 
 export default new HotReloadingManager();
+

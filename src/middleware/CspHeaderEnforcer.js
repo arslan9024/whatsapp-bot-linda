@@ -49,3 +49,4 @@ export class CspHeaderEnforcer {
 }
 
 export default new CspHeaderEnforcer();
+

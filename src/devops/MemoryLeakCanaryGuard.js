@@ -45,3 +45,4 @@ export class MemoryLeakCanaryGuard {
 }
 
 export default new MemoryLeakCanaryGuard();
+

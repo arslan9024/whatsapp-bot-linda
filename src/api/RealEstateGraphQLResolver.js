@@ -48,3 +48,4 @@ export class RealEstateGraphQLResolver {
 }
 
 export default new RealEstateGraphQLResolver();
+
