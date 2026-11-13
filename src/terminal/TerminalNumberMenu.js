@@ -58,6 +58,14 @@ export default class TerminalNumberMenu {
     this.root = {
       label: 'Linda numbered menu',
       children: [
+        { label: 'Terminal & Dashboard Controls', children: [
+          action('View Live Dashboard', 'dashboard'),
+          action('Clear Terminal Screen', 'clear'),
+          action('Toggle Console Logger (On / Off)', 'logger'),
+          action('Toggle Layout (Clean / Full Panels)', 'layout'),
+          action('Show Logger (Enable Console Logs)', 'logger on'),
+          action('Hide Logger (Mute Console Logs)', 'logger off')
+        ] },
         { label: 'Devices and accounts', children: [
           action('All accounts', 'accounts'),
           action('All devices', 'list'),

@@ -35,6 +35,23 @@ const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 const LEVEL_LABELS = { 0: 'ERROR', 1: 'WARN ', 2: 'INFO ', 3: 'DEBUG' };
 const LEVEL_ICONS  = { 0: '❌', 1: '⚠️ ', 2: 'ℹ️ ', 3: '🐛' };
 
+// Runtime console visibility toggle (can be toggled from Terminal UI)
+let _consoleOutputEnabled = true;
+
+export function setConsoleLogging(enabled) {
+  _consoleOutputEnabled = Boolean(enabled);
+  return _consoleOutputEnabled;
+}
+
+export function isConsoleLoggingEnabled() {
+  return _consoleOutputEnabled;
+}
+
+export function toggleConsoleLogging() {
+  _consoleOutputEnabled = !_consoleOutputEnabled;
+  return _consoleOutputEnabled;
+}
+
 function resolveMinLevel() {
   const env = (process.env.LOG_LEVEL || 'info').toLowerCase();
   return LEVELS[env] ?? LEVELS.info;
@@ -107,12 +124,14 @@ class Logger {
     const label = LEVEL_LABELS[level];
     const prefix = `[${ts}] ${icon} [${this.name}]`;
 
-    // Console output
-    const consoleLine = `${prefix} ${safeMessage}`;
-    if (level === 0) {
-      console.error(consoleLine);
-    } else {
-      console.log(consoleLine);
+    // Console output (suppressible via setConsoleLogging / terminal input toggle)
+    if (_consoleOutputEnabled) {
+      const consoleLine = `${prefix} ${safeMessage}`;
+      if (level === 0) {
+        console.error(consoleLine);
+      } else {
+        console.log(consoleLine);
+      }
     }
 
     // File output (plain text, no emoji artifacts from some terminals)

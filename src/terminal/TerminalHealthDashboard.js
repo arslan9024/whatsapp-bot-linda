@@ -20,18 +20,19 @@ import accountHealthMonitor from '../accounts/AccountHealthMonitor.js';
 import TerminalNumberMenu from './TerminalNumberMenu.js';
 import services from '../core/ServiceRegistry.js';
 import { SessionManager } from '../sessions/SessionManager.js';
-import TerminalLayout, { colorize, PANEL_COLORS } from './TerminalLayout.js';
+import TerminalLayout, { colorize, PANEL_COLORS, getLayoutMode, setLayoutMode, toggleLayoutMode } from './TerminalLayout.js';
 import FeatureCatalog from './FeatureCatalog.js';
 import TerminalPlaybooks, { PLAYBOOKS } from './TerminalPlaybooks.js';
 import { conversationReportLines, conversationSummaryLines } from './TerminalConversationAnalysis.js';
 import { getNewConversationGuard } from '../outreach/MasterChatDirectory.js';
 import OutreachCommand from '../outreach/OutreachCommand.js';
 import OutreachDailyRunner from '../outreach/OutreachDailyRunner.js';
+import { isConsoleLoggingEnabled, setConsoleLogging, toggleConsoleLogging } from '../core/Logger.js';
 import {
   dedupeLines, intentLines, pickClient, scoreLines, sendSingleMessage, sentimentLines, similarLines, validateLines,
 } from './TerminalFeatureCommands.js';
 
-const COMMAND_HINT = 'First: master check | master ready = restore if offline | features = all commands | menu = choose options | help';
+const COMMAND_HINT = 'First: master check | dashboard = show status | clear = clear screen | logger = toggle logs | menu = choose options';
 const APP_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).version || '?';
@@ -698,7 +699,24 @@ class TerminalHealthDashboard {
       ...this.masterSectionLines(masterInfo),
       ...this.conversationLines(onlinePhones.filter(entry => !entry.master)),
     ];
-    const screen = [
+    const isCleanMode = getLayoutMode() === 'clean';
+    const cleanScreen = [
+      '[1;36m╔══════════════════════════════════════════════════════════════════════════╗[0m',
+      '[1;36m║               🤖 LINDA WHATSAPP BOT · COMMAND CENTER                    ║[0m',
+      '[1;36m╚══════════════════════════════════════════════════════════════════════════╝[0m',
+      ` 📱 [1mMaster Account:[0m ${masterInfo ? `${masterInfo.phone} [${masterInfo.online ? '[32mONLINE ✓[0m' : `[31m${masterInfo.status}[0m`}]` : '[33mNot Configured[0m'}`,
+      ` ⚡ [1mDevices:[0m Total: ${rows.size} | [32mActive: ${active}[0m | [33mOffline: ${rows.size - active}[0m | Saved: ${saved}`,
+      ` 🎯 [1mDaily Outreach:[0m Target: VARDON | Limit: 10-15/day | Spacing: 35-55m | [32mActive[0m`,
+      ' ──────────────────────────────────────────────────────────────────────────',
+      ...lines.slice(0, 10).map(l => `  ${l}`),
+      ' ──────────────────────────────────────────────────────────────────────────',
+      ' 💡 [1mQuick Commands:[0m',
+      '    [menu] Interactive choices   [clear] Clear screen   [logger] Toggle logs',
+      '    [layout] Switch simple/full  [dashboard] Refresh    [help] All commands',
+      '[1;36m──────────────────────────────────────────────────────────────────────────[0m'
+    ].join('\n');
+
+    const screen = isCleanMode ? cleanScreen : [
       'LINDA | DEVICE DASHBOARD',
       devicesLine,
       'Linked = registered on the phone (last known). Active = connected now. Reactivating an offline linked device does not need relinking.',
@@ -1285,7 +1303,53 @@ class TerminalHealthDashboard {
           break;
 
         case 'status':
+        case 'dashboard':
           this.displayHealthDashboard(true);
+          break;
+
+        case 'cls':
+        case 'clear':
+          console.clear();
+          if (this.layout?.current && this.usePanels) {
+            this.layout.reset();
+            this.renderInputPanel();
+          }
+          console.log('✨ Terminal screen cleared. (Type "dashboard" or "status" to view dashboard, "logger" to toggle logs)');
+          break;
+
+        case 'mode':
+        case 'layout':
+          if (parts[1] === 'panels' || parts[1] === 'complex' || parts[1] === 'full') {
+            setLayoutMode('panels');
+            this.usePanels = true;
+            console.log('📊 Terminal layout: Full Pinned Panels (Complex Mode)');
+          } else if (parts[1] === 'clean' || parts[1] === 'simple' || parts[1] === 'modern') {
+            setLayoutMode('clean');
+            this.usePanels = false;
+            if (this.layout?.current) this.layout.reset();
+            console.log('✨ Terminal layout: Clean Modern Stream (Simplified Mode)');
+          } else {
+            const mode = toggleLayoutMode();
+            this.usePanels = mode === 'panels';
+            if (!this.usePanels && this.layout?.current) this.layout.reset();
+            console.log(mode === 'clean' ? '✨ Terminal layout: Clean Modern Stream (Simplified Mode)' : '📊 Terminal layout: Full Pinned Panels (Complex Mode)');
+          }
+          this.displayHealthDashboard(true);
+          break;
+
+        case 'logger':
+        case 'logs':
+        case 'log':
+          if (parts[1] === 'on' || parts[1] === 'show' || parts[1] === '1') {
+            setConsoleLogging(true);
+            console.log('🔊 Console logger: ON (Logs will appear in terminal)');
+          } else if (parts[1] === 'off' || parts[1] === 'hide' || parts[1] === '0') {
+            setConsoleLogging(false);
+            console.log('🔇 Console logger: OFF (Logs silenced from terminal, still recorded in logs/)');
+          } else {
+            const state = toggleConsoleLogging();
+            console.log(state ? '🔊 Console logger: ON (Logs will appear in terminal)' : '🔇 Console logger: OFF (Logs silenced from terminal, still recorded in logs/)');
+          }
           break;
 
         case 'relink':
@@ -1913,6 +1977,11 @@ class TerminalHealthDashboard {
 
         case 'help':
           console.log('Numbered menu: menu | 0 = back | 00 = home | dotted code = direct selection');
+          console.log('\n  TERMINAL & DASHBOARD CONTROLS:');
+          console.log('    dashboard / status        → View live health & account dashboard');
+          console.log('    clear / cls               → Clear terminal screen');
+          console.log('    logger / logs             → Toggle console logger on/off (silences output while keeping file logs)');
+          console.log('    logger on / logger off    → Explicitly enable or mute terminal console logging');
           console.log(`\n📚 Available Commands:`);
           console.log(`\n  ACCOUNT MANAGEMENT:`);
           console.log(`    link master               → Link first master WhatsApp account (with health check)`);

@@ -16,8 +16,24 @@ const MIN_OUTPUT_ROWS = 8;
 // magenta / green / yellow / cyan / blue
 export const PANEL_COLORS = { header: '35', features: '32', input: '33', output: '36', process: '34' };
 
+let _layoutMode = process.env.LINDA_PLAIN_TERMINAL === '1' ? 'clean' : 'clean'; // Default to clean modern layout
+
+export function setLayoutMode(mode) {
+  _layoutMode = mode === 'panels' || mode === 'full' ? 'panels' : 'clean';
+  return _layoutMode;
+}
+
+export function getLayoutMode() {
+  return _layoutMode;
+}
+
+export function toggleLayoutMode() {
+  _layoutMode = _layoutMode === 'clean' ? 'panels' : 'clean';
+  return _layoutMode;
+}
+
 export function layoutSupported(stream = process.stdout) {
-  return Boolean(stream?.isTTY) && process.env.LINDA_PLAIN_TERMINAL !== '1';
+  return Boolean(stream?.isTTY) && _layoutMode === 'panels' && process.env.LINDA_PLAIN_TERMINAL !== '1';
 }
 
 export function colorize(text, color, { bold = false, stream = process.stdout } = {}) {

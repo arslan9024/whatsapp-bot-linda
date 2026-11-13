@@ -8,7 +8,12 @@ import path from 'path';
 
 export function resolveEnvFile(env = process.env, cwd = process.cwd(), exists = fs.existsSync) {
   if (env.DOTENV_CONFIG_PATH) return path.resolve(cwd, env.DOTENV_CONFIG_PATH);
-  for (const candidate of [path.join(cwd, '.env'), path.join(cwd, 'secrets', '.env')]) {
+  for (const candidate of [
+    path.join(cwd, '.env'),
+    path.join(cwd, 'secrets', '.env'),
+    path.resolve(cwd, '..', 'secrets', 'whatsapp-bot-linda-secrets.env'),
+    path.resolve(cwd, '..', 'secrets', '.env')
+  ]) {
     if (exists(candidate)) return candidate;
   }
   return null;
