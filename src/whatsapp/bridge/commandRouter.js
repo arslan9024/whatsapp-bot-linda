@@ -77,6 +77,52 @@ export const COMMAND_HANDLERS = {
     }
   },
 
+  pool: async (b, msg) => {
+    try {
+      const poolModule = await import('../../outreach/WhatsAppDispatchPool.js');
+      const pool = poolModule.default || poolModule.WhatsAppDispatchPool;
+      const snapshot = pool.getPoolStatus();
+      const lines = [
+        '🔄 *WhatsApp Dispatch Pool Status*',
+        '',
+        `📱 *Total Accounts:* ${snapshot.totalAccounts}`,
+        `🟢 *Active Accounts:* ${snapshot.activeAccounts}`,
+        `📬 *Eligible Accounts:* ${snapshot.eligibleAccounts}`,
+        '',
+        '*Account Details:*',
+      ];
+      snapshot.accounts.forEach(acc => {
+        lines.push(`• ${acc.phone}: ${acc.active ? '🟢 ACTIVE' : '🔴 INACTIVE'} | Today: ${acc.dailyCount} (Remaining: ${acc.remainingDaily})`);
+      });
+      await msg.reply(lines.join('\n'));
+    } catch (e) {
+      await msg.reply(`❌ Dispatch Pool error: ${e.message}`);
+    }
+  },
+
+  classify: async (b, msg, args) => {
+    const query = args.join(' ').trim();
+    if (!query) {
+      await msg.reply('Usage: linda classify <client message text>');
+      return;
+    }
+    try {
+      const catModule = await import('../../outreach/InboundIntentCategorizer.js');
+      const categorizer = catModule.default || catModule.InboundIntentCategorizer;
+      const result = categorizer.categorize(query);
+      await msg.reply([
+        '🎯 *Intent Classification Result*',
+        '',
+        `🏷️ *Category:* ${result.category}`,
+        `📊 *Confidence:* ${(result.confidence * 100).toFixed(1)}%`,
+        `🔍 *Matched Keywords:* ${result.matches?.join(', ') || 'None (Fallback)'}`,
+        `📋 *Assigned List:* LIST_${result.category.toUpperCase().replace(/\s+/g, '_')}`,
+      ].join('\n'));
+    } catch (e) {
+      await msg.reply(`❌ Classifier error: ${e.message}`);
+    }
+  },
+
   campaign: async (b, msg) => {
     const env = process.env;
     const mode = env.OUTREACH_DAILY_MODE || 'draft';
