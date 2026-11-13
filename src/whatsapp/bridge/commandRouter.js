@@ -12,6 +12,20 @@ export const COMMAND_HANDLERS = {
   help: (b, msg) => msg.reply(b.getHelpText()),
   menu: (b, msg) => b.handleMenu(msg),
   dashboard: (b, msg) => b.handleMenu(msg),
+  ask: async (b, msg, args) => {
+    const text = args.join(' ').trim();
+    if (!text) {
+      await msg.reply('👋 Hi! Tell me what you need, e.g.: "linda ask what is the price range in Vardon?" or "linda ask can we check owner stats?"');
+      return;
+    }
+    const gen = services.get('advancedResponseGenerator');
+    if (gen) {
+      const reply = await gen.generateResponse(text, { sender: msg.from, role: 'admin' });
+      await msg.reply(`🤖 Linda:\n${reply}`);
+    } else {
+      await msg.reply(`🤖 Linda: I received your message: "${text}". My intelligence core is active.`);
+    }
+  },
   1: (b, msg) => b.handleGroupCommands(msg, '1'),
   2: (b, msg) => b.handleGroupCommands(msg, '2'),
   3: (b, msg) => b.handleGroupCommands(msg, '3'),
