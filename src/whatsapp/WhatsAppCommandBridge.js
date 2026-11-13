@@ -225,22 +225,6 @@ export class WhatsAppCommandBridge {
 
     if (!acm?.getAllAccounts) return false;
     return (acm.getAllAccounts() || []).some(a => this.normalizePhone(a.phoneNumber) === sender);
-    const acm = this.accountConfigManager || services.get('accountConfigManager');
-    if (!acm?.getAllAccounts || !acm?.getMasterPhoneNumber) {
-      return false;
-    }
-
-    let sender = this.normalizePhone(senderJid);
-    // WhatsApp privacy IDs (LIDs) are mapped to real numbers by InboundDeviceLinkingService.
-    const lidStore = services.get('lidPhoneStore');
-    if (lidStore?.has(sender)) {
-      sender = this.normalizePhone(lidStore.get(sender));
-    }
-    const master = this.normalizePhone(acm.getMasterPhoneNumber());
-    if (!sender || !master || sender === master) {
-      return false;
-    }
-    return (acm.getAllAccounts() || []).some((a) => this.normalizePhone(a.phoneNumber) === sender);
   }
 
   destroy() {
