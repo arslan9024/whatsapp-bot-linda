@@ -10,6 +10,9 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
   let categorizer;
   let broadcastMgr;
   let executor;
+  let mockWarmup;
+  let mockCrmSyncer;
+  let mockNotifier;
 
   const mockAccounts = ['+971505760056', '+971553633595', '+971589969886'];
 
@@ -17,10 +20,22 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     pool = new WhatsAppDispatchPool({ accountPhones: mockAccounts, maxDailyPerAccount: 5 });
     categorizer = new InboundIntentCategorizer();
     broadcastMgr = new BroadcastListManager();
+    mockWarmup = {
+      canSend: () => ({ allowed: true, limit: 12 }),
+      recordSend: () => {},
+    };
+    mockCrmSyncer = async (leadData) => ({ success: true, leadId: 'lead_mock_123' });
+    mockNotifier = {
+      notifyAdmins: async (alertData) => ({ sent: 3, failed: 0, recipients: mockAccounts }),
+    };
+
     executor = new VardonLiveCampaignExecutor({
       pool,
       categorizer,
       broadcastManager: broadcastMgr,
+      warmupScheduler: mockWarmup,
+      crmSyncer: mockCrmSyncer,
+      notifier: mockNotifier,
       dailyTarget: 6,
     });
   });
@@ -37,12 +52,21 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.equal(s4, '+971505760056'); // Loops back
   });
 
-  it('categorizes inbound messages into real estate intent lists', () => {
+  it('categorizes inbound messages into real estate intent lists in English and Arabic', () => {
     const sellerRes = categorizer.categorize('Hello Linda, I want to sell my villa in Vardon');
     assert.equal(sellerRes.category, RE_INTENT_CATEGORIES.SELLER);
+    assert.equal(sellerRes.isHighPriority, true);
 
     const buyerRes = categorizer.categorize('Interested in buying an offplan unit with good ROI');
     assert.equal(buyerRes.category, RE_INTENT_CATEGORIES.BUYER);
+
+    const cashBuyerRes = categorizer.categorize('Ready cash buyer looking for urgent villa deal in Vardon');
+    assert.equal(cashBuyerRes.category, RE_INTENT_CATEGORIES.BUYER);
+    assert.equal(cashBuyerRes.isHighPriority, true);
+
+    const arabicSellerRes = categorizer.categorize('السلام عليكم، أريد أبيع فيلتي في مجمع فاردون داماك هيلز 2 وعندي سند الملكية');
+    assert.equal(arabicSellerRes.category, RE_INTENT_CATEGORIES.SELLER);
+    assert.equal(arabicSellerRes.isHighPriority, true);
 
     const brokerRes = categorizer.categorize('Hi, I am an agent with direct client, commission split?');
     assert.equal(brokerRes.category, RE_INTENT_CATEGORIES.BROKER);
@@ -54,19 +78,24 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.equal(landlordRes.category, RE_INTENT_CATEGORIES.LANDLORD);
   });
 
-  it('enrolls contacts automatically into broadcast lists upon inbound reply', () => {
-    const inbound = executor.handleInboundReply('+971501112233', 'I want to sell my townhouse in Vardon');
+  it('enrolls contacts automatically and syncs leads to CRM & triggers admin alerts', async () => {
+    const inbound = await executor.handleInboundReply('+971501112233', 'I want to sell my townhouse in Vardon', { name: 'Sultan' });
     assert.equal(inbound.category, RE_INTENT_CATEGORIES.SELLER);
+    assert.equal(inbound.isHighPriority, true);
+    assert.equal(inbound.crmSync.success, true);
+    assert.equal(inbound.crmSync.leadId, 'lead_mock_123');
+    assert.equal(inbound.adminAlert.sent, 3);
 
     const enrolled = broadcastMgr.getRecipients('LIST_SELLER');
     assert.ok(enrolled.includes('+971501112233'));
+    assert.ok(inbound.readReceipt.scheduledDelayMs >= 2500);
   });
 
-  it('executes live dispatch verification batch without exhausting pool', () => {
+  it('executes live dispatch verification batch with humanized typing indicators and anti-ban pacing', () => {
     const testCandidates = [
-      { phone: '+971500000001', name: 'Rashid', project: 'VARDON' },
-      { phone: '+971500000002', name: 'Khalid', project: 'VARDON' },
-      { phone: '+971500000003', name: 'Fatima', project: 'VARDON' },
+      { phone: '+971500000001', name: 'Rashid', project: 'VARDON', draftMessage: 'Hi Rashid, market update on Vardon' },
+      { phone: '+971500000002', name: 'Khalid', project: 'VARDON', draftMessage: 'Hi Khalid' },
+      { phone: '+971500000003', name: 'Fatima', project: 'VARDON', draftMessage: 'Good afternoon Fatima, your unit valuation' },
       { phone: '+971500000004', name: 'Tariq', project: 'VARDON' },
     ];
 
@@ -74,6 +103,7 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.equal(batch.status, 'ACTIVE_DISPATCH_VERIFIED');
     assert.equal(batch.totalDispatched, 4);
     assert.equal(batch.skipped, 0);
+    assert.ok(batch.recentLogs[0].typingDurationMs >= 1200);
 
     const status = executor.getCampaignStatus();
     assert.equal(status.totalDispatchesToday, 4);
