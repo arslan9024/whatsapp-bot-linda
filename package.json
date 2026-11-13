@@ -8,6 +8,7 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
+        "ports:check": "node ../White-Caves-Frontend/node_modules/tsx/dist/cli.mjs ../secrets/ports.ts --check lindaWebhook lindaUi",
         "start": "node index.js",
         "api-server": "node src/api/api-server.js",
         "api-dev": "nodemon --watch src/api/ --watch src/services/ --watch src/database/ --exec node src/api/api-server.js",
