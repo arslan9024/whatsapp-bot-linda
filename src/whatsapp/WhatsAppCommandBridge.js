@@ -181,6 +181,24 @@ export class WhatsAppCommandBridge {
   /** Only known accounts (other than the primary master) may send commands. */
   isAuthorizedSender(senderJid) {
     const acm = this.accountConfigManager || services.get('accountConfigManager');
+    let sender = this.normalizePhone(senderJid);
+    const lidStore = services.get('lidPhoneStore');
+    if (lidStore?.has(sender)) {
+      sender = this.normalizePhone(lidStore.get(sender));
+    }
+    const master = this.normalizePhone(acm?.getMasterPhoneNumber?.());
+    if (!sender) return false;
+
+    // Allow whitelisted numbers from environment (BOT_ADMIN_NUMBERS)
+    const envAdmins = (process.env.BOT_ADMIN_NUMBERS || '')
+      .split(',')
+      .map(p => this.normalizePhone(p))
+      .filter(Boolean);
+    if (envAdmins.includes(sender)) return true;
+
+    if (!acm?.getAllAccounts) return false;
+    return (acm.getAllAccounts() || []).some(a => this.normalizePhone(a.phoneNumber) === sender);
+    const acm = this.accountConfigManager || services.get('accountConfigManager');
     if (!acm?.getAllAccounts || !acm?.getMasterPhoneNumber) {
       return false;
     }

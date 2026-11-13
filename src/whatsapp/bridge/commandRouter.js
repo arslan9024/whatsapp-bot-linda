@@ -31,6 +31,28 @@ export const COMMAND_HANDLERS = {
   list: (b, msg) => b.handleList(msg),
   device: (b, msg, args) => b.handleDevice(msg, args),
   'bridge-stats': (b, msg) => b.handleBridgeStats(msg),
+  outreach: async (b, msg, args) => {
+    const dashboard = services.get('terminalHealthDashboard');
+    if (!dashboard?.outreachCommand) {
+      await msg.reply('❌ Outreach module not ready.');
+      return;
+    }
+    const sub = (args[0] || '').toLowerCase();
+    if (sub === 'daily') {
+      const proj = args[1] || 'VARDON';
+      await msg.reply(`⏳ Generating daily outreach plan for ${proj}...`);
+      const plan = await dashboard.outreachCommand.daily?.run('draft', proj);
+      await msg.reply(plan ? `✅ Plan ready. Today: ${plan.totals.today} owners | Held: ${plan.totals.waiting}` : '⚠️ No plan generated.');
+    } else if (sub === 'status' || !sub) {
+      const desc = dashboard.outreachCommand.daily?.describe?.() || 'Daily outreach active.';
+      await msg.reply(`📋 Outreach Status:\n${desc}`);
+    } else {
+      await msg.reply('Usage: linda outreach [status|daily <project>]');
+    }
+  },
+  clear: async (b, msg) => {
+    await msg.reply('✨ Linda Command Bridge is online and responsive.');
+  },
 };
 
 /**
