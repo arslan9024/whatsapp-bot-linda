@@ -16,6 +16,8 @@
  */
 
 import services from './ServiceRegistry.js';
+import GeminiChatService from '../intelligence/GeminiChatService.js';
+import MorningBriefingService from '../intelligence/MorningBriefingService.js';
 
 // Phase 20 Managers
 import GoogleServiceAccountManager from '../integrations/google/GoogleServiceAccountManager.js';
@@ -193,6 +195,10 @@ export async function initResilienceAndAnalyticsManagers({ logBot, terminalHealt
     logBot('✅ Phase 30: GoogleSheetsManager initialized (Google Sheets CRUD operations)', 'success');
     services.register('googleSheetsManager', googleSheetsManager);
   }
+  // AI Chat & Autonomous Briefing Core
+  services.register('geminiChatService', GeminiChatService);
+  services.register('morningBriefingService', MorningBriefingService);
+  logBot('✅ Linda AI: GeminiChatService & MorningBriefingService registered in ServiceRegistry', 'success');
 
   return {
     autoAccountRelinkingManager,

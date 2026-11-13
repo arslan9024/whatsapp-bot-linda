@@ -67,6 +67,70 @@ export const COMMAND_HANDLERS = {
   clear: async (b, msg) => {
     await msg.reply('✨ Linda Command Bridge is online and responsive.');
   },
+  reset: async (b, msg) => {
+    const gemini = services.get('geminiChatService');
+    if (gemini) {
+      const result = gemini.clearMemory(msg.from);
+      await msg.reply(`🔄 ${result}`);
+    } else {
+      await msg.reply('🔄 Conversation reset (no active AI session).');
+    }
+  },
+
+  campaign: async (b, msg) => {
+    const env = process.env;
+    const mode = env.OUTREACH_DAILY_MODE || 'draft';
+    const project = env.OUTREACH_DAILY_PROJECTS || 'VARDON';
+    const dailyLimit = parseInt(env.NEW_CONVERSATIONS_DAILY_LIMIT || '12');
+    const monthlyLimit = parseInt(env.NEW_CONVERSATIONS_MONTHLY_LIMIT || '300');
+    const minGap = env.OUTREACH_SEND_GAP_MIN_MINUTES || '35';
+    const maxGap = env.OUTREACH_SEND_GAP_MAX_MINUTES || '55';
+    const lines = [
+      '📊 *Campaign Status — Linda*', '',
+      `📋 *Project:* ${project}`,
+      `🔧 *Mode:* ${mode.toUpperCase()}${mode === 'draft' ? ' (safe — not sending externally)' : ' ✅ LIVE'}`,
+      `📅 *Daily limit:* ${dailyLimit}`,
+      `📆 *Monthly limit:* ${monthlyLimit}`,
+      `⏱️ *Send gap:* ${minGap}–${maxGap} min`,
+    ];
+    try {
+      const guard = services.get('newConversationGuard');
+      if (guard?.getTodayCount) {
+        const sent = guard.getTodayCount();
+        lines.push('', `✉️ *Sent today:* ${sent}/${dailyLimit}`, `📬 *Remaining:* ${Math.max(0, dailyLimit - sent)}`);
+      }
+    } catch {}
+    lines.push('', `💡 To activate: type "outreach auto send ${project}" in terminal`);
+    await msg.reply(lines.join('\n'));
+  },
+
+  who: async (b, msg, args) => {
+    const raw = (args[0] || '').replace(/\D/g, '');
+    if (!raw || raw.length < 8) { await msg.reply('📖 Usage: linda who +971XXXXXXXXX'); return; }
+    try {
+      const goraha = services.get('gorahaServicesBridge');
+      if (!goraha?.lookupContact) { await msg.reply('🔍 Goraha bridge not available.'); return; }
+      const contact = await goraha.lookupContact(raw);
+      if (!contact) { await msg.reply(`❌ No contact found for +${raw} in Goraha.`); return; }
+      await msg.reply([`👤 *Contact: ${contact.name || 'Unknown'}*`, `Phone: +${raw}`, `Project: ${contact.project||'—'}`, `Unit: ${contact.unit||'—'}`, `Type: ${contact.type||'Owner'}`, `Last contact: ${contact.lastContact||'Never'}`].join('\n'));
+    } catch(e) { await msg.reply(`❌ Lookup error: ${e.message}`); }
+  },
+
+  report: async (b, msg) => {
+    const now = new Date().toLocaleString('en-AE', { timeZone: 'Asia/Dubai' });
+    const lines = ['📈 *Linda Daily Report*', '', `🕐 ${now} GST`, ''];
+    try { const h = services.get('accountHealthMonitor')?.getHealthSummary?.() || {}; lines.push(`📱 Devices: ${h.linked??'?'}/${h.total??'?' } linked`); } catch {}
+    try {
+      const env = process.env;
+      lines.push(`📢 Campaign: ${env.OUTREACH_DAILY_PROJECTS||'VARDON'} [${(env.OUTREACH_DAILY_MODE||'draft').toUpperCase()}]`);
+      const g = services.get('newConversationGuard');
+      if (g?.getTodayCount) lines.push(`✉️ Sent today: ${g.getTodayCount()}/${env.NEW_CONVERSATIONS_DAILY_LIMIT||12}`);
+    } catch {}
+    try { const gem = services.get('geminiChatService'); if (gem?.memoryStats) lines.push(`🧠 AI sessions: ${gem.memoryStats().activeSessions}`); } catch {}
+    try { const bs = b.getBridgeStats?.(); if (bs) lines.push('', `🤖 Commands: ${bs.commandsProcessed||0}`); } catch {}
+    lines.push('', '_Linda AI — White Caves Real Estate LLC_');
+    await msg.reply(lines.join('\n'));
+  },
 };
 
 /**

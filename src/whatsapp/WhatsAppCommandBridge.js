@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ====================================================================
  * WHATSAPP COMMAND BRIDGE (Phase 31)
  * ====================================================================
@@ -53,6 +53,7 @@ export class WhatsAppCommandBridge {
     this.recoveryDelay = opts.recoveryDelay || 3000;
     this.terminalHealthDashboard = opts.terminalHealthDashboard || null;
     this.prefix = COMMAND_PREFIX;
+    this._seenAdmins = new Set(); // tracks first-time admin contacts for auto-welcome
     this.botActive = false;
     this.isInitialized = false;
     this.recoveryInProgress = false;
@@ -160,13 +161,39 @@ export class WhatsAppCommandBridge {
       const { command, args } = parseCommand((msg.body || '').trim(), this.prefix);
       this._trackCommand(command || 'help');
 
+      // Auto-welcome new admin senders on first contact
+      if (!this._seenAdmins.has(msg.from)) {
+        this._seenAdmins.add(msg.from);
+        await msg.reply([
+          `👋 *Welcome to Linda Command Bridge!*`,
+          ``,
+          `🤖 I'm Linda — your WhatsApp AI assistant for White Caves Real Estate.`,
+          ``,
+          `*Quick commands:*`,
+          `• linda status — system health`,
+          `• linda campaign — outreach stats`,
+          `• linda report — daily summary`,
+          `• linda who +971XXXXXXXX — contact lookup`,
+          `• linda help — full command list`,
+          ``,
+          `💬 Or just chat with me naturally!`,
+        ].join('\n'));
+        if (!command) return true;
+      }
+
       if (!command) {
         await msg.reply(this.getHelpText());
         return true;
       }
       const handler = Object.hasOwn(COMMAND_HANDLERS, command) ? COMMAND_HANDLERS[command] : null;
       if (!handler) {
-        await msg.reply(`❌ Unknown command: ${command}. Send "linda help" for command list.`);
+        // Route unrecognized input to Gemini AI for natural language reply
+        const gemini = services.get('geminiChatService');
+        const fullText = (msg.body || '').trim();
+        const reply = (gemini?.isReady)
+          ? await gemini.chat(msg.from, fullText)
+          : `❓ Unknown command: "${command}". Send "linda help" for the full list.`;
+        await msg.reply(reply);
         return true;
       }
       await handler(this, msg, args);
