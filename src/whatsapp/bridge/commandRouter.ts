@@ -78,6 +78,65 @@ export const COMMAND_HANDLERS = {
     }
   },
 
+  templates: async (b, msg, args) => {
+    try {
+      const { default: templateEngine } = await import('../../outreach/DynamicOutreachTemplateEngine.js');
+      const templates = templateEngine.listTemplates();
+      const lines = [
+        '📋 *Linda Outreach Template Library*',
+        '',
+        `Total Active Templates: ${templates.length}`,
+        '',
+      ];
+      templates.forEach((t, i) => {
+        lines.push(`${i + 1}. *${t.id}* [${t.language}]`);
+        lines.push(`   Cluster: ${t.cluster} | Purpose: ${t.purpose}`);
+      });
+      lines.push('');
+      lines.push('💡 Type "linda preview <templateId> <name>" to sample a generated message.');
+      await msg.reply(lines.join('\n'));
+    } catch (e) {
+      await msg.reply(`❌ Templates error: ${e.message}`);
+    }
+  },
+
+  preview: async (b, msg, args) => {
+    const templateId = args[0] || 'VARDON_VALUATION_EN';
+    const name = args.slice(1).join(' ') || 'Rashid';
+    try {
+      const { default: templateEngine } = await import('../../outreach/DynamicOutreachTemplateEngine.js');
+      const sample = templateEngine.generateOutreachMessage(templateId, { firstName: name, cluster: 'Vardon' });
+      await msg.reply([
+        `🔍 *Template Preview: ${templateId}* [${sample.language}]`,
+        `🎯 *Variations Available:* ${sample.variationsAvailable}`,
+        '',
+        '💬 *Sample Message Output:*',
+        `"${sample.messageText}"`,
+      ].join('\n'));
+    } catch (e) {
+      await msg.reply(`❌ Preview error: ${e.message}`);
+    }
+  },
+
+  schedule: async (b, msg) => {
+    try {
+      const { default: schedulePacer } = await import('../../outreach/LiveCampaignSchedulePacer.js');
+      const status = schedulePacer.isWithinCompliantHours();
+      const lines = [
+        '⏰ *Dubai Cadence Campaign Schedule Guard*',
+        '',
+        `🕐 *Current GST Hour:* ${status.currentHourGST}:00 GST`,
+        `🛡️ *Compliant Hours:* ${schedulePacer.workingHoursStart}:00 - ${schedulePacer.workingHoursEnd}:00 GST`,
+        `🚦 *Status:* ${status.isAllowed ? '🟢 ALLOWED (Within compliant hours)' : '🔴 PAUSED (Outside compliant hours)'}`,
+        '',
+        `⏱️ *Randomized Jitter Gap:* ${schedulePacer.minGapMinutes}–${schedulePacer.maxGapMinutes} minutes`,
+        `📅 *Daily Safety Ceiling:* ${schedulePacer.dailyLimit} owners/day`,
+      ];
+      await msg.reply(lines.join('\n'));
+    } catch (e) {
+      await msg.reply(`❌ Schedule guard error: ${e.message}`);
+    }
+  },
   pool: async (b, msg) => {
     try {
       const poolModule = await import('../../outreach/WhatsAppDispatchPool.js');

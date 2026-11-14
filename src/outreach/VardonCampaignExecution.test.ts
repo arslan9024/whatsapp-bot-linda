@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { WhatsAppDispatchPool } from './WhatsAppDispatchPool.js';
