@@ -25,6 +25,10 @@ export class SupervisorAlertDispatcher {
     this.telegramBotToken = options.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null;
     this.telegramChatId = options.telegramChatId || process.env.TELEGRAM_CHAT_ID || null;
     this.webhookUrl = options.webhookUrl || process.env.SUPERVISOR_WEBHOOK_URL || null;
+    this.crmWebhookUrl =
+      options.crmWebhookUrl ||
+      process.env.WHITE_CAVES_CRM_LEADS_URL ||
+      `${process.env.MAIN_SERVER_URL || 'http://localhost:5001'}/api/v1/webhooks/linda/lead`;
     this.fetchImpl = options.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
     this.enabled = Boolean(this.telegramBotToken && this.telegramChatId) || Boolean(this.webhookUrl);
   }
@@ -89,7 +93,7 @@ export class SupervisorAlertDispatcher {
   /**
    * Alert supervisor regarding a HOT or INVESTOR lead.
    */
-  async notifyHotLead({ ownerName = 'Property Owner', phone, tier, text, assignedAgent }) {
+  async notifyHotLead({ ownerName = 'Property Owner', phone, tier = 'HOT_LEAD', text = '', assignedAgent, project = 'VARDON', unit = '' }) {
     const masked = maskPhone(phone);
     const alertMsg = [
       `🔥 <b>HOT LEAD DETECTED [${tier}]</b>`,
@@ -99,7 +103,31 @@ export class SupervisorAlertDispatcher {
       `⚡ <i>Action required: Immediate contact recommended.</i>`
     ].filter(Boolean).join('\n');
 
-    return this.sendAlert(alertMsg, { event: 'HOT_LEAD', phone, tier });
+    if (this.fetchImpl && this.crmWebhookUrl) {
+      void Promise.resolve(
+        this.fetchImpl(this.crmWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Relay-Secret': process.env.WHATSAPP_WEBHOOK_SECRET || 'white-caves-dev-webhook-secret',
+          },
+          body: JSON.stringify({
+            event: 'HOT_LEAD',
+            phone,
+            name: ownerName,
+            category: tier || 'HOT_LEAD',
+            project,
+            unit,
+            inquiry: text,
+            confidence: 0.96,
+            assignedAgent,
+            source: 'whatsapp_linda_hot_lead',
+          }),
+        })
+      ).catch(() => {});
+    }
+
+    return this.sendAlert(alertMsg, { event: 'HOT_LEAD', phone, tier, ownerName, project, unit });
   }
 
   /**
