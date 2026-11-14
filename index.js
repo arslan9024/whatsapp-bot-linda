@@ -4,6 +4,23 @@ import { createDeviceStatusFile, updateDeviceStatus } from "./src/linking/device
 import { SessionStateManager } from "./src/sessions/SessionStateManager.js";
 import { acquireBotInstance } from "./src/core/BotInstanceGuard.js";
 import { fileURLToPath } from "node:url";
+// Expose Live Chat & Campaign Bridge on port 5000 for White-Caves-Server & Frontend
+(async () => {
+  try {
+    const express = (await import('express')).default;
+    const { default: lindaLiveChatRoutes } = await import('./src/api/routes/lindaLiveChatRoutes.js');
+    const bridgeApp = express();
+    bridgeApp.use(express.json({ limit: '1mb' }));
+    bridgeApp.use('/api/linda', lindaLiveChatRoutes);
+    const port = Number(process.env.LINDA_BOT_PORT || 5000);
+    bridgeApp.listen(port, () => {
+      console.log(`📡 Linda Live Chat Bridge listening on http://localhost:${port}/api/linda`);
+    });
+  } catch (err) {
+    console.warn('⚠️ Failed to start Linda Live Chat Bridge:', err?.message || err);
+  }
+})();
+
 
 // PHASE 20: Secure Credential Management & Interactive Master Setup (February 18, 2026)
 // - GoogleServiceAccountManager: base64-encoded credentials in .env (no secrets in git)

@@ -16,6 +16,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import damacApiRoutes from './routes/damacApiRoutes.js';
 import communicationRoutes from './routes/communication.routes.js';
+import lindaLiveChatRoutes from './routes/lindaLiveChatRoutes.js';
 import { connectToMongoDB } from '../database/config.js';
 import {
   assertApiAccessToken,
@@ -92,6 +93,7 @@ app.use('/api/v1/damac', damacApiRoutes);
 
 // Mount Communication API routes (Phase 5)
 app.use('/api/v1/damac/communication', communicationRoutes);
+app.use('/api/linda', lindaLiveChatRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -169,6 +169,11 @@ export async function CreatingNewWhatsAppClient(ClientID, retryCount = 0) {
     // Apply Level 2 Device Fingerprint & Battery State Emulation on readiness
     RegisteredAgentWAClient.on('ready', async () => {
       try {
+        const { registerLiveWhatsAppClient } = await import('../api/routes/lindaLiveChatRoutes.js');
+        const readyPhone = RegisteredAgentWAClient.info?.wid?.user || '971505760056';
+        registerLiveWhatsAppClient(readyPhone, RegisteredAgentWAClient);
+      } catch (_) {}
+      try {
         if (RegisteredAgentWAClient.pupPage) {
           const { DeviceFingerprintEmulator } = await import('../anti-ban/DeviceFingerprintEmulator.js');
           await DeviceFingerprintEmulator.apply(RegisteredAgentWAClient.pupPage);

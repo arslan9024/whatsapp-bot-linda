@@ -71,6 +71,10 @@ router.get('/conversations', async (req, res) => {
           unreadCount: Number(chat.unreadCount || 0),
           isGroup: Boolean(chat.isGroup),
           accountPhone: `+${accountPhone}`,
+          cluster: chat.isGroup ? 'WhatsApp Group' : 'Primary Master',
+          unit: '',
+          intent: 'GENERAL',
+          confidence: 100,
           channel: 'LINDA_WHATSAPP',
         });
       }
