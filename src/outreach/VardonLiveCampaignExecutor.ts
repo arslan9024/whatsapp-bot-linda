@@ -4,7 +4,8 @@
  * 
  * Single responsibility: Execute live/dry-run dispatch verification for Vardon Campaign,
  * coordinating WhatsAppDispatchPool, BroadcastListManager, InboundIntentCategorizer,
- * AccountWarmupScheduler, ReadReceiptScheduler, and TypingStateGuard.
+ * AccountWarmupScheduler, ReadReceiptScheduler, TypingStateGuard, DynamicOutreachTemplateEngine,
+ * and LiveCampaignSchedulePacer.
  * Features automated White Caves CRM lead synchronization & admin alerts on high-intent inbound replies.
  * Category: 2️⃣ Domain / Feature (src/outreach/)
  * Law: Single Purpose File Law (< 350 lines).
@@ -16,6 +17,8 @@ import broadcastListManager from './BroadcastListManager.js';
 import { accountWarmupScheduler } from '../anti-ban/AccountWarmupScheduler.js';
 import readReceiptScheduler from '../anti-ban/ReadReceiptScheduler.js';
 import typingStateGuard from '../anti-ban/TypingStateGuard.js';
+import templateEngine from './DynamicOutreachTemplateEngine.js';
+import schedulePacer from './LiveCampaignSchedulePacer.js';
 import { syncLeadToCrm } from '../whatsapp/bridge/whiteCavesServerBridge.js';
 import adminNotifier from '../whatsapp/bridge/AdminNotificationBridge.js';
 
@@ -27,6 +30,8 @@ export class VardonLiveCampaignExecutor {
     warmupScheduler = accountWarmupScheduler,
     readScheduler = readReceiptScheduler,
     typingGuard = typingStateGuard,
+    templates = templateEngine,
+    pacer = schedulePacer,
     crmSyncer = syncLeadToCrm,
     notifier = adminNotifier,
     campaignName = 'VARDON_OUTREACH_CAMPAIGN',
@@ -38,11 +43,13 @@ export class VardonLiveCampaignExecutor {
     this.warmupScheduler = warmupScheduler;
     this.readScheduler = readScheduler;
     this.typingGuard = typingGuard;
+    this.templates = templates;
+    this.pacer = pacer;
     this.crmSyncer = crmSyncer;
     this.notifier = notifier;
     this.campaignName = campaignName;
     this.dailyTarget = dailyTarget;
-    /** @type {Array<{ recipientPhone: string, senderPhone: string, timestamp: string, status: string, typingDurationMs?: number }>} */
+    /** @type {Array<{ recipientPhone: string, senderPhone: string, timestamp: string, status: string, typingDurationMs?: number, messageText?: string }>} */
     this.dispatchLog = [];
   }
 
@@ -55,8 +62,24 @@ export class VardonLiveCampaignExecutor {
   }
 
   /**
+   * Create an automated campaign schedule plan respecting working hours and daily target limits
+   * @param {Array<{ phone: string, name: string }>} candidates
+   * @returns {{ scheduledDispatches: Array, totalScheduled: number, dailyCapEnforced: boolean, compliantHoursCheck: Object }}
+   */
+  planCampaignSchedule(candidates = []) {
+    const compliantHoursCheck = this.pacer.isWithinCompliantHours();
+    const schedule = this.pacer.generateDispatchSchedule(candidates);
+    return {
+      campaignName: this.campaignName,
+      ...schedule,
+      compliantHoursCheck,
+    };
+  }
+
+  /**
    * Simulate or verify live dispatch across the candidate queue with humanized anti-ban simulation
-   * @param {Array<{ phone: string, name: string, project: string, draftMessage?: string }>} candidates
+   * and dynamic bilingual spintax template generation.
+   * @param {Array<{ phone: string, name: string, project: string, templateId?: string, draftMessage?: string }>} candidates
    * @returns {{ status: string, totalDispatched: number, skipped: number, poolStatus: Object, recentLogs: Array }}
    */
   executeDispatchBatch(candidates = []) {
@@ -88,8 +111,17 @@ export class VardonLiveCampaignExecutor {
         continue;
       }
 
-      const draft = candidate.draftMessage || 'Hello from White Caves Real Estate regarding Vardon';
-      const typingDurationMs = this.typingGuard.calculateTypingDuration(draft);
+      // Synthesize dynamic template if custom draft not provided
+      let messageContent = candidate.draftMessage;
+      if (!messageContent) {
+        const templateResult = this.templates.generateOutreachMessage(
+          candidate.templateId || 'VARDON_VALUATION_EN',
+          { firstName: candidate.name, cluster: candidate.project || 'VARDON' }
+        );
+        messageContent = templateResult.messageText;
+      }
+
+      const typingDurationMs = this.typingGuard.calculateTypingDuration(messageContent);
 
       const logEntry = {
         recipientPhone: candidate.phone,
@@ -97,6 +129,7 @@ export class VardonLiveCampaignExecutor {
         project: candidate.project || 'VARDON',
         senderPhone: sender,
         status: 'VERIFIED_DISPATCHED',
+        messageText: messageContent,
         typingDurationMs,
         timestamp: new Date().toISOString(),
       };
@@ -187,6 +220,7 @@ export class VardonLiveCampaignExecutor {
       dailyTargetLimit: this.dailyTarget,
       totalDispatchesToday: this.dispatchLog.length,
       poolSnapshot: this.pool.getPoolStatus(),
+      availableTemplates: this.templates.listTemplates().length,
     };
   }
 }

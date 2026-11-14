@@ -1,10 +1,11 @@
-// @ts-nocheck
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { WhatsAppDispatchPool } from './WhatsAppDispatchPool.js';
 import { InboundIntentCategorizer, RE_INTENT_CATEGORIES } from './InboundIntentCategorizer.js';
 import { BroadcastListManager } from './BroadcastListManager.js';
 import { VardonLiveCampaignExecutor } from './VardonLiveCampaignExecutor.js';
+import { DynamicOutreachTemplateEngine } from './DynamicOutreachTemplateEngine.js';
+import { LiveCampaignSchedulePacer } from './LiveCampaignSchedulePacer.js';
 
 describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
   let pool;
@@ -14,6 +15,8 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
   let mockWarmup;
   let mockCrmSyncer;
   let mockNotifier;
+  let templates;
+  let pacer;
 
   const mockAccounts = ['+971505760056', '+971553633595', '+971589969886'];
 
@@ -21,6 +24,9 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     pool = new WhatsAppDispatchPool({ accountPhones: mockAccounts, maxDailyPerAccount: 5 });
     categorizer = new InboundIntentCategorizer();
     broadcastMgr = new BroadcastListManager();
+    templates = new DynamicOutreachTemplateEngine();
+    pacer = new LiveCampaignSchedulePacer({ minGapMinutes: 35, maxGapMinutes: 55, dailyLimit: 12 });
+
     mockWarmup = {
       canSend: () => ({ allowed: true, limit: 12 }),
       recordSend: () => {},
@@ -35,6 +41,8 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
       categorizer,
       broadcastManager: broadcastMgr,
       warmupScheduler: mockWarmup,
+      templates,
+      pacer,
       crmSyncer: mockCrmSyncer,
       notifier: mockNotifier,
       dailyTarget: 6,
@@ -51,6 +59,33 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.equal(s2, '+971553633595');
     assert.equal(s3, '+971589969886');
     assert.equal(s4, '+971505760056'); // Loops back
+  });
+
+  it('generates dynamic bilingual spintax outreach messages for Vardon cluster', () => {
+    const enOutreach = templates.generateOutreachMessage('VARDON_VALUATION_EN', { firstName: 'Rashid', cluster: 'Vardon' });
+    assert.equal(enOutreach.language, 'EN');
+    assert.ok(enOutreach.messageText.includes('Rashid'));
+    assert.ok(enOutreach.messageText.includes('Vardon'));
+    assert.ok(enOutreach.variationsAvailable > 1);
+
+    const arOutreach = templates.generateOutreachMessage('VARDON_VALUATION_AR', { firstName: 'سلطان', cluster: 'فاردون' });
+    assert.equal(arOutreach.language, 'AR');
+    assert.ok(arOutreach.messageText.includes('سلطان'));
+    assert.ok(arOutreach.messageText.includes('وايت كيفز العقارية'));
+  });
+
+  it('plans compliant campaign schedule with 35-55m delay spacing and daily cap', () => {
+    const prospects = [
+      { phone: '+971501110001', name: 'Rashid' },
+      { phone: '+971501110002', name: 'Khalid' },
+      { phone: '+971501110003', name: 'Fatima' },
+    ];
+    const plan = executor.planCampaignSchedule(prospects);
+    assert.equal(plan.totalScheduled, 3);
+    assert.equal(plan.scheduledDispatches.length, 3);
+    assert.equal(plan.scheduledDispatches[0].delayMinutesFromStart, 0);
+    assert.ok(plan.scheduledDispatches[1].delayMinutesFromStart >= 35);
+    assert.ok(plan.scheduledDispatches[2].delayMinutesFromStart >= 70);
   });
 
   it('categorizes inbound messages into real estate intent lists in English and Arabic', () => {
@@ -92,11 +127,11 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.ok(inbound.readReceipt.scheduledDelayMs >= 2500);
   });
 
-  it('executes live dispatch verification batch with humanized typing indicators and anti-ban pacing', () => {
+  it('executes live dispatch verification batch with dynamic templates and anti-ban typing pacing', () => {
     const testCandidates = [
-      { phone: '+971500000001', name: 'Rashid', project: 'VARDON', draftMessage: 'Hi Rashid, market update on Vardon' },
-      { phone: '+971500000002', name: 'Khalid', project: 'VARDON', draftMessage: 'Hi Khalid' },
-      { phone: '+971500000003', name: 'Fatima', project: 'VARDON', draftMessage: 'Good afternoon Fatima, your unit valuation' },
+      { phone: '+971500000001', name: 'Rashid', project: 'VARDON', templateId: 'VARDON_VALUATION_EN' },
+      { phone: '+971500000002', name: 'Khalid', project: 'VARDON', templateId: 'VARDON_VALUATION_AR' },
+      { phone: '+971500000003', name: 'Fatima', project: 'VARDON', templateId: 'VARDON_RENTAL_EJARI_EN' },
       { phone: '+971500000004', name: 'Tariq', project: 'VARDON' },
     ];
 
@@ -105,8 +140,11 @@ describe('Vardon Campaign & WhatsApp Multi-Account Dispatch Suite', () => {
     assert.equal(batch.totalDispatched, 4);
     assert.equal(batch.skipped, 0);
     assert.ok(batch.recentLogs[0].typingDurationMs >= 1200);
+    assert.ok(batch.recentLogs[0].messageText.includes('Rashid'));
+    assert.ok(batch.recentLogs[1].messageText.includes('خالد') || batch.recentLogs[1].messageText.includes('Khalid'));
 
     const status = executor.getCampaignStatus();
     assert.equal(status.totalDispatchesToday, 4);
+    assert.ok(status.availableTemplates >= 5);
   });
 });
