@@ -18,6 +18,8 @@ import { GroupEventHandler } from './handlers/GroupEventHandler.js';
 import services from '../core/ServiceRegistry.js';
 import closedCircleGuard from '../core/ClosedCircleGuard.js';
 import ContactConsentService from '../campaigns/ContactConsentService.js';
+import { damacHills2CampaignManager } from '../outreach/DamacHills2CampaignManager.js';
+import { syncReceiptToCrm } from './bridge/whiteCavesServerBridge.js';
 import {
   handleAdminCommand,
   handleReportCommand,
@@ -46,7 +48,7 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
   } = deps;
 
   // ═══ LISTENER CLEANUP (Phase 10) ═══
-  const messageEvents = ['message', 'message_reaction', 'group_update', 'group_join', 'group_leave'];
+  const messageEvents = ['message', 'message_ack', 'message_reaction', 'group_update', 'group_join', 'group_leave'];
   for (const event of messageEvents) {
     try {
       client.removeAllListeners(event);
@@ -55,6 +57,25 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     }
   }
   logBot(`🧹 Cleaned message listeners for ${maskPhone(phoneNumber)} before rebind`, 'info');
+
+  // ─── Delivery & Read Receipt Sync (message_ack) ───────────────────
+  client.on('message_ack', async (msg, ack) => {
+    try {
+      if (!msg?.to) return;
+      const updated = damacHills2CampaignManager.recordDeliveryReceipt(msg.to, ack, msg.id?.id);
+      if (updated) {
+        await syncReceiptToCrm({
+          phone: updated.phone,
+          receiptStatus: updated.receiptStatus,
+          messageId: updated.lastMessageId,
+          cluster: updated.cluster,
+          unit: updated.unit,
+        }).catch(() => {});
+      }
+    } catch (_) {
+      /* non-blocking receipt sync */
+    }
+  });
 
   // ─── Activity tracking ─────────────────────────────────────────────
   if (connManager) {
@@ -143,6 +164,24 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
       !msg.from?.includes('@g.us') &&
       linkingService.shouldHandle(msg, phoneNumber)
     );
+
+    // ── DAMAC Hills 2 Owner Reply Escalation & CRM Sync ──
+    const trackedOwner = !msg.fromMe && !msg.from?.includes('@g.us')
+      ? damacHills2CampaignManager.getDispatchedOwner(msg.from)
+      : null;
+    if (trackedOwner && messageText.trim()) {
+      try {
+        await damacHills2CampaignManager.handleOwnerReply({
+          ownerPhone: msg.from,
+          replyText: messageText.trim(),
+          receivingAgentPhone: phoneNumber,
+          ownerMeta: trackedOwner,
+        });
+        logBot(`👑 [DAMAC2 VIP Escalation] Processed owner reply from ${maskPhone(msg.from)} (${trackedOwner.cluster} - ${trackedOwner.unit})`, 'success');
+      } catch (err) {
+        logBot(`⚠️ DAMAC2 owner reply escalation error: ${err.message}`, 'warn');
+      }
+    }
 
     // ── Closed Circle Guard: Strict dev phase drop for non-master contacts (unless device linking intent) ──
     if (!msg.fromMe && !closedCircleGuard.isMasterRecipient(msg.from) && !isLinkingRequest) {

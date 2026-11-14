@@ -15,11 +15,15 @@ import dispatchPool from './WhatsAppDispatchPool.js';
 import intentCategorizer, { RE_INTENT_CATEGORIES } from './InboundIntentCategorizer.js';
 import broadcastListManager from './BroadcastListManager.js';
 import { accountWarmupScheduler } from '../anti-ban/AccountWarmupScheduler.js';
+import { GaussianJitterScheduler } from '../anti-ban/GaussianJitterScheduler.js';
 import readReceiptScheduler from '../anti-ban/ReadReceiptScheduler.js';
 import typingStateGuard from '../anti-ban/TypingStateGuard.js';
 import templateEngine from './DynamicOutreachTemplateEngine.js';
 import schedulePacer from './LiveCampaignSchedulePacer.js';
-import { syncLeadToCrm } from '../whatsapp/bridge/whiteCavesServerBridge.js';
+import {
+  syncLeadToCrm,
+  emitCampaignTelemetryToServer,
+} from '../whatsapp/bridge/whiteCavesServerBridge.js';
 import adminNotifier from '../whatsapp/bridge/AdminNotificationBridge.js';
 
 export class VardonLiveCampaignExecutor {
@@ -28,11 +32,13 @@ export class VardonLiveCampaignExecutor {
     categorizer = intentCategorizer,
     broadcastManager = broadcastListManager,
     warmupScheduler = accountWarmupScheduler,
+    jitterScheduler = new GaussianJitterScheduler({ meanMs: 30000, stdDevMs: 7500, minMs: 15000, maxMs: 45000 }),
     readScheduler = readReceiptScheduler,
     typingGuard = typingStateGuard,
     templates = templateEngine,
     pacer = schedulePacer,
     crmSyncer = syncLeadToCrm,
+    telemetryEmitter = emitCampaignTelemetryToServer,
     notifier = adminNotifier,
     campaignName = 'VARDON_OUTREACH_CAMPAIGN',
     dailyTarget = 12,
@@ -41,15 +47,17 @@ export class VardonLiveCampaignExecutor {
     this.categorizer = categorizer;
     this.broadcastManager = broadcastManager;
     this.warmupScheduler = warmupScheduler;
+    this.jitterScheduler = jitterScheduler;
     this.readScheduler = readScheduler;
     this.typingGuard = typingGuard;
     this.templates = templates;
     this.pacer = pacer;
     this.crmSyncer = crmSyncer;
+    this.telemetryEmitter = telemetryEmitter;
     this.notifier = notifier;
     this.campaignName = campaignName;
     this.dailyTarget = dailyTarget;
-    /** @type {Array<{ recipientPhone: string, senderPhone: string, timestamp: string, status: string, typingDurationMs?: number, messageText?: string }>} */
+    /** @type {Array<{ recipientPhone: string, senderPhone: string, timestamp: string, status: string, typingDurationMs?: number, jitterDelayMs?: number, messageText?: string }>} */
     this.dispatchLog = [];
   }
 
@@ -79,10 +87,29 @@ export class VardonLiveCampaignExecutor {
   /**
    * Simulate or verify live dispatch across the candidate queue with humanized anti-ban simulation
    * and dynamic bilingual spintax template generation.
-   * @param {Array<{ phone: string, name: string, project: string, templateId?: string, draftMessage?: string }>} candidates
+   * @param {Array<{ phone: string, name: string, project: string, unit?: string, templateId?: string, draftMessage?: string }>} candidates
+   * @param {Object} [options]
+   * @param {boolean} [options.enforceQuietHours]
+   * @param {Date} [options.now]
    * @returns {{ status: string, totalDispatched: number, skipped: number, poolStatus: Object, recentLogs: Array }}
    */
-  executeDispatchBatch(candidates = []) {
+  executeDispatchBatch(candidates = [], options = {}) {
+    if (options.enforceQuietHours) {
+      const hoursCheck = this.pacer.isWithinCompliantHours(options.now || new Date());
+      if (!hoursCheck.isAllowed) {
+        return {
+          campaign: this.campaignName,
+          status: 'QUIET_HOURS_PAUSED',
+          currentHourGST: hoursCheck.currentHourGST,
+          reason: hoursCheck.reason,
+          totalDispatched: 0,
+          skipped: candidates.length,
+          poolStatus: this.pool.getPoolStatus(),
+          recentLogs: [],
+        };
+      }
+    }
+
     const toSend = candidates.slice(0, this.dailyTarget);
     const results = [];
 
@@ -98,13 +125,14 @@ export class VardonLiveCampaignExecutor {
         continue;
       }
 
-      // Check account warmup limit if applicable
+      // Check account warmup limit if applicable (handles both boolean and object returns)
       const warmupCheck = this.warmupScheduler.canSend(sender);
-      if (warmupCheck && !warmupCheck.allowed) {
+      const isWarmupAllowed = typeof warmupCheck === 'boolean' ? warmupCheck : Boolean(warmupCheck?.allowed ?? true);
+      if (!isWarmupAllowed) {
         results.push({
           recipientPhone: candidate.phone,
           status: 'SKIPPED_WARMUP_LIMIT',
-          reason: warmupCheck.reason,
+          reason: warmupCheck?.reason || 'Account daily warmup ceiling reached',
           senderPhone: sender,
           timestamp: new Date().toISOString(),
         });
@@ -122,15 +150,18 @@ export class VardonLiveCampaignExecutor {
       }
 
       const typingDurationMs = this.typingGuard.calculateTypingDuration(messageContent);
+      const jitterDelayMs = this.jitterScheduler ? this.jitterScheduler.getNextInterval() : 30000;
 
       const logEntry = {
         recipientPhone: candidate.phone,
         recipientName: candidate.name,
         project: candidate.project || 'VARDON',
+        unit: candidate.unit || '',
         senderPhone: sender,
         status: 'VERIFIED_DISPATCHED',
         messageText: messageContent,
         typingDurationMs,
+        jitterDelayMs,
         timestamp: new Date().toISOString(),
       };
 
@@ -140,7 +171,7 @@ export class VardonLiveCampaignExecutor {
       results.push(logEntry);
     }
 
-    return {
+    const batchSummary = {
       campaign: this.campaignName,
       status: 'ACTIVE_DISPATCH_VERIFIED',
       totalDispatched: results.filter(r => r.status === 'VERIFIED_DISPATCHED').length,
@@ -148,6 +179,22 @@ export class VardonLiveCampaignExecutor {
       poolStatus: this.pool.getPoolStatus(),
       recentLogs: results,
     };
+
+    if (typeof this.telemetryEmitter === 'function') {
+      void Promise.resolve(
+        this.telemetryEmitter({
+          campaignName: this.campaignName,
+          status: batchSummary.status,
+          totalDispatched: batchSummary.totalDispatched,
+          skipped: batchSummary.skipped,
+          dailyTarget: this.dailyTarget,
+          poolStatus: batchSummary.poolStatus,
+          recentLogs: batchSummary.recentLogs.slice(-5),
+        })
+      ).catch(() => {});
+    }
+
+    return batchSummary;
   }
 
   /**
@@ -177,13 +224,15 @@ export class VardonLiveCampaignExecutor {
       crmSyncResult = { success: false, error: 'CRM bridge unreachable' };
     }
 
-    // Trigger high-priority admin alert if seller or cash buyer
+    // Trigger high-priority admin alert if seller, cash buyer, or DAMAC Hills 2 owner reply
     let adminAlertResult = null;
-    if (classified.isHighPriority) {
+    if (classified.isHighPriority || meta.alwaysAlertPrimaryMaster) {
       try {
         adminAlertResult = await this.notifier.notifyAdmins({
           phone,
           name: meta.name,
+          unit: meta.unit,
+          cluster: meta.cluster || meta.project || 'VARDON',
           category: classified.category,
           intentText: text,
           project: meta.project || 'VARDON',

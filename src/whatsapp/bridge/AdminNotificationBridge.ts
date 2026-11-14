@@ -35,7 +35,7 @@ export class AdminNotificationBridge {
    * @param {Object} alertData
    * @returns {string}
    */
-  formatAlertMessage({ phone, name, category, intentText, project, confidence }) {
+  formatAlertMessage({ phone, name, unit, cluster, category, intentText, project, confidence }) {
     const timeStr = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Dubai', hour12: false });
     return [
       `🚨 *HIGH-INTENT LEAD ALERT [LINDA AI]* 🚨`,
@@ -43,6 +43,8 @@ export class AdminNotificationBridge {
       `👤 *Role:* ${category || 'SELLER / BUYER'}`,
       `📞 *Contact:* ${phone}`,
       name ? `🏷️ *Name:* ${name}` : null,
+      unit ? `🔑 *Unit:* ${unit}` : null,
+      cluster ? `🏡 *Cluster:* ${cluster}` : null,
       `📍 *Project:* ${project || 'VARDON (Damac Hills 2)'}`,
       `🎯 *Confidence:* ${Math.round((confidence || 0.8) * 100)}%`,
       `⏰ *Time (GST):* ${timeStr}`,

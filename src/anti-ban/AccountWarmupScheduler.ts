@@ -31,7 +31,7 @@ export const WARMUP_SCHEDULE = [
   { maxDays: 14, limit: 12, stage: 'STAGE_4_MATURING' },
 ];
 
-export const MATURE_DEFAULT_LIMIT = 25;
+export const MATURE_DEFAULT_LIMIT = 15;
 
 export class AccountWarmupScheduler {
   constructor(options = {}) {

@@ -68,7 +68,7 @@ describe('AccountWarmupScheduler (Pillar 2 - Graduated Outreach)', () => {
     const status = scheduler.getWarmupStatus(phone);
     expect(status.ageDays).toBe(20);
     expect(status.stage).toBe('STAGE_MATURE');
-    expect(status.allowed).toBe(25);
+    expect(status.allowed).toBe(15);
   });
 });
 

@@ -6,7 +6,7 @@
  * to White-Caves-Server webhook router for AI processing, CRM lead triage, and client tracking.
  */
 
-const MAIN_SERVER_URL = process.env.MAIN_SERVER_URL || 'http://localhost:5000';
+const MAIN_SERVER_URL = process.env.MAIN_SERVER_URL || 'http://localhost:5001';
 const DEFAULT_WEBHOOK_PATH = '/api/v1/webhooks/linda';
 
 /**
@@ -100,7 +100,72 @@ export async function syncLeadToCrm(leadData) {
   }
 }
 
+/**
+ * Sync delivery/read receipt telemetry back to White-Caves-Server CRM
+ * @param {Object} receiptData
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export async function syncReceiptToCrm(receiptData) {
+  try {
+    const payload = {
+      phone: receiptData.phone,
+      receiptStatus: receiptData.receiptStatus || 'DELIVERED',
+      messageId: receiptData.messageId || null,
+      cluster: receiptData.cluster || 'VARDON',
+      unit: receiptData.unit || '',
+      timestamp: new Date().toISOString(),
+    };
+    const receiptUrl = process.env.WHITE_CAVES_CRM_RECEIPT_URL || `${MAIN_SERVER_URL}${DEFAULT_WEBHOOK_PATH}/receipt`;
+    const res = await fetch(receiptUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Relay-Secret': process.env.WHATSAPP_WEBHOOK_SECRET || 'white-caves-dev-webhook-secret',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { success: false, error: `HTTP ${res.status}` };
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Emit live Vardon campaign batch telemetry or HOT_LEAD escalation to White-Caves-Server Socket.IO hub
+ * @param {Object} telemetryPayload
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export async function emitCampaignTelemetryToServer(telemetryPayload) {
+  try {
+    const campaignUrl =
+      process.env.WHITE_CAVES_CAMPAIGN_WEBHOOK_URL ||
+      `${MAIN_SERVER_URL}${DEFAULT_WEBHOOK_PATH}/campaign`;
+    const res = await fetch(campaignUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Relay-Secret': process.env.WHATSAPP_WEBHOOK_SECRET || 'white-caves-dev-webhook-secret',
+      },
+      body: JSON.stringify({
+        ...telemetryPayload,
+        timestamp: new Date().toISOString(),
+        sourceBotId: 'whatsapp-bot-linda',
+      }),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   forwardMessageToWhiteCavesServer,
-  syncLeadToCrm
+  syncLeadToCrm,
+  syncReceiptToCrm,
+  emitCampaignTelemetryToServer,
 };

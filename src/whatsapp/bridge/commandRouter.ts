@@ -223,6 +223,60 @@ export const COMMAND_HANDLERS = {
       return;
     }
 
+    if (sub === 'dispatch-now' || sub === 'dispatch') {
+      const targetCluster = String(args[1] || 'ALL').trim().toUpperCase();
+      const { DamacHills2CampaignManager } = await import('../../outreach/DamacHills2CampaignManager.js');
+      const clients = b?.accountClients || services.get('accountClients') || new Map();
+      const acm = b?.accountConfigManager || services.get('accountConfigManager');
+      const manager = new DamacHills2CampaignManager({
+        accountClients: clients,
+        accountConfigManager: acm,
+      });
+
+      const batchResult = await manager.dispatchNowBatch(targetCluster, { instant: true });
+      if (batchResult.status === 'PAUSED') {
+        await msg.reply([
+          '⏸️ *DISPATCH BLOCKED — CAMPAIGN PAUSED*',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          `🛑 Cannot run *dispatch-now ${targetCluster}* while safety hold is active.`,
+          `📝 *Reason:* ${batchResult.reason}`,
+          '💡 Send *"linda campaign active"* first to resume outreach.',
+        ].join('\n'));
+        return;
+      }
+
+      if (batchResult.status === 'QUIET_HOURS_BLOCKED') {
+        await msg.reply([
+          '🌙 *DISPATCH HELD — UAE QUIET HOURS ACTIVE*',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          `🕐 *Current GST Hour:* ${batchResult.currentHourGST}:00 GST`,
+          '🛡️ *UAE Compliance Guard:* Cold outreach is blocked between 20:00 and 09:00 GST.',
+          `📍 *Target Cluster:* ${batchResult.cluster}`,
+          '💡 Batch will automatically resume during 09:00–20:00 GST working hours.',
+        ].join('\n'));
+        return;
+      }
+
+      const summaryLines = [
+        `🚀 *DAMAC HILLS 2 LIVE DISPATCH SUMMARY [${batchResult.cluster}]*`,
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        `✅ *Fresh Greetings Sent:* ${batchResult.dispatchedCount}`,
+        `👑 *Supervisor Follow-ups:* ${batchResult.supervisorReminders}`,
+        `⏭️ *Skipped / Exhausted:* ${batchResult.skippedCount}`,
+        `⏱️ *Anti-Ban Pacing:* 15s–45s Gaussian jitter + Warmup Scaling (1–15/day)`,
+      ];
+      if (batchResult.results?.length) {
+        summaryLines.push('', '*Batch Breakdown:*');
+        batchResult.results.slice(0, 8).forEach((r, idx) => {
+          const name = r.lead?.name || 'Owner';
+          const unit = r.lead?.unit ? ` (${r.lead.unit})` : '';
+          summaryLines.push(`${idx + 1}. *${name}*${unit} → \`${r.action}\`${r.sendingAgent ? ` via ${r.sendingAgent}` : ''}`);
+        });
+      }
+      await msg.reply(summaryLines.join('\n'));
+      return;
+    }
+
     const isPaused = outreachSafetyController.isPaused();
     const env = process.env;
     const mode = isPaused ? 'paused' : (env.OUTREACH_DAILY_MODE || 'draft');
@@ -252,6 +306,7 @@ export const COMMAND_HANDLERS = {
       '📲 *WhatsApp Remote Controls:*',
       '• `linda campaign active` — Activate / Resume outreach',
       '• `linda campaign pause` — Pause outreach immediately',
+      '• `linda campaign dispatch-now [cluster]` — Trigger compliant batch (VARDON, AMAZON, PACIFICA, CAMELLIA, ALL)',
       '• Reply `3.7` — One-tap Keypad toggle'
     );
     await msg.reply(lines.join('\n'));
