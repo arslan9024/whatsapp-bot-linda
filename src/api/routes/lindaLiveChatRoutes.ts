@@ -5,8 +5,27 @@
  * to White-Caves-Server and White-Caves-Frontend.
  */
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import dispatchPool from '../../outreach/WhatsAppDispatchPool.js';
 import { DamacHills2CampaignManager } from '../../outreach/DamacHills2CampaignManager.js';
+
+function loadDispatchedOwnersMap(): Map<string, any> {
+  const map = new Map<string, any>();
+  try {
+    const filePath = path.resolve('data', 'outreach', 'dispatched-owners.json');
+    if (!fs.existsSync(filePath)) return map;
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const entries = Array.isArray(raw) ? raw : Object.values(raw || {});
+    for (const entry of entries) {
+      const digits = String(entry?.phone || entry?.ownerPhone || '').replace(/\D/g, '');
+      if (digits) map.set(digits, entry);
+    }
+  } catch {
+    // Non-fatal if registry file is absent or malformed
+  }
+  return map;
+}
 
 const router = express.Router();
 
@@ -45,6 +64,10 @@ router.get('/conversations', async (req, res) => {
     const accountFilter = req.query.accountPhone
       ? String(req.query.accountPhone).replace(/\D/g, '')
       : null;
+    const typeFilter = req.query.type ? String(req.query.type).toLowerCase() : 'all';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 500);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const ownersMap = loadDispatchedOwnersMap();
 
     const conversations: any[] = [];
     const accounts: string[] = [];
@@ -59,22 +82,27 @@ router.get('/conversations', async (req, res) => {
         const rawId = chat?.id?._serialized || chat?.id?.user || '';
         const phone = String(rawId).replace(/@.*$/, '').replace(/\D/g, '');
         if (!phone) continue;
+        const isGroup = Boolean(chat.isGroup);
+        if (typeFilter === 'groups' && !isGroup) continue;
+        if (typeFilter === 'direct' && isGroup) continue;
 
+        const ownerMeta = ownersMap.get(phone);
         conversations.push({
           id: `LINDA_${phone}`,
           phone: `+${phone}`,
-          contactName: chat.name || chat.pushname || `+${phone}`,
+          contactName: ownerMeta?.ownerName || chat.name || chat.pushname || `+${phone}`,
           lastMessage: chat.lastMessage?.body || '',
           timestamp: chat.timestamp
             ? new Date(chat.timestamp * 1000).toISOString()
             : new Date().toISOString(),
           unreadCount: Number(chat.unreadCount || 0),
-          isGroup: Boolean(chat.isGroup),
+          isGroup,
           accountPhone: `+${accountPhone}`,
-          cluster: chat.isGroup ? 'WhatsApp Group' : 'Primary Master',
-          unit: '',
-          intent: 'GENERAL',
-          confidence: 100,
+          cluster: ownerMeta?.cluster || (isGroup ? 'WhatsApp Group' : 'Primary Master'),
+          unit: ownerMeta?.unit || '',
+          intent: ownerMeta?.intent || (ownerMeta ? 'OWNER_OUTREACH' : 'GENERAL'),
+          confidence: Number(ownerMeta?.confidence ?? (ownerMeta ? 92 : 100)),
+          gorahaSaved: Boolean(ownerMeta?.gorahaSaved),
           channel: 'LINDA_WHATSAPP',
         });
       }
@@ -84,11 +112,17 @@ router.get('/conversations', async (req, res) => {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
+    const total = conversations.length;
+    const paged = conversations.slice(offset, offset + limit);
+
     res.json({
       success: true,
       data: {
-        conversations,
-        count: conversations.length,
+        conversations: paged,
+        count: paged.length,
+        total,
+        limit,
+        offset,
         accounts: accounts.map((p) => `+${p}`),
       },
     });
