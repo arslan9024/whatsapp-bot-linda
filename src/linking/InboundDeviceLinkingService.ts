@@ -161,7 +161,7 @@ export class InboundDeviceLinkingService {
 
     // 1. Master adding another device check
     const senderDigits = normalizeDigits(senderPhone);
-    const accountConfig = acm.getAccountByPhone(senderPhone) ||
+    let accountConfig = acm.getAccountByPhone(senderPhone) ||
       acm.getAllAccounts?.().find(acc => normalizeDigits(acc.phoneNumber) === senderDigits);
 
     const handledByMasterAdd = await handleMasterAddDeviceRequest({
@@ -173,7 +173,14 @@ export class InboundDeviceLinkingService {
       sendWhatsAppMessage: this.sendWhatsAppMessage.bind(this),
       logBot: this.logBot.bind(this),
     });
-    if (handledByMasterAdd) {
+    let targetPhoneToLink = senderPhone;
+    if (typeof handledByMasterAdd === 'string' && handledByMasterAdd.startsWith('PAIR_TARGET:')) {
+      targetPhoneToLink = handledByMasterAdd.replace('PAIR_TARGET:', '');
+      const targetDigits = normalizeDigits(targetPhoneToLink);
+      accountConfig = acm.getAccountByPhone(targetPhoneToLink) ||
+        acm.getAllAccounts?.().find(acc => normalizeDigits(acc.phoneNumber) === targetDigits) ||
+        { phoneNumber: targetPhoneToLink, displayName: `Master - ${targetPhoneToLink}`, role: 'master' };
+    } else if (handledByMasterAdd) {
       return true;
     }
 
@@ -186,37 +193,37 @@ export class InboundDeviceLinkingService {
 
     // 3. Self Check: Primary master cannot link itself via inbound message
     const primaryMasterPhone = acm.getMasterPhoneNumber?.();
-    if (senderDigits === normalizeDigits(primaryMasterPhone)) {
+    if (normalizeDigits(targetPhoneToLink) === normalizeDigits(primaryMasterPhone)) {
       await this.sendWhatsAppMessage(senderPhone, formatPrimaryMasterSelfMessage(primaryMasterPhone), primaryClient, msg);
       return true;
     }
 
     // 4. Robust Already Active / Connected Check
-    const isAlreadyConnected = await isAccountConnected(senderPhone, { clients, connManagers, dlm, ssm });
+    const isAlreadyConnected = await isAccountConnected(targetPhoneToLink, { clients, connManagers, dlm, ssm });
     if (isAlreadyConnected) {
-      this.activeRequests.clear(senderPhone);
-      this.logBot(`📲 Inbound linking: ${senderPhone} is already online and active. Sent confirmation.`, 'info');
-      await this.sendWhatsAppMessage(senderPhone, formatAlreadyConnectedMessage(senderPhone), primaryClient, msg);
+      this.activeRequests.clear(targetPhoneToLink);
+      this.logBot(`📲 Inbound linking: ${targetPhoneToLink} is already online and active. Sent confirmation.`, 'info');
+      await this.sendWhatsAppMessage(senderPhone, formatAlreadyConnectedMessage(targetPhoneToLink), primaryClient, msg);
       return true;
     }
 
     // 5. Concurrency Guard (With automatic TTL expiration)
-    if (this.activeRequests.isActive(senderPhone)) {
-      this.logBot(`📲 Inbound linking: Active pairing code request already in progress for ${senderPhone}`, 'info');
-      await this.sendWhatsAppMessage(senderPhone, formatPairingInProgressMessage(senderPhone), primaryClient, msg);
+    if (this.activeRequests.isActive(targetPhoneToLink)) {
+      this.logBot(`📲 Inbound linking: Active pairing code request already in progress for ${targetPhoneToLink}`, 'info');
+      await this.sendWhatsAppMessage(senderPhone, formatPairingInProgressMessage(targetPhoneToLink), primaryClient, msg);
       return true;
     }
 
     // 6. Begin Linking Flow
-    this.activeRequests.start(senderPhone);
-    this.logBot(`📲 Inbound linking: Started pairing flow for ${senderPhone} (${accountConfig.displayName || accountConfig.name})`, 'info');
+    this.activeRequests.start(targetPhoneToLink);
+    this.logBot(`📲 Inbound linking: Started pairing flow for ${targetPhoneToLink} (${accountConfig.displayName || accountConfig.name})`, 'info');
 
     try {
-      await this.sendWhatsAppMessage(senderPhone, formatInitiatingLinkingMessage(senderPhone), primaryClient, msg);
-      await this.cleanupExistingConnections(senderPhone, clients, connManagers);
+      await this.sendWhatsAppMessage(senderPhone, formatInitiatingLinkingMessage(targetPhoneToLink), primaryClient, msg);
+      await this.cleanupExistingConnections(targetPhoneToLink, clients, connManagers);
 
-      const metadata = ssm?.getDeviceMetadata(senderPhone) || {};
-      const clientId = SessionManager.resolveClientId(senderPhone, metadata, accountConfig);
+      const metadata = ssm?.getDeviceMetadata(targetPhoneToLink) || {};
+      const clientId = SessionManager.resolveClientId(targetPhoneToLink, metadata, accountConfig);
 
       if (typeof this.createClient !== 'function') {
         throw new Error('Client creation factory not configured');
@@ -226,11 +233,11 @@ export class InboundDeviceLinkingService {
         throw new Error('Failed to create new WhatsApp client instance');
       }
 
-      clients?.set(senderPhone, newClient);
-      this.sharedContext?.accountClients?.set(senderPhone, newClient);
-      chm?.registerClient?.(senderPhone, newClient);
-      dlm?.addDevice?.(senderPhone, {
-        name: accountConfig.displayName || senderPhone,
+      clients?.set(targetPhoneToLink, newClient);
+      this.sharedContext?.accountClients?.set(targetPhoneToLink, newClient);
+      chm?.registerClient?.(targetPhoneToLink, newClient);
+      dlm?.addDevice?.(targetPhoneToLink, {
+        name: accountConfig.displayName || targetPhoneToLink,
         role: accountConfig.role || 'master',
         status: 'linking',
       });
@@ -242,11 +249,11 @@ export class InboundDeviceLinkingService {
       const flowDeps = typeof this.getFlowDeps === 'function' ? this.getFlowDeps() : {};
       this.setupClientFlow(
         newClient,
-        senderPhone,
+        targetPhoneToLink,
         clientId,
         {
           isRestore: false,
-          displayName: accountConfig.displayName || senderPhone,
+          displayName: accountConfig.displayName || targetPhoneToLink,
           linkingMethod: 'code',
           manualLinking: true,
         },
@@ -255,25 +262,25 @@ export class InboundDeviceLinkingService {
 
       // Wait for pairing code
       const code = await awaitPairingCode(newClient, this.codeTimeoutMs);
-      this.logBot(`📲 Inbound linking: Generated pairing code for ${senderPhone}: ${code}`, 'success');
+      this.logBot(`📲 Inbound linking: Generated pairing code for ${targetPhoneToLink}: ${code}`, 'success');
 
-      await this.sendWhatsAppMessage(senderPhone, formatPairingCodeInstructions(senderPhone, code), primaryClient, msg);
+      await this.sendWhatsAppMessage(senderPhone, formatPairingCodeInstructions(targetPhoneToLink, code), primaryClient, msg);
 
       // Listen for successful authentication and readiness
       newClient.once('authenticated', () => {
-        this.activeRequests.clear(senderPhone);
+        this.activeRequests.clear(targetPhoneToLink);
       });
 
       newClient.once('ready', async () => {
-        this.activeRequests.clear(senderPhone);
-        this.logBot(`🎉 Inbound linking: ${senderPhone} successfully linked and online!`, 'success');
-        await this.sendWhatsAppMessage(senderPhone, formatDeviceLinkedSuccess(senderPhone), primaryClient, msg);
+        this.activeRequests.clear(targetPhoneToLink);
+        this.logBot(`🎉 Inbound linking: ${targetPhoneToLink} successfully linked and online!`, 'success');
+        await this.sendWhatsAppMessage(senderPhone, formatDeviceLinkedSuccess(targetPhoneToLink), primaryClient, msg);
       });
 
       return true;
     } catch (error) {
-      this.activeRequests.clear(senderPhone);
-      this.logBot(`❌ Inbound linking failed for ${senderPhone}: ${error.message}`, 'error');
+      this.activeRequests.clear(targetPhoneToLink);
+      this.logBot(`❌ Inbound linking failed for ${targetPhoneToLink}: ${error.message}`, 'error');
       await this.sendWhatsAppMessage(senderPhone, formatLinkingErrorMessage(error.message), primaryClient, msg);
       return true;
     }

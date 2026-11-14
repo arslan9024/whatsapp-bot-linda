@@ -183,9 +183,49 @@ export const COMMAND_HANDLERS = {
     }
   },
 
-  campaign: async (b, msg) => {
+  campaign: async (b, msg, args = []) => {
+    const sub = String(args[0] || '').toLowerCase();
+    const { outreachSafetyController } = await import('../../outreach/OutreachSafetyController.js');
+
+    if (sub === 'pause' || sub === 'stop' || sub === 'hold') {
+      const reason = args.slice(1).join(' ').trim() || `WhatsApp command from master (${msg.from})`;
+      outreachSafetyController.pause(reason);
+      const dashboard = services.get('terminalHealthDashboard');
+      try {
+        dashboard?.outreachCommand?.daily?.configure?.(['off']);
+      } catch {}
+      await msg.reply([
+        '⏸️ *CAMPAIGN PAUSED (SAFE HOLD)*',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        '🛑 All automated DAMAC Hills 2 outreach greetings and follow-ups are immediately halted.',
+        `📝 *Reason:* ${reason}`,
+        '',
+        '💡 Send *"linda campaign active"* or *"linda campaign resume"* to reactivate.',
+      ].join('\n'));
+      return;
+    }
+
+    if (sub === 'active' || sub === 'resume' || sub === 'start') {
+      const targetProject = args.slice(1).join(' ').trim() || process.env.OUTREACH_DAILY_PROJECTS || 'VARDON';
+      outreachSafetyController.resume();
+      const dashboard = services.get('terminalHealthDashboard');
+      try {
+        dashboard?.outreachCommand?.daily?.configure?.(['send', targetProject]);
+      } catch {}
+      await msg.reply([
+        '🟢 *CAMPAIGN ACTIVE (LIVE OUTREACH RESUMED)*',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        `🚀 Automated outreach is now *ACTIVE* for project: *${targetProject}*`,
+        '🛡️ *Safety Guardrails:* 1 fresh lead / account / day + Gaussian humanizer active.',
+        '',
+        '💡 Send *"linda campaign pause"* anytime to hold.',
+      ].join('\n'));
+      return;
+    }
+
+    const isPaused = outreachSafetyController.isPaused();
     const env = process.env;
-    const mode = env.OUTREACH_DAILY_MODE || 'draft';
+    const mode = isPaused ? 'paused' : (env.OUTREACH_DAILY_MODE || 'draft');
     const project = env.OUTREACH_DAILY_PROJECTS || 'VARDON';
     const dailyLimit = parseInt(env.NEW_CONVERSATIONS_DAILY_LIMIT || '12');
     const monthlyLimit = parseInt(env.NEW_CONVERSATIONS_MONTHLY_LIMIT || '300');
@@ -194,7 +234,8 @@ export const COMMAND_HANDLERS = {
     const lines = [
       '📊 *Campaign Status — Linda*', '',
       `📋 *Project:* ${project}`,
-      `🔧 *Mode:* ${mode.toUpperCase()}${mode === 'draft' ? ' (safe — not sending externally)' : ' ✅ LIVE'}`,
+      `🚦 *Safety State:* ${isPaused ? '🛑 PAUSED (Safe Hold)' : '🟢 ACTIVE'}`,
+      `🔧 *Mode:* ${mode.toUpperCase()}${mode === 'draft' ? ' (safe — not sending externally)' : mode === 'paused' ? ' (halted)' : ' ✅ LIVE'}`,
       `📅 *Daily limit:* ${dailyLimit}`,
       `📆 *Monthly limit:* ${monthlyLimit}`,
       `⏱️ *Send gap:* ${minGap}–${maxGap} min`,
@@ -206,7 +247,13 @@ export const COMMAND_HANDLERS = {
         lines.push('', `✉️ *Sent today:* ${sent}/${dailyLimit}`, `📬 *Remaining:* ${Math.max(0, dailyLimit - sent)}`);
       }
     } catch {}
-    lines.push('', `💡 To activate: type "outreach auto send ${project}" in terminal`);
+    lines.push(
+      '',
+      '📲 *WhatsApp Remote Controls:*',
+      '• `linda campaign active` — Activate / Resume outreach',
+      '• `linda campaign pause` — Pause outreach immediately',
+      '• Reply `3.7` — One-tap Keypad toggle'
+    );
     await msg.reply(lines.join('\n'));
   },
 

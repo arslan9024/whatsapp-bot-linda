@@ -58,9 +58,11 @@ export async function handleMasterAddDeviceRequest({
   const targetPhone = otherPhones[0];
   const targetDigits = normalizeDigits(targetPhone);
 
+  const bodyText = (msg.body || '').trim();
+  const isDirectPairCmd = /^(?:!link|!pair)\b/i.test(bodyText);
+
   // Extract optional display name after the phone number
   let displayName = '';
-  const bodyText = (msg.body || '').trim();
   const phoneIndex = bodyText.indexOf(targetPhone);
   if (phoneIndex !== -1) {
     displayName = bodyText.substring(phoneIndex + targetPhone.length).trim();
@@ -84,6 +86,11 @@ export async function handleMasterAddDeviceRequest({
     logBot(`✅ Added ${targetPhone} (${displayName}) to closed circle master list`, 'success');
   } else {
     logBot(`ℹ️ ${targetPhone} already configured in master list (${existing.displayName || existing.name})`, 'info');
+  }
+
+  // If the master explicitly ran "!link <phone>" or "!pair <phone>", immediately start pairing code generation!
+  if (isDirectPairCmd) {
+    return 'PAIR_TARGET:' + targetPhone;
   }
 
   await sendWhatsAppMessage(
