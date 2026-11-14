@@ -124,7 +124,7 @@ function checkAccountsJson() {
 
 // ─── CHECK 4: browserCleanup safe ────────────────────────────────────
 function checkBrowserCleanup() {
-  const filePath = r('src/connection/browserCleanup.js');
+  const filePath = fs.existsSync(r('src/connection/browserCleanup.ts')) ? r('src/connection/browserCleanup.ts') : r('src/connection/browserCleanup.js');
   if (!fs.existsSync(filePath)) {
     fail(4, 'browserCleanup.js safe kill', 'File not found');
     return;
@@ -146,7 +146,7 @@ function checkBrowserCleanup() {
 
 // ─── CHECK 5: WhatsAppCommandBridge session-aware guard ──────────────
 function checkCommandBridgeGuard() {
-  const filePath = r('src/whatsapp/WhatsAppCommandBridge.js');
+  const filePath = fs.existsSync(r('src/whatsapp/WhatsAppCommandBridge.ts')) ? r('src/whatsapp/WhatsAppCommandBridge.ts') : r('src/whatsapp/WhatsAppCommandBridge.js');
   if (!fs.existsSync(filePath)) {
     fail(5, 'CommandBridge session-aware guard', 'File not found');
     return;
@@ -154,7 +154,7 @@ function checkCommandBridgeGuard() {
   // Bridge logic is split across src/whatsapp/bridge/*.js - scan the entry file and its modules.
   const bridgeDir = r('src/whatsapp/bridge');
   const moduleFiles = fs.existsSync(bridgeDir)
-    ? fs.readdirSync(bridgeDir).filter(f => f.endsWith('.js')).map(f => path.join(bridgeDir, f))
+    ? fs.readdirSync(bridgeDir).filter(f => f.endsWith('.js') || f.endsWith('.ts')).map(f => path.join(bridgeDir, f))
     : [];
   const src = [filePath, ...moduleFiles].map(f => fs.readFileSync(f, 'utf8')).join('\n');
   if (src.includes('hasSessionArtifacts')) {
@@ -257,7 +257,7 @@ function checkNoNodeKillAnywhere() {
 
 // ─── CHECK 11: ServiceRegistry exports ───────────────────────────────
 async function checkServiceRegistry() {
-  const filePath = r('src/core/ServiceRegistry.js');
+  const filePath = fs.existsSync(r('src/core/ServiceRegistry.ts')) ? r('src/core/ServiceRegistry.ts') : r('src/core/ServiceRegistry.js');
   if (!fs.existsSync(filePath)) {
     fail(11, 'ServiceRegistry exports', 'File not found');
     return;
@@ -279,7 +279,7 @@ async function checkServiceRegistry() {
 
 // ─── CHECK 12: Logger exports + methods ──────────────────────────────
 async function checkLogger() {
-  const filePath = r('src/core/Logger.js');
+  const filePath = fs.existsSync(r('src/core/Logger.ts')) ? r('src/core/Logger.ts') : r('src/core/Logger.js');
   if (!fs.existsSync(filePath)) {
     fail(12, 'Logger exports', 'File not found');
     return;
