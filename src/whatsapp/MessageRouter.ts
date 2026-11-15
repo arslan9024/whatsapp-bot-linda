@@ -131,6 +131,16 @@ export function setupMessageListeners(client, phoneNumber = 'Unknown', connManag
     const timestamp = new Date().toLocaleTimeString();
     const from = msg.from.includes('@g.us') ? 'Group message' : `User: ${maskPhone(msg.from)}`;
     const messageText = typeof msg.body === 'string' ? msg.body : '';
+    const msgId = msg.id?._serialized || `${msg.from}:${msg.timestamp || Date.now()}`;
+    const { isDuplicateMessage } = await import('../utils/messageDedup.js');
+    if (isDuplicateMessage(msgId)) return;
+    const { detectVipUrgency } = await import('../utils/vipUrgency.js');
+    const { categorizeLeadIntent } = await import('../utils/intentCategorizer.js');
+    const vipSignal = detectVipUrgency(messageText);
+    const leadIntent = categorizeLeadIntent(messageText);
+    if (vipSignal.isVipUrgent) {
+      logBot(`🚨 [VIP-URGENT] (${maskPhone(phoneNumber)}) intent=${leadIntent}`, 'warn');
+    }
 
     // Keep-alive activity
     if (keepAliveManager) {

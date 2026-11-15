@@ -254,6 +254,10 @@ app.use((err, req, res, next) => {
 // SERVER STARTUP
 // ========================================
 
+import liveChatsRouter from './liveChatsRouter.js';
+
+app.use('/api/whatsapp', liveChatsRouter);
+
 async function startServer() {
   try {
     // Connect to database first
