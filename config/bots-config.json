@@ -3,7 +3,7 @@
     "arslan-malik": {
       "id": "arslan-malik",
       "phoneNumber": "+971505760056",
-      "displayName": "Arslan Malik",
+      "displayName": "Arslan Malik (Primary Master)",
       "description": "Master WhatsApp Account - Linda AI Assistant",
       "role": "primary",
       "sessionPath": "sessions/session-971505760056",
@@ -15,16 +15,16 @@
         "analytics": true,
         "scheduling": true
       },
-      "status": "pending",
+      "status": "authenticated",
       "createdAt": "2026-02-11",
       "lastSync": null
     },
     "bigbroker": {
       "id": "master_1771448396526",
       "phoneNumber": "+971553633595",
-      "displayName": "\"big broker\"",
-      "description": "Master Account - \"big broker\"",
-      "role": "primary",
+      "displayName": "Servant & Outreach Line (+971553633595)",
+      "description": "Servant Account - +971553633595",
+      "role": "servant",
       "sessionPath": "sessions/session-971553633595",
       "enabled": true,
       "features": {
@@ -34,16 +34,16 @@
         "analytics": true,
         "scheduling": true
       },
-      "status": "pending",
+      "status": "authenticated",
       "createdAt": "2026-02-18",
       "lastSync": null
     },
     "master_971589969886": {
       "id": "master_971589969886",
       "phoneNumber": "+971589969886",
-      "displayName": "Master 971589969886",
-      "description": "Master Account - +971589969886",
-      "role": "primary",
+      "displayName": "Employee Desk (+971589969886)",
+      "description": "Employee Desk - +971589969886",
+      "role": "employee",
       "sessionPath": "sessions/session-971589969886",
       "enabled": true,
       "features": {
@@ -53,16 +53,16 @@
         "analytics": true,
         "scheduling": true
       },
-      "status": "pending",
+      "status": "authenticated",
       "createdAt": "2026-10-30",
       "lastSync": null
     },
     "master_971503869886": {
       "id": "master_971503869886",
       "phoneNumber": "+971503869886",
-      "displayName": "Master 971503869886",
+      "displayName": "Master Account 2 (+971503869886)",
       "description": "Master Account - +971503869886",
-      "role": "primary",
+      "role": "master",
       "sessionPath": "sessions/session-971503869886",
       "enabled": true,
       "features": {
@@ -72,7 +72,7 @@
         "analytics": true,
         "scheduling": true
       },
-      "status": "pending",
+      "status": "authenticated",
       "createdAt": "2026-10-30",
       "lastSync": null
     },
@@ -326,9 +326,9 @@
     "master_971505110636": {
       "id": "master_971505110636",
       "phoneNumber": "+971505110636",
-      "displayName": "Master 971505110636",
+      "displayName": "Master Account 3 (+971505110636)",
       "description": "Master Account - +971505110636",
-      "role": "primary",
+      "role": "master",
       "sessionPath": "sessions/session-971505110636",
       "enabled": true,
       "features": {
@@ -338,7 +338,7 @@
         "analytics": true,
         "scheduling": true
       },
-      "status": "pending",
+      "status": "authenticated",
       "createdAt": "2026-10-31",
       "lastSync": null
     }
@@ -349,7 +349,7 @@
   "format": "Dynamic WhatsApp Bot Accounts Registry",
   "metadata": {
     "totalBots": 18,
-    "activeBots": 0,
+    "activeBots": 5,
     "pendingBots": 18,
     "lastModified": "2026-10-31T04:47:00Z",
     "managedBy": "DynamicAccountManager",

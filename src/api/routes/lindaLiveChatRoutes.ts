@@ -257,4 +257,175 @@ router.get('/pool/telemetry', (_req, res) => {
   }
 });
 
+
+/**
+ * GET /api/linda/status
+ * Returns connection state for all 5 registered accounts.
+ * Bot Upgrade #1 — whatsapp-bot-linda
+ */
+router.get('/status', (req, res) => {
+  try {
+    const sessions = Array.from(activeClients.entries()).map(([phone, client]) => ({
+      phone: `+${phone}`,
+      isConnected: Boolean(
+        client?.info?.wid || client?.pupPage || client?.user || client?.isConnected?.()
+      ),
+      displayName: client?.info?.pushname || client?.info?.me?.user || `+${phone}`,
+      sessionPath: `sessions/session-${phone}`,
+    }));
+    const isAnyConnected = sessions.some((s) => s.isConnected);
+    res.json({
+      success: true,
+      data: {
+        isConnected: isAnyConnected,
+        activeSessions: sessions.filter((s) => s.isConnected).length,
+        totalSessions: sessions.length,
+        sessions,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to read status' });
+  }
+});
+
+/**
+ * POST /api/linda/session/register
+ * Dynamically registers a new WhatsApp account into the pool at runtime.
+ * Bot Upgrade #2 — whatsapp-bot-linda
+ */
+router.post('/session/register', async (req, res) => {
+  try {
+    const { phone, role = 'employee', displayName } = req.body || {};
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'phone is required' });
+    }
+    const normalized = String(phone).replace(/\D/g, '');
+    if (!normalized || normalized.length < 9) {
+      return res.status(400).json({ success: false, error: 'Invalid phone number format' });
+    }
+
+    // Write to bots-config.json
+    const configPath = path.resolve('config', 'bots-config.json');
+    if (fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const accountId = `account-${normalized}`;
+      if (!cfg.whatsappBots) cfg.whatsappBots = {};
+      if (!cfg.whatsappBots[accountId]) {
+        cfg.whatsappBots[accountId] = {
+          id: accountId,
+          phoneNumber: `+${normalized}`,
+          displayName: displayName || `+${normalized}`,
+          role,
+          status: 'pending',
+          enabled: true,
+          sessionPath: `sessions/session-${normalized}`,
+        };
+        fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf-8');
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        phone: `+${normalized}`,
+        role,
+        message: 'Account registered. Restart bot to link via QR.',
+        sessionPath: `sessions/session-${normalized}`,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Registration failed' });
+  }
+});
+
+/**
+ * GET /api/linda/accounts/unread
+ * Returns unread message counts per account for the UI badge system.
+ * Bot Upgrade #3 — whatsapp-bot-linda
+ */
+router.get('/accounts/unread', async (req, res) => {
+  try {
+    const counts: Record<string, number> = {};
+    for (const [phone, client] of activeClients.entries()) {
+      let unread = 0;
+      try {
+        if (typeof client?.getChats === 'function') {
+          const chats = await client.getChats();
+          unread = chats.reduce((sum: number, c: any) => sum + (Number(c.unreadCount) || 0), 0);
+        }
+      } catch { /* client not ready */ }
+      counts[`+${phone}`] = unread;
+    }
+    res.json({ success: true, data: { counts } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to fetch unread counts' });
+  }
+});
+
+/**
+ * GET /api/linda/health
+ * Quick health check: uptime, memory, active accounts.
+ * Bot Upgrade #4 — whatsapp-bot-linda
+ */
+router.get('/health', (req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    success: true,
+    data: {
+      status: 'operational',
+      uptime: Math.round(process.uptime()),
+      uptimeHuman: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`,
+      activeClients: activeClients.size,
+      memory: {
+        heapUsedMB: Math.round(mem.heapUsed / 1_048_576),
+        heapTotalMB: Math.round(mem.heapTotal / 1_048_576),
+        rssMB: Math.round(mem.rss / 1_048_576),
+      },
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+/**
+ * POST /api/linda/singletonlock/clear
+ * Clears all SingletonLock files from all 5 session directories.
+ * Bot Upgrade #5 — whatsapp-bot-linda
+ */
+router.post('/singletonlock/clear', (req, res) => {
+  const targetSessions = [
+    'sessions/session-971505760056',
+    'sessions/session-971503869886',
+    'sessions/session-971505110636',
+    'sessions/session-971589969886',
+    'sessions/session-971553633595',
+  ];
+
+  const results: { session: string; cleared: boolean; path?: string }[] = [];
+
+  for (const sessionDir of targetSessions) {
+    const lockPath = path.resolve(sessionDir, 'SingletonLock');
+    try {
+      if (fs.existsSync(lockPath)) {
+        fs.unlinkSync(lockPath);
+        results.push({ session: sessionDir, cleared: true, path: lockPath });
+      } else {
+        results.push({ session: sessionDir, cleared: false });
+      }
+    } catch (e: any) {
+      results.push({ session: sessionDir, cleared: false });
+    }
+  }
+
+  const clearedCount = results.filter((r) => r.cleared).length;
+  res.json({
+    success: true,
+    data: {
+      clearedCount,
+      results,
+      message: `Cleared ${clearedCount} SingletonLock artifact(s)`,
+    },
+  });
+});
+
 export default router;
